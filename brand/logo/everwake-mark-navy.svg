@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15.6371 -15.6371 31.2742 31.2742" role="img" aria-label="Everwake mark">
+  <title>Everwake mark</title>
+  <circle cx="0" cy="0" r="15.1816" fill="none" stroke="#B8913F" stroke-width="0.9109"/>
+  <path d="M -8.1601 4.9335 C -2.7227 -3.2890 2.7287 -3.2890 8.1601 4.9335" fill="none" stroke="#0B222E" stroke-width="1.6700" stroke-linecap="round"/>
+  <path d="M -5.6953 7.5936 C -1.8984 1.3944 1.8945 1.3944 5.6914 7.5936" fill="none" stroke="#B8913F" stroke-width="1.2904" stroke-linecap="round"/>
+  <circle cx="0" cy="-5.1210" r="1.6700" fill="#0B222E"/>
+</svg>

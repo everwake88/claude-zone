@@ -1,0 +1,122 @@
+/* ==========================================================================
+   Everwake — Design Tokens
+   The single source of truth for colour, type, space and motion.
+   Website, proposals, deck and social templates all consume this file.
+   Change a value here and every Everwake surface follows.
+   ========================================================================== */
+
+:root {
+  /* ---- Brand core ------------------------------------------------------
+     Sampled from the Everwake company profile. Do not alter these two. */
+  --ew-navy:            #0B222E;   /* primary surface, ink on light */
+  --ew-gold:            #B8913F;   /* accent, rules, the selling half */
+
+  /* ---- Navy ramp ------------------------------------------------------- */
+  --ew-navy-deep:       #071822;   /* deepest — deck backdrops, gradients */
+  --ew-navy-raised:     #102C3A;   /* cards and panels sitting on navy */
+  --ew-navy-soft:       #16384A;   /* hover state for raised panels */
+  --ew-hairline-dark:   #2B4A59;   /* rules and borders on navy */
+
+  /* ---- Gold ramp -------------------------------------------------------
+     --ew-gold passes AA on navy (5.9:1) but only 2.7:1 on white.
+     Use --ew-gold-ink for gold text on light surfaces. */
+  --ew-gold-bright:     #D4A94B;   /* hover / active on navy */
+  --ew-gold-ink:        #8A6B23;   /* gold text on light surfaces (5.0:1) */
+  --ew-gold-wash:       #F6F0E2;   /* tinted surface, callouts */
+  --ew-gold-line:       #E3D4AE;   /* hairline on light, gold family */
+
+  /* ---- Light surfaces --------------------------------------------------- */
+  --ew-surface:         #FFFFFF;
+  --ew-paper:           #F3F5F6;   /* page background, light mode */
+  --ew-paper-sunk:      #E9EDEF;   /* wells, table stripes */
+  --ew-hairline:        #DFE5E8;   /* rules and borders on light */
+
+  /* ---- Text ------------------------------------------------------------- */
+  --ew-ink:             #0B222E;   /* body on light */
+  --ew-ink-muted:       #51666F;   /* secondary on light (6.3:1) */
+  --ew-on-navy:         #FFFFFF;   /* body on navy (16.0:1) */
+  --ew-on-navy-muted:   #9FB3BC;   /* secondary on navy (7.4:1) */
+
+  /* ---- Status ----------------------------------------------------------
+     Desaturated to sit beside the brand without shouting. */
+  --ew-positive:        #2E7D5B;
+  --ew-positive-wash:   #E8F2ED;
+  --ew-caution:         #9A6B1E;
+  --ew-caution-wash:    #FBF2E2;
+  --ew-critical:        #A33B32;
+  --ew-critical-wash:   #FAECEA;
+
+  /* ---- Typography -------------------------------------------------------
+     Inter Tight carries the headlines (the neutral grotesque voice the
+     Everwake documents already use). Lora carries the body — it is what
+     gives the brand its considered, consultative tone. Keep the pairing.
+     Arabic falls back to IBM Plex Sans Arabic / Noto Naskh Arabic. */
+  --ew-font-display: "Inter Tight", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --ew-font-ui:      "Inter", "Helvetica Neue", Arial, sans-serif;
+  --ew-font-body:    "Lora", Georgia, "Times New Roman", serif;
+  --ew-font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ew-font-ar-ui:   "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif;
+  --ew-font-ar-body: "Noto Naskh Arabic", "Amiri", serif;
+
+  /* Fluid type scale — 1.25 ratio, clamped between 360px and 1440px */
+  --ew-text-xs:   0.75rem;                                  /* 12 — micro labels */
+  --ew-text-sm:   0.8125rem;                                /* 13 — eyebrows */
+  --ew-text-base: 1rem;                                     /* 16 */
+  --ew-text-md:   clamp(1.0625rem, 0.99rem + 0.31vw, 1.1875rem);
+  --ew-text-lg:   clamp(1.25rem,  1.15rem + 0.44vw, 1.5rem);
+  --ew-text-xl:   clamp(1.5rem,   1.33rem + 0.76vw, 1.95rem);
+  --ew-text-2xl:  clamp(1.875rem, 1.58rem + 1.30vw, 2.6rem);
+  --ew-text-3xl:  clamp(2.25rem,  1.75rem + 2.22vw, 3.5rem);
+  --ew-text-4xl:  clamp(2.75rem,  1.95rem + 3.55vw, 4.75rem);
+
+  --ew-leading-tight:  1.1;
+  --ew-leading-snug:   1.25;
+  --ew-leading-normal: 1.5;
+  --ew-leading-relaxed:1.72;   /* body copy — Lora wants room */
+
+  /* Letterspacing. The wide-tracked caps label is an Everwake signature. */
+  --ew-track-label:  0.16em;
+  --ew-track-tight: -0.02em;
+  --ew-track-snug:  -0.01em;
+
+  /* ---- Space — 4px base ------------------------------------------------- */
+  --ew-space-1:  0.25rem;  --ew-space-2:  0.5rem;   --ew-space-3: 0.75rem;
+  --ew-space-4:  1rem;     --ew-space-5:  1.5rem;   --ew-space-6: 2rem;
+  --ew-space-7:  2.5rem;   --ew-space-8:  3rem;     --ew-space-9: 4rem;
+  --ew-space-10: 5rem;     --ew-space-11: 6.5rem;   --ew-space-12: 8rem;
+
+  /* ---- Layout ----------------------------------------------------------- */
+  --ew-measure:       68ch;    /* readable line length for body copy */
+  --ew-container:     1180px;
+  --ew-container-wide:1360px;
+  --ew-gutter:        clamp(1.25rem, 0.75rem + 2.2vw, 3rem);
+
+  /* ---- Radius, shadow, motion ------------------------------------------- */
+  --ew-radius-sm: 3px;
+  --ew-radius:    6px;
+  --ew-radius-lg: 12px;
+  --ew-radius-pill: 999px;
+
+  --ew-shadow-sm: 0 1px 2px rgba(11, 34, 46, 0.06);
+  --ew-shadow:    0 2px 8px rgba(11, 34, 46, 0.07), 0 1px 2px rgba(11, 34, 46, 0.05);
+  --ew-shadow-lg: 0 18px 48px rgba(11, 34, 46, 0.13), 0 2px 8px rgba(11, 34, 46, 0.06);
+
+  --ew-ease:      cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ew-dur-fast:  140ms;
+  --ew-dur:       240ms;
+  --ew-dur-slow:  520ms;
+}
+
+/* Arabic: swap the font stacks, keep every other token identical. */
+:lang(ar) {
+  --ew-font-display: var(--ew-font-ar-ui);
+  --ew-font-ui:      var(--ew-font-ar-ui);
+  --ew-font-body:    var(--ew-font-ar-body);
+  --ew-track-label:  0;          /* Arabic caps tracking does not apply */
+  --ew-track-tight:  0;
+  --ew-track-snug:   0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --ew-dur-fast: 0ms; --ew-dur: 0ms; --ew-dur-slow: 0ms; }
+}
