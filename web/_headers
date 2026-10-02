@@ -1,0 +1,8 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Never cache the settings file, or edits appear to do nothing.
+/site-config.js
+  Cache-Control: public, max-age=0, must-revalidate

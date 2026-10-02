@@ -189,7 +189,90 @@ Netlify updates the live site within a minute. That is the whole workflow.
 
 ---
 
+## If the site will not open at all ("can't reach this page")
+
+If your browser says **ERR_CONNECTION_TIMED_OUT** or *"took too long to respond"*,
+that is **not** a problem with your website. A broken deploy shows a
+*"Page not found"* message from Netlify. A timeout means your browser never
+reached Netlify in the first place.
+
+`netlify.app` is one shared address used by millions of websites. Some internet
+providers — this is reported in Egypt — block the whole of `netlify.app` because
+of other people's sites on it. Your site is live; you just cannot see it from
+your own connection.
+
+### Step 1 — Find out whether it is only you
+
+**Open the link on your phone with Wi-Fi switched off, using mobile data.**
+
+| Result | What it means | What to do |
+|---|---|---|
+| It loads | Your Wi-Fi, router or office network is blocking it | Step 2 |
+| It does not load | Your internet provider blocks `netlify.app` | Step 3 |
+
+Also check your Netlify dashboard. If **Deploys** shows a green **Published**,
+the website is genuinely online.
+
+### Step 2 — It is your local network
+
+- Try a different browser, and try a private/incognito window.
+- Turn off any VPN, ad-blocker or security extension and retry.
+- Change your computer's DNS to Cloudflare: `1.1.1.1` and `1.0.0.1`.
+- Restart your router.
+
+### Step 3 — Your provider blocks netlify.app
+
+You have three good options. All are free.
+
+**Option A — Use your own domain (best, and you need it anyway).**
+`everwake.com` is a different address from `netlify.app`, so a block on the
+shared domain does not apply to it. Follow Part 5 above. This also stops you
+ever sending a client a link with `netlify.app` in it, which never looks
+professional on a proposal.
+
+**Option B — Move to Cloudflare Pages.** Different company, different domain
+(`pages.dev`), strong presence in the Middle East.
+
+1. Create a free account at [pages.cloudflare.com](https://pages.cloudflare.com).
+2. **Create a project → Connect to Git →** choose `claude-zone`.
+3. Settings:
+
+   | Field | Value |
+   |---|---|
+   | Framework preset | **None** |
+   | Build command | **leave empty** |
+   | Build output directory | `web` |
+
+4. **Save and Deploy.**
+
+Nothing in the project needs changing — `web/_redirects` and `web/_headers`
+already configure Cloudflare exactly as they configure Netlify.
+
+**Option C — GitHub Pages.** Served from `github.io`, which is almost never
+blocked because developers everywhere depend on it.
+
+1. On github.com open your repository → **Settings → Pages**.
+2. Under **Source**, choose **GitHub Actions**.
+3. Push to `main`. The included workflow publishes `web/` automatically.
+
+Your address becomes `https://everwake88.github.io/claude-zone/`.
+
+> **One catch with GitHub Pages:** the site sits in a sub-folder, so a few links
+> may need adjusting. Tell me if you choose this one and I will fix them.
+
+### Which should you pick?
+
+Get the domain (**Option A**) — it solves this permanently and you need it for
+client-facing work regardless. If you want something working this afternoon
+while the domain is being set up, do **Option B** as well. You can run both at
+once; they do not conflict.
+
+---
+
 ## When something goes wrong
+
+**The page will not open at all / connection timed out.**
+See the section above — this is a network block, not a broken website.
 
 **The site looks broken / unstyled after I edited something.**
 You probably deleted a quote mark, a comma or a bracket in `site-config.js`.
