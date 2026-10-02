@@ -1,0 +1,151 @@
+/* ==========================================================================
+   Everwake — AI agent bubble and social links
+   Uses the same tokens as the rest of the site.
+   ========================================================================== */
+
+/* --- Social row ----------------------------------------------------------- */
+.social-row { display: flex; flex-wrap: wrap; gap: var(--ew-space-3); list-style: none; margin: 0; padding: 0; }
+.social-link {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  border: 1px solid var(--ew-hairline-dark); border-radius: var(--ew-radius-sm);
+  color: var(--ew-on-navy-muted);
+  transition: color var(--ew-dur-fast) var(--ew-ease),
+              border-color var(--ew-dur-fast) var(--ew-ease),
+              background var(--ew-dur-fast) var(--ew-ease);
+}
+.social-link svg { width: 18px; height: 18px; fill: currentColor; }
+.social-link:hover { color: var(--ew-navy); background: var(--ew-gold); border-color: var(--ew-gold); }
+.surface-paper .social-link, .section .social-link { border-color: var(--ew-hairline); color: var(--ew-ink-muted); }
+
+/* --- The bubble ----------------------------------------------------------- */
+.ew-agent-bubble {
+  position: fixed; inset-inline-end: clamp(1rem, 2vw, 1.75rem); bottom: clamp(1rem, 2vw, 1.75rem);
+  z-index: 120;
+  display: inline-flex; align-items: center; gap: var(--ew-space-3);
+  padding: var(--ew-space-3) var(--ew-space-5);
+  background: var(--ew-gold); color: var(--ew-navy);
+  border: 0; border-radius: var(--ew-radius-pill);
+  font-family: var(--ew-font-ui); font-size: var(--ew-text-base); font-weight: 600;
+  text-decoration: none; cursor: pointer;
+  box-shadow: var(--ew-shadow-lg);
+  transition: background var(--ew-dur-fast) var(--ew-ease), transform var(--ew-dur-fast) var(--ew-ease);
+}
+.ew-agent-bubble:hover { background: var(--ew-gold-bright); transform: translateY(-1px); }
+.ew-agent-bubble__icon { width: 20px; height: 20px; fill: currentColor; flex: none; }
+.is-open .ew-agent-bubble { display: none; }
+
+@media (max-width: 480px) {
+  .ew-agent-bubble__text { display: none; }
+  .ew-agent-bubble { padding: var(--ew-space-4); }
+}
+
+/* --- The panel ------------------------------------------------------------ */
+.ew-agent-panel {
+  position: fixed; inset-inline-end: clamp(1rem, 2vw, 1.75rem); bottom: clamp(1rem, 2vw, 1.75rem);
+  z-index: 121;
+  width: min(390px, calc(100vw - 2rem));
+  height: min(560px, calc(100vh - 2rem));
+  display: flex; flex-direction: column;
+  background: var(--ew-surface);
+  border: 1px solid var(--ew-hairline);
+  border-top: 3px solid var(--ew-gold);
+  border-radius: var(--ew-radius-lg);
+  box-shadow: var(--ew-shadow-lg);
+  overflow: hidden;
+}
+.ew-agent-panel[hidden] { display: none; }
+
+.ew-agent-panel__head {
+  display: flex; align-items: center; gap: var(--ew-space-3);
+  padding: var(--ew-space-4) var(--ew-space-5);
+  background: var(--ew-navy); color: var(--ew-on-navy);
+}
+.ew-agent-panel__head h2 {
+  margin: 0; flex: 1;
+  font-family: var(--ew-font-ui); font-size: var(--ew-text-base); font-weight: 600;
+  letter-spacing: var(--ew-track-snug); color: var(--ew-on-navy);
+}
+.ew-agent-panel__dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--ew-gold); flex: none;
+}
+.ew-agent-panel__close {
+  background: none; border: 0; color: var(--ew-on-navy-muted);
+  font-size: 1.6rem; line-height: 1; cursor: pointer; padding: 0 var(--ew-space-1);
+}
+.ew-agent-panel__close:hover { color: var(--ew-on-navy); }
+
+/* --- Messages ------------------------------------------------------------- */
+.ew-agent-log {
+  flex: 1; overflow-y: auto;
+  padding: var(--ew-space-5);
+  display: flex; flex-direction: column; gap: var(--ew-space-4);
+  background: var(--ew-paper);
+}
+.ew-agent-msg { display: flex; }
+.ew-agent-msg--user { justify-content: flex-end; }
+.ew-agent-msg__body {
+  max-width: 85%;
+  padding: var(--ew-space-3) var(--ew-space-4);
+  border-radius: var(--ew-radius);
+  font-size: var(--ew-text-base);
+  line-height: var(--ew-leading-normal);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.ew-agent-msg--agent .ew-agent-msg__body {
+  background: var(--ew-surface); border: 1px solid var(--ew-hairline); color: var(--ew-ink);
+  border-start-start-radius: var(--ew-radius-sm);
+}
+.ew-agent-msg--user .ew-agent-msg__body {
+  background: var(--ew-navy); color: var(--ew-on-navy);
+  border-end-end-radius: var(--ew-radius-sm);
+}
+
+/* Typing indicator */
+.ew-agent-typing .ew-agent-msg__body { display: flex; gap: 4px; padding: var(--ew-space-4); }
+.ew-agent-typing span {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--ew-ink-muted);
+  animation: ew-bounce 1.2s infinite ease-in-out;
+}
+.ew-agent-typing span:nth-child(2) { animation-delay: 0.15s; }
+.ew-agent-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ew-bounce { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ew-agent-typing span { animation: none; opacity: 0.5; } }
+
+/* --- Suggestions ---------------------------------------------------------- */
+.ew-agent-suggest { display: flex; flex-wrap: wrap; gap: var(--ew-space-2); padding: 0 var(--ew-space-5); background: var(--ew-paper); }
+.ew-agent-suggest:empty { display: none; }
+.ew-agent-chip {
+  font-family: var(--ew-font-ui); font-size: var(--ew-text-sm);
+  background: var(--ew-surface); color: var(--ew-ink-muted);
+  border: 1px solid var(--ew-hairline); border-radius: var(--ew-radius-pill);
+  padding: var(--ew-space-2) var(--ew-space-4); cursor: pointer;
+  transition: border-color var(--ew-dur-fast) var(--ew-ease), color var(--ew-dur-fast) var(--ew-ease);
+}
+.ew-agent-chip:hover { border-color: var(--ew-gold); color: var(--ew-ink); }
+
+/* --- Composer ------------------------------------------------------------- */
+.ew-agent-form {
+  display: flex; align-items: flex-end; gap: var(--ew-space-3);
+  padding: var(--ew-space-4) var(--ew-space-5);
+  background: var(--ew-surface); border-top: 1px solid var(--ew-hairline);
+}
+.ew-agent-form textarea {
+  flex: 1; resize: none; overflow-y: auto; max-height: 120px;
+  font-family: var(--ew-font-body); font-size: var(--ew-text-base); line-height: 1.45;
+  color: var(--ew-ink); background: var(--ew-surface);
+  border: 1px solid var(--ew-hairline); border-radius: var(--ew-radius-sm);
+  padding: var(--ew-space-3) var(--ew-space-4);
+}
+.ew-agent-form textarea:focus { border-color: var(--ew-gold); outline: none; }
+.ew-agent-form button {
+  flex: none; width: 40px; height: 40px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--ew-gold); color: var(--ew-navy);
+  border: 0; border-radius: var(--ew-radius-sm); cursor: pointer;
+  transition: background var(--ew-dur-fast) var(--ew-ease);
+}
+.ew-agent-form button:hover { background: var(--ew-gold-bright); }
+.ew-agent-form button svg { width: 18px; height: 18px; fill: currentColor; }
+
+@media print { .ew-agent, .ew-agent-bubble { display: none !important; } }

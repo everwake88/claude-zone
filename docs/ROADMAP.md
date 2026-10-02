@@ -38,6 +38,22 @@ Pages or GitHub Pages by pointing at `web/`.
 Verified: no horizontal overflow at 390px, no console errors, AA contrast on
 every text/background pair, keyboard-navigable, print stylesheet included.
 
+## Phase 2b — Editability, social and the AI agent ✅ DONE
+
+| Item | Status |
+|---|---|
+| All contacts moved into one settings file | ✅ `web/site-config.js` |
+| Social links with auto-hiding icons | ✅ |
+| Contact form with email / WhatsApp / Formspree modes | ✅ |
+| AI agent chat widget, ready for an n8n webhook | ✅ |
+| Beginner guide to editing the site | ✅ `docs/EDITING.md` |
+| Beginner guide to GitHub and going live | ✅ `docs/PUBLISH.md` |
+| Netlify configuration so deploy settings cannot be mistyped | ✅ `netlify.toml` |
+
+Contacts, social links and the agent endpoint are deliberately left empty. The
+site hides whatever is unfilled, so it is safe to publish today and complete
+later.
+
 ## Phase 3 — Brand book — NEXT
 
 The written rules, so the identity survives other people using it.

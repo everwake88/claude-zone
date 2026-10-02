@@ -1,0 +1,43 @@
+# Everwake — deployment settings.
+# With this file in the repository, Netlify configures itself. You do not need
+# to type a build command or a publish directory when connecting the site.
+
+[build]
+  publish = "web"
+  command = ""
+
+# Send the browser to the right page for addresses typed without ".html",
+# so everwake.com/services works as well as everwake.com/services.html
+[[redirects]]
+  from = "/services"
+  to = "/services.html"
+  status = 200
+[[redirects]]
+  from = "/agent"
+  to = "/agent.html"
+  status = 200
+[[redirects]]
+  from = "/approach"
+  to = "/approach.html"
+  status = 200
+[[redirects]]
+  from = "/work"
+  to = "/work.html"
+  status = 200
+[[redirects]]
+  from = "/contact"
+  to = "/contact.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# The settings file must never be cached, or edits appear to do nothing.
+[[headers]]
+  for = "/site-config.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

@@ -16,6 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;600;700&family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/tokens.css">
 <link rel="stylesheet" href="assets/css/site.css">
+<link rel="stylesheet" href="assets/css/agent.css">
 </head>
 <body>
 <a class="ew-skip" href="#main">Skip to content</a>
@@ -59,7 +60,7 @@
           <h2>Send us the shape of the problem</h2>
           <p class="muted">The more concrete, the more useful the first call is. Volume per day,
             which channel, and what your team currently does by hand.</p>
-          <form class="flow" action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+          <form class="flow" data-ew="contact-form" action="#" method="POST">
             <div class="field">
               <label for="name">Name</label>
               <input id="name" name="name" type="text" autocomplete="name" required>
@@ -91,30 +92,17 @@
               <textarea id="message" name="message" required></textarea>
             </div>
             <button class="btn btn--primary" type="submit">Request a discovery call</button>
-            <p class="small muted">We reply within one business day. No retainer to receive a scoped
-              proposal.</p>
+            <p class="small muted" data-ew="form-note">We reply within one business day. No retainer
+              to receive a scoped proposal.</p>
           </form>
         </div>
 
         <div>
           <h2>Or reach us directly</h2>
-          <dl class="deflist" style="border-top-color:var(--ew-hairline);margin-top:var(--ew-space-6)">
-            <div class="deflist__row" style="border-bottom-color:var(--ew-hairline)">
-              <dt class="deflist__key" style="color:var(--ew-ink-muted)">Email</dt>
-              <dd class="deflist__val"><a class="link" href="mailto:hello@everwake.com">hello@everwake.com</a></dd></div>
-            <div class="deflist__row" style="border-bottom-color:var(--ew-hairline)">
-              <dt class="deflist__key" style="color:var(--ew-ink-muted)">Abdelrhman Basem</dt>
-              <dd class="deflist__val"><a class="link" href="tel:+201554354929">+20 155 435 4929</a></dd></div>
-            <div class="deflist__row" style="border-bottom-color:var(--ew-hairline)">
-              <dt class="deflist__key" style="color:var(--ew-ink-muted)">Ahmed El-Qady</dt>
-              <dd class="deflist__val"><a class="link" href="tel:+201144017735">+20 114 401 7735</a></dd></div>
-            <div class="deflist__row" style="border-bottom-color:var(--ew-hairline)">
-              <dt class="deflist__key" style="color:var(--ew-ink-muted)">Markets</dt>
-              <dd class="deflist__val">Qatar &amp; the GCC · Egypt · remote delivery worldwide</dd></div>
-            <div class="deflist__row" style="border-bottom-color:var(--ew-hairline)">
-              <dt class="deflist__key" style="color:var(--ew-ink-muted)">Languages</dt>
-              <dd class="deflist__val">Arabic, including Gulf dialect · English</dd></div>
-          </dl>
+          <dl class="deflist" data-ew="contact-details"
+              style="border-top-color:var(--ew-hairline);margin-top:var(--ew-space-6)"></dl>
+
+          <div data-ew="social" style="margin-top:var(--ew-space-6)"></div>
 
           <h3 style="margin-top:var(--ew-space-9)">What happens next</h3>
           <div class="steps" style="margin-top:var(--ew-space-5)">
@@ -161,11 +149,8 @@
       </div>
       <div>
         <h4>Talk to us</h4>
-        <ul>
-          <li><a href="mailto:hello@everwake.com">hello@everwake.com</a></li>
-          <li><a href="tel:+201554354929">+20 155 435 4929</a></li>
-          <li><a href="tel:+201144017735">+20 114 401 7735</a></li>
-        </ul>
+        <ul data-ew="footer-contacts"></ul>
+        <div data-ew="social" style="margin-top:var(--ew-space-5)"></div>
       </div>
     </div>
     <div class="footer-base">
@@ -175,6 +160,8 @@
   </div>
 </footer>
 
+<script src="site-config.js"></script>
 <script src="assets/js/site.js" defer></script>
+<script src="assets/js/agent-widget.js" defer></script>
 </body>
 </html>

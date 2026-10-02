@@ -11,7 +11,10 @@ transformation and intelligent automation studio.
 brand/
   logo/            7 logo variants, true vector
   tokens/          everwake.css — the single source of truth
-web/               the website (static, no build step)
+web/
+  site-config.js   contacts, social links, form and AI agent — edit this
+  *.html           the six pages
+  assets/          styles, scripts, images
 templates/         proposal template            (Phase 4)
 deck/              company presentation         (Phase 5)
 social/            social media kit             (Phase 6)
@@ -37,6 +40,17 @@ host at the `web/` directory — no build command, no install step.
 | Netlify / Vercel | Publish directory `web`, build command empty |
 | Cloudflare Pages | Build output directory `web` |
 | GitHub Pages | Serve from `/web` on the default branch |
+
+## Changing your details — start here
+
+Contact details, social links, the enquiry form and the AI agent are all set in
+**one file**: `web/site-config.js`. Nothing else needs touching, and anything
+left empty is hidden from the site rather than shown as a placeholder.
+
+Step-by-step, assuming no coding knowledge:
+
+- **[docs/EDITING.md](docs/EDITING.md)** — how to change anything on the site
+- **[docs/PUBLISH.md](docs/PUBLISH.md)** — GitHub, going live, and a custom domain
 
 ## Changing the brand
 
