@@ -31,7 +31,7 @@ Fill in what you have:
 
 ```js
 contact: {
-  email: "hello@everwake.com",
+  email: "hello@everwake.tech",
   whatsapp: "+201554354929",
   location: "Cairo, Egypt",
 ```
@@ -126,7 +126,7 @@ You already build these with n8n. Point the website at one:
 ```js
 agent: {
   mode: "auto",
-  webhookUrl: "https://n8n.everwake.com/webhook/site-agent",
+  webhookUrl: "https://n8n.everwake.tech/webhook/site-agent",
 ```
 
 That is all. The bubble appears on every page.

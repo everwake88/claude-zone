@@ -1,5 +1,9 @@
 # Getting your website online
 
+> **Already have everwake.tech and want to use Cloudflare?**
+> Go straight to **[docs/GO-LIVE.md](GO-LIVE.md)** — it is written for exactly
+> that setup. This file covers the general case and GitHub basics.
+
 Written for someone who has never used GitHub or published a website. Follow it
 in order. Total time: about 30 minutes, once.
 
@@ -67,7 +71,7 @@ Let's add your email address.
    Open it with **Notepad** (Windows), **TextEdit** (Mac) or, better,
    **[VS Code](https://code.visualstudio.com)** — free and much easier to read.
 2. Find `email: ""` and put your address between the quotes:
-   `email: "hello@everwake.com"`.
+   `email: "hello@everwake.tech"`.
 3. Save the file.
 4. Refresh `index.html` in your browser. Your email is now in the footer.
 
@@ -150,12 +154,12 @@ From now on you can work directly on `main`.
 
 ## Part 5 — Your own domain name
 
-`everwake.netlify.app` works, but `everwake.com` is what you want on a proposal.
+`everwake.netlify.app` works, but `everwake.tech` is what you want on a proposal.
 
 1. **Buy the domain.** [Namecheap](https://namecheap.com),
    [Cloudflare](https://cloudflare.com) or [GoDaddy](https://godaddy.com).
    Roughly $10–15 a year.
-2. In Netlify: **Domain management → Add a domain** → type `everwake.com`.
+2. In Netlify: **Domain management → Add a domain** → type `everwake.tech`.
 3. Netlify shows you some **nameservers** — two or more addresses.
 4. Go to where you bought the domain, find **Nameservers**, and replace what is
    there with the ones Netlify gave you.
@@ -166,7 +170,7 @@ an SSL certificate from anyone.
 
 ### Email on your domain
 
-Buying `everwake.com` does **not** give you `hello@everwake.com`. That is a
+Buying `everwake.tech` does **not** give you `hello@everwake.tech`. That is a
 separate service:
 
 - **Google Workspace** — about $6/user/month, what most businesses use.
@@ -225,7 +229,7 @@ the website is genuinely online.
 You have three good options. All are free.
 
 **Option A — Use your own domain (best, and you need it anyway).**
-`everwake.com` is a different address from `netlify.app`, so a block on the
+`everwake.tech` is a different address from `netlify.app`, so a block on the
 shared domain does not apply to it. Follow Part 5 above. This also stops you
 ever sending a client a link with `netlify.app` in it, which never looks
 professional on a proposal.

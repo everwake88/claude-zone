@@ -50,7 +50,8 @@ left empty is hidden from the site rather than shown as a placeholder.
 Step-by-step, assuming no coding knowledge:
 
 - **[docs/EDITING.md](docs/EDITING.md)** — how to change anything on the site
-- **[docs/PUBLISH.md](docs/PUBLISH.md)** — GitHub, going live, and a custom domain
+- **[docs/GO-LIVE.md](docs/GO-LIVE.md)** — putting everwake.tech online via Cloudflare
+- **[docs/PUBLISH.md](docs/PUBLISH.md)** — GitHub basics and other hosting options
 
 ## Changing the brand
 

@@ -7,7 +7,7 @@
   command = ""
 
 # Send the browser to the right page for addresses typed without ".html",
-# so everwake.com/services works as well as everwake.com/services.html
+# so everwake.tech/services works as well as everwake.tech/services.html
 [[redirects]]
   from = "/services"
   to = "/services.html"

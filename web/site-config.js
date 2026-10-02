@@ -31,7 +31,7 @@ window.EVERWAKE = {
      Leave any line empty ("") and it disappears from the site.
      ----------------------------------------------------------------------- */
   contact: {
-    // Your main email address. Example: "hello@everwake.com"
+    // Your main email address. Example: "hello@everwake.tech"
     email: "everwake88@gmail.com",
 
     // Your main WhatsApp / phone number, in full international format
@@ -122,7 +122,7 @@ window.EVERWAKE = {
     // ---- Connecting your real agent --------------------------------------
     // Paste your n8n Webhook URL (or any API address) here. It should accept
     // a POST request and reply with JSON.
-    // Example: "https://n8n.everwake.com/webhook/site-agent"
+    // Example: "https://n8n.everwake.tech/webhook/site-agent"
     webhookUrl: "",
 
     // The name of the field in YOUR reply that contains the answer text.
