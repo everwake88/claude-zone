@@ -125,22 +125,63 @@ emails you when the domain is active. There is nothing to do meanwhile.
 
 ## Step 4 — Attach the domain to your site
 
-Once Cloudflare says everwake.tech is **Active**:
+Once Cloudflare says everwake.tech is **Active**, the domain is on Cloudflare but
+still shows whatever it showed before — for a Hostinger domain, that is the
+"Registered at Hostinger" parking page. That is expected. Cloudflare copied
+Hostinger's existing DNS record when it took the domain over, so it is faithfully
+proxying you to Hostinger's parking server. Nothing is broken; the website simply
+is not connected yet.
 
-1. Go back to **Workers & Pages** → your project → the **Custom domains** tab.
-2. Click **Set up a custom domain**, type `everwake.tech`, confirm.
-3. Do it **a second time** for `www.everwake.tech`.
+### 4a. Check the site itself is deployed
 
-Cloudflare creates the DNS records itself, because it now runs your DNS. This is
-exactly why we moved the nameservers — it makes this step one click instead of a
-fight.
+In the left sidebar go to **Compute (Workers & Pages)**. You should see a project
+named `everwake` (or `claude-zone`).
 
-The padlock (HTTPS) is issued automatically and free, usually within a few
-minutes.
+- **No project there?** Step 1 did not complete. Go back and do it.
+- **Project is there?** Open it and find its own address — it ends in
+  `.workers.dev` or `.pages.dev`. **Open that address.**
+  - The Everwake site loads → good, continue to 4b.
+  - "Page not found" → Cloudflare is serving the wrong folder. Check that
+    `wrangler.jsonc` is in the repository, then redeploy.
+
+Do not continue until that address shows the website. Connecting a domain to a
+project that is not working just moves the problem.
+
+### 4b. Connect the domain
+
+Two ways in — use whichever you can see.
+
+**From the domain Overview page:** on the right, under *"No Workers connected"*,
+click **Connect Worker** and choose your project.
+
+**From the project:** open it → **Settings** → **Domains & Routes** → **Add** →
+**Custom domain** → type `everwake.tech` → confirm.
+
+Then do it **a second time** for `www.everwake.tech`.
+
+### 4c. Let it replace the Hostinger record
+
+Cloudflare will warn that an existing DNS record conflicts and offer to replace
+it. **Let it.** That record is the one pointing at Hostinger's parking page.
+
+If it does not offer, remove the old record yourself: **DNS → Records**, find the
+**A** record for `everwake.tech` (and for `www`), and delete it. The custom
+domain creates the correct record in its place.
+
+### 4d. Set the encryption mode
+
+**SSL/TLS → Overview → Full (strict).**
+
+Do this now rather than later. The default setting is the usual cause of a
+"too many redirects" error, and it is much easier to set correctly than to
+diagnose afterwards.
+
+HTTPS is issued automatically and free, usually within a few minutes.
 
 **Open https://everwake.tech.** That is your website.
 
----
+> Still seeing the parking page? Your browser caches aggressively. Try a
+> private window, or add `?x=1` to the address.
 
 ## Step 5 — Tidy up
 
