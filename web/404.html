@@ -7,15 +7,15 @@
 <meta name="description" content="That page does not exist. Everything on the Everwake site is one click away.">
 <link rel="icon" href="/assets/img/everwake-icon.svg" type="image/svg+xml">
 <meta property="og:title" content="Page not found — Everwake">
-<meta property="og:description" content="That page does not exist. Everything on the Everwake site is one click away.">
+<meta property="og:description" content="That page does not exist.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://everwake.com/404.html">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;600;700&family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../brand/tokens/everwake.css">
+<link rel="stylesheet" href="/assets/css/tokens.css">
 <link rel="stylesheet" href="/assets/css/site.css">
+<link rel="stylesheet" href="/assets/css/agent.css">
 </head>
 <body>
 <a class="ew-skip" href="#main">Skip to content</a>
@@ -39,7 +39,6 @@
 </header>
 
 <main id="main">
-
   <section class="hero surface-navy">
     <div class="container">
       <p class="eyebrow eyebrow--boxed">Error 404</p>
@@ -97,20 +96,19 @@
       </div>
       <div>
         <h4>Talk to us</h4>
-        <ul>
-          <li><a href="mailto:hello@everwake.com">hello@everwake.com</a></li>
-          <li><a href="tel:+201554354929">+20 155 435 4929</a></li>
-          <li><a href="tel:+201144017735">+20 114 401 7735</a></li>
-        </ul>
+        <ul data-ew="footer-contacts"></ul>
+        <div data-ew="social" style="margin-top:var(--ew-space-5)"></div>
       </div>
     </div>
     <div class="footer-base">
-      <span>&copy; 2026 Everwake. All rights reserved.</span>
-      <span>Qatar &amp; the GCC &middot; Egypt &middot; remote delivery worldwide</span>
+      <span>© 2026 Everwake. All rights reserved.</span>
+      <span>Qatar &amp; the GCC · Egypt · remote delivery worldwide</span>
     </div>
   </div>
 </footer>
 
+<script src="/site-config.js"></script>
 <script src="/assets/js/site.js" defer></script>
+<script src="/assets/js/agent-widget.js" defer></script>
 </body>
 </html>
