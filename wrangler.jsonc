@@ -1,0 +1,19 @@
+/**
+ * Everwake — Cloudflare deployment settings.
+ *
+ * Cloudflare's newer "Workers" setup screen has no "build output directory"
+ * field. This file supplies it instead: it tells Cloudflare the website lives
+ * in the web/ folder and that there is no application code to run, only files
+ * to serve.
+ *
+ * With this file present you can leave the build command empty on that screen
+ * and simply click Deploy.
+ */
+{
+  "name": "everwake",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./web",
+    "not_found_handling": "404-page"
+  }
+}

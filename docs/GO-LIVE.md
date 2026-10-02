@@ -39,35 +39,54 @@ replaces it.
 
 ---
 
-## Step 1 — Add your site to Cloudflare Pages
+## Step 1 — Put the site on Cloudflare
 
-1. Create a free account at **[dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up)**.
-2. In the left sidebar choose **Compute (Workers & Pages)** → **Create** →
-   **Pages** tab → **Connect to Git**.
-3. Authorise GitHub and pick the **claude-zone** repository.
-4. Fill in the build settings **exactly** like this:
+Cloudflare currently shows one of two different setup screens. Both work — use
+whichever you get.
 
-   | Field | What to enter |
-   |---|---|
-   | Production branch | `main` |
-   | Framework preset | **None** |
-   | Build command | **leave completely empty** |
-   | Build output directory | `web` |
+### Screen A — "Set up your application / Configure your Worker project"
 
-   > The output directory **must** be `web`. This is the one setting people get
-   > wrong, and it produces a "page not found" when they do.
+Three fields: the repository, **Project name**, and **Build command**.
 
-5. Click **Save and Deploy**.
+| Field | What to enter |
+|---|---|
+| Project name | `everwake` |
+| Build command | **leave completely empty** |
 
-After about a minute you get an address like
-`https://claude-zone-abc.pages.dev`. **Open it.** If it loads, the website works
-and the rest of this guide is just putting your own name on it.
+Then click **Deploy**. That is all.
 
-> If your production branch is still `claude/jolly-darwin-i1bnww` rather than
-> `main`, either select that branch here, or merge it to `main` first — Part 4
-> of `docs/PUBLISH.md` explains how.
+There is no "output directory" box on this screen, and you do not need one —
+the `wrangler.jsonc` file in the repository tells Cloudflare that the website is
+in the `web/` folder. It is already committed, so Cloudflare reads it when it
+clones the project.
 
----
+> **Branch:** your repository's default branch is
+> `claude/jolly-darwin-i1bnww`, and Cloudflare uses the default branch
+> automatically. There is nothing to change.
+
+### Screen B — the classic Pages screen
+
+If instead you see a screen with **Framework preset** and **Build output
+directory**, fill it in like this:
+
+| Field | What to enter |
+|---|---|
+| Project name | `everwake` |
+| Production branch | `claude/jolly-darwin-i1bnww` |
+| Framework preset | **None** |
+| Build command | **leave empty** |
+| Build output directory | `web` |
+
+### Either way
+
+After about a minute you get an address ending in `.pages.dev`.
+**Open it.** If the Everwake home page loads, hosting is done and the rest of
+this guide is only about putting your own name on it.
+
+**If you get a "page not found" or a file listing instead**, Cloudflare served
+the wrong folder. On Screen A, check that `wrangler.jsonc` exists in your
+repository. On Screen B, set the build output directory to `web` and redeploy.
+Tell me what you see and I will sort it.
 
 ## Step 2 — Move everwake.tech to Cloudflare DNS
 
@@ -178,8 +197,9 @@ Cloudflare rebuilds the live site within about a minute. Nothing else to do.
 ## If something is wrong
 
 **"Page not found" on the pages.dev address.**
-The build output directory is not `web`. Project → **Settings → Builds &
-deployments** → fix it → **Retry deployment**.
+Cloudflare is serving the wrong folder. Either `wrangler.jsonc` is missing from
+the repository, or (on the classic screen) the build output directory is not
+set to `web`. Fix it, then **Retry deployment**.
 
 **The domain still shows a Hostinger parking page.**
 DNS has not propagated yet. Wait. To confirm what the world sees, check
