@@ -32,7 +32,7 @@ window.EVERWAKE = {
      ----------------------------------------------------------------------- */
   contact: {
     // Your main email address. Example: "hello@everwake.com"
-    email: "",
+    email: "everwake88@gmail.com",
 
     // Your main WhatsApp / phone number, in full international format
     // with no spaces or symbols except the leading +.
