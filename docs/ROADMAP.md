@@ -54,6 +54,21 @@ Contacts, social links and the agent endpoint are deliberately left empty. The
 site hides whatever is unfilled, so it is safe to publish today and complete
 later.
 
+## Phase 2c — Site restructure, languages, lead capture ✅ DONE
+
+| Item | Status |
+|---|---|
+| Apple-style frosted top bar with pill navigation | ✅ |
+| Services dropdown — 8 services, each with its own section | ✅ |
+| Removed How It Works / Case Studies (old links redirect) | ✅ |
+| Pricing as three bundles, no prices, free demo + meeting | ✅ |
+| New pages: FAQ, Blog (3 articles), About | ✅ |
+| Green WhatsApp button to the agent's line, every page | ✅ |
+| Contact form at the bottom of every page | ✅ |
+| English · Arabic (right-to-left) · Spanish · French | ✅ 501 strings each |
+| Apple's typography (San Francisco / Inter) | ✅ |
+| Shared chrome in one place, link checker | ✅ `tools/sync_chrome.py` |
+
 ## Phase 3 — Brand book — NEXT
 
 The written rules, so the identity survives other people using it.

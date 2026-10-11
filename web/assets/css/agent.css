@@ -20,15 +20,15 @@
 
 /* --- The bubble ----------------------------------------------------------- */
 .ew-agent-bubble {
-  position: fixed; inset-inline-end: clamp(1rem, 2vw, 1.75rem); bottom: clamp(1rem, 2vw, 1.75rem);
+  position: fixed; inset-inline-end: clamp(1rem, 2vw, 1.5rem); bottom: clamp(1rem, 2vw, 1.5rem);
   z-index: 120;
   display: inline-flex; align-items: center; gap: var(--ew-space-3);
   padding: var(--ew-space-3) var(--ew-space-5);
   background: var(--ew-gold); color: var(--ew-navy);
   border: 0; border-radius: var(--ew-radius-pill);
   font-family: var(--ew-font-ui); font-size: var(--ew-text-base); font-weight: 600;
-  text-decoration: none; cursor: pointer;
-  box-shadow: var(--ew-shadow-lg);
+  text-decoration: none; cursor: pointer; min-height: 56px;
+  box-shadow: 0 10px 30px rgba(11, 34, 46, 0.22);
   transition: background var(--ew-dur-fast) var(--ew-ease), transform var(--ew-dur-fast) var(--ew-ease);
 }
 .ew-agent-bubble:hover { background: var(--ew-gold-bright); transform: translateY(-1px); }
@@ -149,3 +149,29 @@
 .ew-agent-form button svg { width: 18px; height: 18px; fill: currentColor; }
 
 @media print { .ew-agent, .ew-agent-bubble { display: none !important; } }
+
+[dir="rtl"] .ew-agent-form button svg { transform: scaleX(-1); }
+.social-link { border-radius: 12px; }
+
+/* --- The green WhatsApp button --------------------------------------------
+   #0E8044 rather than WhatsApp's #25D366: white text on the official green
+   is 2.0:1 and unreadable; on this shade it is 5.0:1. */
+.wa-float {
+  position: fixed; z-index: 110;
+  inset-inline-start: clamp(1rem, 2vw, 1.5rem); bottom: clamp(1rem, 2vw, 1.5rem);
+  display: inline-flex; align-items: center; gap: 12px; min-height: 56px;
+  padding-block: 8px; padding-inline: 8px 22px;
+  background: #0E8044; color: #FFFFFF; border-radius: var(--ew-radius-pill);
+  font-family: var(--ew-font-ui); font-size: 16px; font-weight: 600; letter-spacing: var(--ew-track-small);
+  text-decoration: none; box-shadow: 0 10px 30px rgba(14, 128, 68, 0.34);
+  transition: background var(--ew-dur-fast) var(--ew-ease), transform var(--ew-dur-fast) var(--ew-ease), box-shadow var(--ew-dur-fast) var(--ew-ease);
+}
+.wa-float:hover { background: #0B6E3A; transform: translateY(-2px); box-shadow: 0 14px 34px rgba(14, 128, 68, 0.4); color: #FFFFFF; }
+.wa-float:focus-visible { outline: 3px solid var(--ew-gold); outline-offset: 3px; }
+.wa-float__icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
+.wa-float__icon svg { width: 22px; height: 22px; fill: #FFFFFF; }
+/* On a phone the label would cover content: keep just the round icon. */
+@media (max-width: 520px) {
+  .wa-float { padding: 8px; }
+  .wa-float__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}

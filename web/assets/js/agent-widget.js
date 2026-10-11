@@ -11,33 +11,13 @@
 
   function filled(v) { return typeof v === "string" && v.trim() !== ""; }
 
-  /* ---- Decide what this bubble actually does ----------------------------- */
-  var mode = A.mode || "auto";
-  if (mode === "auto") {
-    mode = filled(A.webhookUrl) ? "webhook"
-         : filled(contact.whatsapp) ? "whatsapp"
-         : "off";
-  }
-  /* Only an http(s) endpoint is ever called. */
-  if (mode === "webhook" && !/^https?:\/\//i.test((A.webhookUrl || "").trim())) mode = "off";
-  if (mode === "whatsapp" && !filled(contact.whatsapp)) mode = "off";
-  if (mode === "off") return;
+  /* The chat panel appears only once a webhook is configured. Until then the
+     green WhatsApp button (site.js) is the way to reach the agent, so there
+     is nothing for this widget to do. Only an http(s) endpoint is called. */
+  if (!/^https?:\/\//i.test((A.webhookUrl || "").trim())) return;
 
+  var t = (window.EW_I18N && window.EW_I18N.t) || function (s) { return s; };
   var NAME = filled(A.name) ? A.name : "Everwake Agent";
-
-  /* ---- WhatsApp mode is just a link ------------------------------------- */
-  if (mode === "whatsapp") {
-    var wa = "https://wa.me/" + contact.whatsapp.replace(/\D/g, "");
-    var link = document.createElement("a");
-    link.className = "ew-agent-bubble";
-    link.href = wa;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.setAttribute("aria-label", "Chat with us on WhatsApp");
-    link.innerHTML = bubbleIcon() + '<span class="ew-agent-bubble__text">Chat with us</span>';
-    document.body.appendChild(link);
-    return;
-  }
 
   /* ---- Webhook mode: a real chat panel ----------------------------------- */
   var sessionId = readSession();
@@ -48,20 +28,20 @@
   root.className = "ew-agent";
   root.innerHTML =
     '<button class="ew-agent-bubble" type="button" aria-expanded="false" aria-controls="ew-agent-panel">' +
-      bubbleIcon() + '<span class="ew-agent-bubble__text">Ask the agent</span>' +
+      bubbleIcon() + '<span class="ew-agent-bubble__text">' + esc(t("Ask the agent")) + '</span>' +
     '</button>' +
     '<section class="ew-agent-panel" id="ew-agent-panel" role="dialog" aria-modal="false" aria-label="' + esc(NAME) + '" hidden>' +
       '<header class="ew-agent-panel__head">' +
         '<span class="ew-agent-panel__dot" aria-hidden="true"></span>' +
         '<h2>' + esc(NAME) + '</h2>' +
-        '<button class="ew-agent-panel__close" type="button" aria-label="Close chat">&times;</button>' +
+        '<button class="ew-agent-panel__close" type="button" aria-label="' + esc(t("Close chat")) + '">&times;</button>' +
       '</header>' +
       '<div class="ew-agent-log" role="log" aria-live="polite" aria-atomic="false"></div>' +
       '<div class="ew-agent-suggest"></div>' +
       '<form class="ew-agent-form">' +
-        '<label class="visually-hidden" for="ew-agent-input">Your message</label>' +
-        '<textarea id="ew-agent-input" rows="1" placeholder="Type your question…" autocomplete="off"></textarea>' +
-        '<button type="submit" aria-label="Send message">' +
+        '<label class="visually-hidden" for="ew-agent-input">' + esc(t("Your message")) + '</label>' +
+        '<textarea id="ew-agent-input" rows="1" placeholder="' + esc(t("Type your question…")) + '" autocomplete="off"></textarea>' +
+        '<button type="submit" aria-label="' + esc(t("Send message")) + '">' +
           '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.4L21 12 3.4 3.6 3.39 9.9 15 12 3.39 14.1z"/></svg>' +
         '</button>' +
       '</form>' +
@@ -104,7 +84,7 @@
     var row = document.createElement("div");
     row.className = "ew-agent-msg ew-agent-msg--agent ew-agent-typing";
     row.innerHTML = '<div class="ew-agent-msg__body"><span></span><span></span><span></span></div>';
-    row.setAttribute("aria-label", NAME + " is typing");
+    row.setAttribute("aria-label", t("Typing…"));
     log.appendChild(row);
     log.scrollTop = log.scrollHeight;
     return row;
@@ -119,8 +99,8 @@
       var b = document.createElement("button");
       b.type = "button";
       b.className = "ew-agent-chip";
-      b.textContent = q;
-      b.addEventListener("click", function () { send(q); });
+      b.textContent = t(q);
+      b.addEventListener("click", function () { send(t(q)); });
       suggest.appendChild(b);
     });
   }
@@ -174,6 +154,7 @@
         sessionId: sessionId,
         history: history.slice(-20),
         source: "website",
+        language: (window.EW_I18N && window.EW_I18N.lang) || "en",
         page: location.pathname
       })
     })
@@ -185,13 +166,13 @@
       .then(function (data) {
         typing.remove();
         var reply = extractReply(data);
-        if (!filled(reply)) reply = A.errorMessage || "Sorry — I did not get that. Could you try again?";
+        if (!filled(reply)) reply = t(A.errorMessage || "Sorry — I did not get that. Could you try again?");
         addMessage("agent", reply);
         history.push({ role: "assistant", content: reply });
       })
       .catch(function () {
         typing.remove();
-        addMessage("agent", A.errorMessage || "I could not reach the server just now. Please try again.");
+        addMessage("agent", t(A.errorMessage || "I could not reach the server just now. Please try again."));
       })
       .then(function () { busy = false; input.focus(); });
   }
@@ -200,7 +181,7 @@
     panel.hidden = false;
     bubble.setAttribute("aria-expanded", "true");
     root.classList.add("is-open");
-    if (!log.childElementCount && filled(A.greeting)) addMessage("agent", A.greeting);
+    if (!log.childElementCount && filled(A.greeting)) addMessage("agent", t(A.greeting));
     renderSuggestions();
     setTimeout(function () { input.focus(); }, 60);
   }

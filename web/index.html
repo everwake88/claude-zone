@@ -1,330 +1,354 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- ew:head -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Everwake — Intelligent automation, built to be owned</title>
-<meta name="description" content="Everwake designs, builds and hands over the AI systems that run the repetitive parts of a business — sales conversations, order operations, follow-up and product knowledge — on WhatsApp, Instagram and the web.">
+<meta name="description" content="Everwake designs, builds and hands over AI voice agents, chat agents and automation for businesses in Qatar, the GCC and Egypt — in Arabic and English.">
+<link rel="canonical" href="https://everwake.tech/">
+<meta property="og:url" content="https://everwake.tech/">
+<link rel="alternate" hreflang="en" href="https://everwake.tech/">
+<link rel="alternate" hreflang="ar" href="https://everwake.tech/?lang=ar">
+<link rel="alternate" hreflang="es" href="https://everwake.tech/?lang=es">
+<link rel="alternate" hreflang="fr" href="https://everwake.tech/?lang=fr">
+<link rel="alternate" hreflang="x-default" href="https://everwake.tech/">
 <link rel="icon" href="assets/img/everwake-icon.svg" type="image/svg+xml">
 <meta property="og:title" content="Everwake — Intelligent automation, built to be owned">
-<meta property="og:description" content="AI transformation and intelligent automation. Conversational agents, AI commerce platforms and knowledge engineering for Qatar, the GCC and Egypt.">
+<meta property="og:description" content="Everwake designs, builds and hands over AI voice agents, chat agents and automation for businesses in Qatar, the GCC and Egypt — in Arabic and English.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://everwake.tech/">
-<link rel="canonical" href="https://everwake.tech/">
+<meta property="og:site_name" content="Everwake">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#FBFBFD">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;600;700&family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/tokens.css">
 <link rel="stylesheet" href="assets/css/site.css">
 <link rel="stylesheet" href="assets/css/agent.css">
+<script src="site-config.js"></script>
+<script src="i18n/i18n.js"></script>
+<script src="assets/js/site.js" defer></script>
+<script src="assets/js/agent-widget.js" defer></script>
+<!-- /ew:head -->
 </head>
 <body>
+<!-- ew:header -->
 <a class="ew-skip" href="#main">Skip to content</a>
-<div class="ew-band"></div>
-
+<div class="ew-band" aria-hidden="true"></div>
 <header class="site-header">
   <div class="container site-header__inner">
     <a class="brand" href="index.html" aria-label="Everwake — home">
-      <img src="assets/img/everwake-lockup.svg" alt="Everwake">
+      <img src="assets/img/everwake-lockup-navy.svg" alt="Everwake" width="188" height="31">
     </a>
-    <button class="nav-toggle" aria-expanded="false" aria-controls="nav">Menu</button>
-    <nav class="nav" id="nav" aria-label="Primary">
-      <a href="index.html" aria-current="page">Home</a>
-      <a href="services.html">Services</a>
-      <a href="agent.html">The Agent</a>
-      <a href="approach.html">Approach</a>
-      <a href="work.html">Work</a>
-      <a class="btn btn--primary" href="contact.html">Book a discovery call</a>
+
+    <nav class="topnav" id="nav" aria-label="Primary">
+      <ul class="topnav__list">
+        <li><a class="topnav__link" href="index.html" data-nav="home" aria-current="page">Home</a></li>
+        <li class="topnav__item" data-ew-menu>
+          <button class="topnav__link topnav__trigger" type="button" aria-expanded="false" aria-controls="menu-services" data-nav="services">
+            Services
+            <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg>
+          </button>
+          <div class="menu" id="menu-services">
+            <ul class="menu__grid">
+              <li><a class="menu__link" href="services.html#voice-agents"><span class="menu__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h3.2l1.8 4.6-2.3 1.5a11.5 11.5 0 0 0 6.2 6.2l1.5-2.3L20 15.8V19a2 2 0 0 1-2.2 2A17 17 0 0 1 3 6.2 2 2 0 0 1 5 4z"/></svg></span><span><span class="menu__title">Voice agents</span><span class="menu__desc">Answer and place calls in Arabic and English</span></span></a></li>
+              <li><a class="menu__link" href="services.html#chat-agents"><span class="menu__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4z"/><path d="M8.5 10h.01M12 10h.01M15.5 10h.01"/></svg></span><span><span class="menu__title">Chat agents</span><span class="menu__desc">Sell and support on WhatsApp, Instagram and the web</span></span></a></li>
+              <li><a class="menu__link" href="services.html#ai-automation"><span class="menu__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 12a7.5 7.5 0 0 1 13.2-4.9"/><path d="M19.5 12a7.5 7.5 0 0 1-13.2 4.9"/><path d="M18 3.5v4h-4"/><path d="M6 20.5v-4h4"/></svg></span><span><span class="menu__title">AI automation solutions</span><span class="menu__desc">Orders, follow-up and operations on autopilot</span></span></a></li>
+              <li><a class="menu__link" href="services.html#custom-ai"><span class="menu__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l1.7 4.6 4.8 1.7-4.8 1.7L12 16.2l-1.7-4.7-4.8-1.7 4.8-1.7z"/><path d="M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><span><span class="menu__title">Custom AI solutions</span><span class="menu__desc">Built around your data, rules and workflows</span></span></a></li>
+              <li><a class="menu__link" href="services.html#websites-crms"><span class="menu__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4.5" width="18" height="15" rx="1.5"/><path d="M3 9h18"/><path d="M6 6.8h.01M8.5 6.8h.01"/><path d="M7 13h6M7 16h4"/></svg></span><span><span class="menu__title">Websites &amp; CRMs</span><span class="menu__desc">Sites that convert, pipelines that fit how you sell</span></span></a></li>
+              <li><a class="menu__link" href="services.html#smart-solutions"><span class="menu__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20V11M9.3 20V6M14.7 20v-6M20 20V9"/><path d="M2.5 20.5h19"/></svg></span><span><span class="menu__title">Smart solutions</span><span class="menu__desc">Dashboards, document processing and smart devices</span></span></a></li>
+              <li><a class="menu__link" href="services.html#marketing"><span class="menu__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.5v3a1 1 0 0 0 1 1h2l5.5 4V5.5L7 9.5H5a1 1 0 0 0-1 1z"/><path d="M15.5 9a3.5 3.5 0 0 1 0 6"/><path d="M18 6.5a7 7 0 0 1 0 11"/></svg></span><span><span class="menu__title">Marketing &amp; advertising</span><span class="menu__desc">Campaigns and content in your brand's voice</span></span></a></li>
+              <li><a class="menu__link" href="services.html#consulting"><span class="menu__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M15.4 8.6l-2 5-4.8 1.8 2-5z"/></svg></span><span><span class="menu__title">AI consulting services</span><span class="menu__desc">An honest roadmap before anything is built</span></span></a></li>
+            </ul>
+            <a class="menu__all" href="services.html">All services <span aria-hidden="true" class="arrow">→</span></a>
+          </div>
+        </li>
+        <li><a class="topnav__link" href="pricing.html" data-nav="pricing">Pricing</a></li>
+        <li><a class="topnav__link" href="faq.html" data-nav="faq">FAQ</a></li>
+        <li><a class="topnav__link" href="blog.html" data-nav="blog">Blog</a></li>
+        <li><a class="topnav__link" href="about.html" data-nav="about">About</a></li>
+        <li><a class="topnav__link" href="contact.html" data-nav="contact">Contact</a></li>
+      </ul>
     </nav>
+
+    <div class="header-tools">
+      <div class="lang" data-ew-menu>
+        <button class="lang__trigger" type="button" aria-expanded="false" aria-controls="menu-lang" aria-label="Change language">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg>
+          <span data-ew="lang-current" data-i18n-skip>EN</span>
+        </button>
+        <ul class="menu menu--lang" id="menu-lang" data-i18n-skip>
+          <li><button type="button" class="lang__option" data-lang="en" lang="en">English</button></li>
+          <li><button type="button" class="lang__option" data-lang="ar" lang="ar" dir="rtl">العربية</button></li>
+          <li><button type="button" class="lang__option" data-lang="es" lang="es">Español</button></li>
+          <li><button type="button" class="lang__option" data-lang="fr" lang="fr">Français</button></li>
+        </ul>
+      </div>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav">
+        <span class="nav-toggle__bars" aria-hidden="true"></span>
+        <span class="visually-hidden">Menu</span>
+      </button>
+    </div>
   </div>
 </header>
+<!-- /ew:header -->
 
 <main id="main">
-
-  <section class="hero surface-navy">
-    <div class="container">
-      <p class="eyebrow eyebrow--boxed">AI transformation &amp; intelligent automation</p>
-      <h1>
-        <span class="display-light">Intelligent automation,</span>
-        <span class="display-bold">built to be owned.</span>
-      </h1>
-      <p class="lede">Everwake designs, builds and hands over the AI systems that run the repetitive
-        parts of a business — sales conversations, order operations, follow-up and product knowledge —
-        on the channels customers already use.</p>
-      <div class="btn-row">
-        <a class="btn btn--primary" href="contact.html">Book a discovery call</a>
-        <a class="btn btn--ghost" href="agent.html">See the agent</a>
-      </div>
-
-      <dl class="deflist">
-        <div class="deflist__row"><dt class="deflist__key">Practice</dt><dd class="deflist__val">AI transformation &amp; intelligent automation</dd></div>
-        <div class="deflist__row"><dt class="deflist__key">What we deliver</dt><dd class="deflist__val">Conversational AI agents · AI commerce platforms · Knowledge engineering · Workflow automation</dd></div>
-        <div class="deflist__row"><dt class="deflist__key">Markets</dt><dd class="deflist__val">Qatar &amp; the GCC · Egypt · remote delivery worldwide</dd></div>
-        <div class="deflist__row"><dt class="deflist__key">Languages</dt><dd class="deflist__val">Arabic, including Gulf dialect · English</dd></div>
-      </dl>
+<section class="hero surface-navy">
+  <div class="container">
+    <p class="eyebrow eyebrow--boxed">AI transformation &amp; intelligent automation</p>
+    <h1><span class="display-light">Intelligent automation,</span> <span class="display-bold">built to be owned.</span></h1>
+    <p class="lede">Everwake designs, builds and hands over the AI systems that run the repetitive parts of a business — sales conversations, phone calls, order operations, follow-up and product knowledge — on the channels your customers already use.</p>
+    <div class="btn-row">
+      <a class="btn btn--primary btn--lg" href="#get-in-touch">Book a free demo</a>
+        <a class="btn btn--ghost btn--lg" href="services.html">Explore our services</a>
     </div>
-  </section>
+    <dl class="deflist">
+      <div class="deflist__row"><dt class="deflist__key">Practice</dt><dd class="deflist__val">AI transformation &amp; intelligent automation</dd></div>
+      <div class="deflist__row"><dt class="deflist__key">What we deliver</dt><dd class="deflist__val">Voice and chat agents · AI automation · Custom AI · Websites &amp; CRMs</dd></div>
+      <div class="deflist__row"><dt class="deflist__key">Markets</dt><dd class="deflist__val">Qatar &amp; the GCC · Egypt · remote delivery worldwide</dd></div>
+      <div class="deflist__row"><dt class="deflist__key">Languages</dt><dd class="deflist__val">Arabic, including Gulf and Egyptian dialects · English</dd></div>
+    </dl>
+  </div>
+</section>
 
-  <section class="section">
-    <div class="container">
+<section class="section">
+  <div class="container">
       <div class="section-head">
         <span class="section-head__num">01 — Who we are</span>
-        <h2 style="margin-top:var(--ew-space-4)">Most AI projects stall in the same place.</h2>
-        <hr class="section-head__rule">
+        <h2>Most AI projects stall in the same place.</h2>
       </div>
-      <div class="grid grid--2">
-        <div>
-          <p>A demo impresses, then nobody can run it, nobody knows what it will say to a real
-            customer, and nobody owns it.</p>
-          <p>We work the other way around. We baseline the numbers before we build. We govern what
-            the system is allowed to say. We design the handover to a human into the first workflow.
-            And we leave the client able to run the system without us.</p>
-        </div>
-        <div class="callout">
-          <p><strong>What we are not.</strong> We are not a chatbot vendor, and we do not resell
-            someone else's platform. We build the system, document it, and — if you prefer — transfer
-            it outright with no monthly subscription. Your data and knowledge base belong to you
-            under every arrangement.</p>
-        </div>
+
+    <div class="grid grid--2">
+      <div>
+        <p class="lede">A demo impresses, then nobody can run it, nobody knows what it will say to a real customer, and nobody owns it.</p>
+        <p>We work the other way around. We baseline the numbers before we build, govern what the system is allowed to say, design the handover to a human into the first workflow — and leave you able to run it without us.</p>
+      </div>
+      <div class="callout">
+        <p><strong>What we are not.</strong> We are not a chatbot vendor, and we do not resell someone else's platform. We build the system, document it, and — if you prefer — transfer it outright with no monthly subscription. Your data and knowledge base belong to you under every arrangement.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <section class="section surface-paper">
-    <div class="container">
+<section class="section surface-paper">
+  <div class="container">
       <div class="section-head">
         <span class="section-head__num">02 — What we build</span>
-        <h2 style="margin-top:var(--ew-space-4)">Five services, one knowledge base.</h2>
-        <hr class="section-head__rule">
+        <h2>Eight services. One knowledge base behind all of them.</h2>
+        <p class="lede">Most clients start with one. The others attach to it, because they all draw on the same governed source of truth about your products, prices and policies.</p>
       </div>
-      <p class="lede measure">In practice a client starts with one and the others attach to it,
-        because they all draw on the same governed source of truth.</p>
 
-      <div class="grid grid--3" style="margin-top:var(--ew-space-8)">
-        <article class="card">
-          <p class="card__index">01</p>
-          <h3>Conversational AI agents</h3>
-          <p class="muted">An agent that sells and supports on WhatsApp and Instagram, in the
-            customer's own dialect — and hands over to a person the moment one is genuinely needed.</p>
-        </article>
-        <article class="card">
-          <p class="card__index">02</p>
-          <h3>AI commerce platform</h3>
-          <p class="muted">The full pre- and post-checkout lifecycle: confirmation in minutes,
-            address validation, delivery follow-up and abandoned-cart recovery that answers the
-            objection instead of nagging.</p>
-        </article>
-        <article class="card">
-          <p class="card__index">03</p>
-          <h3>Knowledge engineering</h3>
-          <p class="muted">The part most projects skip. Scattered product and policy content becomes
-            a governed, measurable knowledge base — with never-say rules enforced at the source.</p>
-        </article>
-        <article class="card">
-          <p class="card__index">04</p>
-          <h3>Workflow automation</h3>
-          <p class="muted">The plumbing that makes the rest real: store, messaging, database,
-            operations and reporting, wired together on infrastructure you can own.</p>
-        </article>
-        <article class="card">
-          <p class="card__index">05</p>
-          <h3>AI marketing studio</h3>
-          <p class="muted">Scoped separately, once the core platform is live. Image, video and copy
-            generation in your brand's voice, with scheduled publishing to Meta channels.</p>
-        </article>
-        <article class="card card--navy">
-          <p class="card__index">Start here</p>
-          <h3>Not sure which one?</h3>
-          <p class="muted">Thirty minutes. We look at where the manual work is, and whether
-            automation is honestly the right answer for it.</p>
-          <p style="margin-top:var(--ew-space-5);margin-bottom:0">
-            <a class="link" href="contact.html">Book a discovery call →</a></p>
-        </article>
+      <div class="grid grid--4">
+        <a class="card" href="services.html#voice-agents">
+          <span class="card__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h3.2l1.8 4.6-2.3 1.5a11.5 11.5 0 0 0 6.2 6.2l1.5-2.3L20 15.8V19a2 2 0 0 1-2.2 2A17 17 0 0 1 3 6.2 2 2 0 0 1 5 4z"/></svg></span>
+          <h3>Voice agents</h3>
+          <p class="muted">Answer and place phone calls in your customer's dialect — bookings, orders and follow-up, day and night.</p>
+          <span class="card__more">Learn more <span class="arrow" aria-hidden="true">→</span></span>
+        </a>
+        <a class="card" href="services.html#chat-agents">
+          <span class="card__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4z"/><path d="M8.5 10h.01M12 10h.01M15.5 10h.01"/></svg></span>
+          <h3>Chat agents</h3>
+          <p class="muted">Sell and support on WhatsApp, Instagram and your website, with prices that come from your catalogue.</p>
+          <span class="card__more">Learn more <span class="arrow" aria-hidden="true">→</span></span>
+        </a>
+        <a class="card" href="services.html#ai-automation">
+          <span class="card__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 12a7.5 7.5 0 0 1 13.2-4.9"/><path d="M19.5 12a7.5 7.5 0 0 1-13.2 4.9"/><path d="M18 3.5v4h-4"/><path d="M6 20.5v-4h4"/></svg></span>
+          <h3>AI automation solutions</h3>
+          <p class="muted">Order confirmation, address checks, follow-up and cart recovery — running on their own.</p>
+          <span class="card__more">Learn more <span class="arrow" aria-hidden="true">→</span></span>
+        </a>
+        <a class="card" href="services.html#custom-ai">
+          <span class="card__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l1.7 4.6 4.8 1.7-4.8 1.7L12 16.2l-1.7-4.7-4.8-1.7 4.8-1.7z"/><path d="M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span>
+          <h3>Custom AI solutions</h3>
+          <p class="muted">Assistants and systems built around your own data, rules and workflows.</p>
+          <span class="card__more">Learn more <span class="arrow" aria-hidden="true">→</span></span>
+        </a>
+        <a class="card" href="services.html#websites-crms">
+          <span class="card__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4.5" width="18" height="15" rx="1.5"/><path d="M3 9h18"/><path d="M6 6.8h.01M8.5 6.8h.01"/><path d="M7 13h6M7 16h4"/></svg></span>
+          <h3>Websites &amp; CRMs</h3>
+          <p class="muted">Bilingual websites that convert, and a CRM where every lead lands automatically.</p>
+          <span class="card__more">Learn more <span class="arrow" aria-hidden="true">→</span></span>
+        </a>
+        <a class="card" href="services.html#smart-solutions">
+          <span class="card__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20V11M9.3 20V6M14.7 20v-6M20 20V9"/><path d="M2.5 20.5h19"/></svg></span>
+          <h3>Smart solutions</h3>
+          <p class="muted">Live dashboards, documents read automatically, and smart devices that act on their own.</p>
+          <span class="card__more">Learn more <span class="arrow" aria-hidden="true">→</span></span>
+        </a>
+        <a class="card" href="services.html#marketing">
+          <span class="card__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.5v3a1 1 0 0 0 1 1h2l5.5 4V5.5L7 9.5H5a1 1 0 0 0-1 1z"/><path d="M15.5 9a3.5 3.5 0 0 1 0 6"/><path d="M18 6.5a7 7 0 0 1 0 11"/></svg></span>
+          <h3>Marketing &amp; advertising</h3>
+          <p class="muted">Content and campaigns in your brand's voice, measured by the orders they create.</p>
+          <span class="card__more">Learn more <span class="arrow" aria-hidden="true">→</span></span>
+        </a>
+        <a class="card" href="services.html#consulting">
+          <span class="card__icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M15.4 8.6l-2 5-4.8 1.8 2-5z"/></svg></span>
+          <h3>AI consulting services</h3>
+          <p class="muted">An honest audit and a measured roadmap — before anything is built.</p>
+          <span class="card__more">Learn more <span class="arrow" aria-hidden="true">→</span></span>
+        </a>
       </div>
-    </div>
-  </section>
+  </div>
+</section>
 
-  <section class="section surface-navy">
-    <div class="container">
+<section class="section surface-navy">
+  <div class="container">
       <div class="section-head">
         <span class="section-head__num">03 — How we work differently</span>
-        <h2 style="margin-top:var(--ew-space-4)">Five commitments we make before anything is built.</h2>
-        <hr class="section-head__rule">
+        <h2>Five commitments we make before anything is built.</h2>
       </div>
-      <div class="grid grid--2" style="margin-top:var(--ew-space-7)">
-        <div>
-          <h3>Baseline first</h3>
-          <p class="muted">Week one measures the numbers the project will be judged on —
-            confirmation time, recovery rate, conversion, order value, repeat purchase — against your
-            own data, not an industry average.</p>
-          <h3>Governed knowledge</h3>
-          <p class="muted">Answers come from one controlled source of truth holding specifications,
-            policies, pricing and commercial rules — including what the agent must never say.</p>
-          <h3>Escalation by design</h3>
-          <p class="muted">A clean handover to a person is built into the first workflow, with full
-            context attached. Not bolted on after launch.</p>
-        </div>
-        <div>
-          <h3>Ownership optional</h3>
-          <p class="muted">Run it as a managed partnership, or take the whole system and pay nothing
-            monthly. The build is identical either way.</p>
-          <h3>Measured monthly</h3>
-          <p class="muted">We report against the week-one baseline. Targets come from your numbers,
-            and the report says what moved and what did not.</p>
-          <div class="callout" style="margin-top:var(--ew-space-6)">
-            <p>Delivery is remote-first from Egypt, with clients in Qatar and the wider Gulf. Systems
-              are built to work in Arabic — including Gulf dialect — and English, on WhatsApp,
-              Instagram and the web.</p>
-          </div>
-        </div>
+
+    <div class="grid grid--2">
+      <div class="steps">
+        <div class="step"><span class="step__num" aria-hidden="true"></span><div><h3>Baseline first</h3><p class="muted">Week one measures the numbers the project will be judged on — confirmation time, recovery rate, conversion, order value, repeat purchase — against your own data, not an industry average.</p></div></div>
+        <div class="step"><span class="step__num" aria-hidden="true"></span><div><h3>Governed knowledge</h3><p class="muted">Answers come from one controlled source of truth holding specifications, policies, pricing and commercial rules — including what the agent must never say.</p></div></div>
+        <div class="step"><span class="step__num" aria-hidden="true"></span><div><h3>Escalation by design</h3><p class="muted">A clean handover to a person is built into the first workflow, with full context attached. Not bolted on after launch.</p></div></div>
+      </div>
+      <div class="steps" style="counter-reset: step 3">
+        <div class="step"><span class="step__num" aria-hidden="true"></span><div><h3>Ownership optional</h3><p class="muted">Run it as a managed partnership, or take the whole system and pay nothing monthly. The build is identical either way.</p></div></div>
+        <div class="step"><span class="step__num" aria-hidden="true"></span><div><h3>Measured monthly</h3><p class="muted">We report against the week-one baseline. Targets come from your numbers, and the report says what moved and what did not.</p></div></div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <section class="section">
-    <div class="container">
+<section class="section" id="proof">
+  <div class="container">
       <div class="section-head">
         <span class="section-head__num">04 — Proof of delivery</span>
-        <h2 style="margin-top:var(--ew-space-4)">IQ Homes Qatar</h2>
-        <hr class="section-head__rule">
-      </div>
-      <p class="lede measure">A premium retailer of AI robots, smart home technology and beauty
-        devices — selling in a category where customers must be educated before they can be sold to,
-        mostly over WhatsApp, mostly outside office hours.</p>
-
-      <div class="surface-navy" style="padding:var(--ew-space-8);margin-top:var(--ew-space-7)">
-        <div class="stats">
-          <div class="stat"><p class="stat__figure">96%</p><p class="stat__label">answer coverage across the tested question bank</p></div>
-          <div class="stat"><p class="stat__figure">1,180</p><p class="stat__label">real customer questions used as the test set</p></div>
-          <div class="stat"><p class="stat__figure">23</p><p class="stat__label">products with governed specifications and policy rules</p></div>
-          <div class="stat"><p class="stat__figure">2</p><p class="stat__label">channels live — WhatsApp and Instagram, one brain</p></div>
-        </div>
+        <h2>In production, and measured.</h2>
+        <p class="lede">IQ Homes Qatar sells AI robots, smart home technology and beauty devices — a category where customers must be educated before they can be sold to, mostly over WhatsApp and mostly outside office hours. We built the Qatari-Arabic agent that does it.</p>
       </div>
 
-      <p style="margin-top:var(--ew-space-7)">
-        <a class="link" href="work.html">Read how the system was built →</a></p>
-    </div>
-  </section>
-
-  <section class="section surface-paper">
-    <div class="container">
-      <div class="section-head">
-        <span class="section-head__num">05 — How we work</span>
-        <h2 style="margin-top:var(--ew-space-4)">Four weeks, kick-off to production.</h2>
-        <hr class="section-head__rule">
-      </div>
-      <div class="timeline">
-        <div class="timeline__step">
-          <p class="timeline__week">Week 1</p>
-          <ul><li>Discovery workshop</li><li>Process mapping</li><li>Architecture &amp; integration plan</li><li>Metric baselining</li></ul>
-        </div>
-        <div class="timeline__step">
-          <p class="timeline__week">Week 2</p>
-          <ul><li>Platform setup</li><li>Store integration</li><li>Messaging integration</li><li>Knowledge base build</li></ul>
-        </div>
-        <div class="timeline__step">
-          <p class="timeline__week">Week 3</p>
-          <ul><li>Workflow development</li><li>Prompt engineering</li><li>Internal testing</li><li>Validation</li></ul>
-        </div>
-        <div class="timeline__step">
-          <p class="timeline__week">Week 4</p>
-          <ul><li>Acceptance testing</li><li>Staff training</li><li>Deployment &amp; go-live</li><li>Hypercare monitoring</li></ul>
-        </div>
-      </div>
-      <p class="small muted" style="margin-top:var(--ew-space-6)">The timeline assumes timely access
-        to your store, a verified business messaging account, and the product and policy content the
-        knowledge base is built from.</p>
-
-      <h3 style="margin-top:var(--ew-space-9)">Two ways to own what we build</h3>
-      <p class="muted measure">The build is identical under both. What differs is what happens after
-        go-live.</p>
-      <div class="grid grid--2" style="margin-top:var(--ew-space-6)">
-        <div class="panel">
-          <h3>Managed partnership</h3>
-          <p class="panel__meta">One-time implementation, then a monthly fee.</p>
-          <ul class="featlist">
-            <li>Hosting, monitoring and uptime checks</li>
-            <li>Continuous tuning and optimisation</li>
-            <li>Maintenance, bug fixes and upgrades</li>
-            <li>Knowledge base updated as products change</li>
-            <li>Priority support and monthly review</li>
-          </ul>
-        </div>
-        <div class="panel panel--featured">
-          <span class="panel__flag">No monthly fee</span>
-          <h3>Full ownership</h3>
-          <p class="panel__meta">Paid once. Handed over. No ongoing commitment.</p>
-          <ul class="featlist">
-            <li>Full transfer of workflows and configuration</li>
-            <li>Deployed to infrastructure you own</li>
-            <li>Complete technical documentation</li>
-            <li>Knowledge base and data exported in full</li>
-            <li>On-demand support, per request</li>
-          </ul>
-        </div>
-      </div>
-      <p class="small muted" style="margin-top:var(--ew-space-6)">Pricing is quoted per engagement,
-        against the scope agreed in discovery. Under either option your data and knowledge base
-        belong to you.</p>
-    </div>
-  </section>
-
-  <section class="cta">
-    <div class="container cta__inner">
-      <div>
-        <h2>Ready to see where the manual work is?</h2>
-        <p>Thirty minutes, no retainer, and an honest answer about whether automation is the right
-          call for it.</p>
-      </div>
-      <div class="btn-row" style="margin-top:0">
-        <a class="btn btn--primary" href="contact.html">Book a discovery call</a>
+    <div class="surface-navy stat-band">
+      <div class="stats">
+        <div><p class="stat__figure">96%</p><p class="stat__label">answer coverage across the tested question bank</p></div>
+        <div><p class="stat__figure">1,180</p><p class="stat__label">real customer questions used as the test set</p></div>
+        <div><p class="stat__figure">23</p><p class="stat__label">products with governed specifications and policy rules</p></div>
+        <div><p class="stat__figure">2</p><p class="stat__label">channels live — WhatsApp and Instagram, one brain</p></div>
       </div>
     </div>
-  </section>
+    <div class="btn-row">
+      <a class="btn btn--outline" href="blog/answer-coverage.html">How we measured it <span class="arrow" aria-hidden="true">→</span></a>
+      <a class="btn btn--outline" href="pricing.html">See the bundles <span class="arrow" aria-hidden="true">→</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ew:contact -->
+<section class="section contact-band" id="get-in-touch" aria-labelledby="get-in-touch-title">
+  <div class="container contact-band__grid">
+    <div class="contact-band__intro">
+      <p class="eyebrow">Free demo</p>
+      <h2 id="get-in-touch-title">Tell us where the manual work is.</h2>
+      <p class="lede">Thirty minutes, no retainer, and an honest answer about whether automation is the right call for it. We reply within one business day.</p>
+
+      <ol class="contact-steps">
+        <li><span class="contact-steps__num" aria-hidden="true">01</span><span><strong>Discovery call.</strong> Where the manual work is, and what it costs you today.</span></li>
+        <li><span class="contact-steps__num" aria-hidden="true">02</span><span><strong>Free demo.</strong> The agent answering your own customers' questions.</span></li>
+        <li><span class="contact-steps__num" aria-hidden="true">03</span><span><strong>Written proposal.</strong> Scope, timeline and price. No retainer to receive it.</span></li>
+      </ol>
+
+      <div class="contact-direct" data-ew="contact-direct"></div>
+      <div data-ew="social" class="contact-band__social"></div>
+    </div>
+
+    <form class="form-card" data-ew="contact-form" action="#" method="post">
+      <div class="field">
+        <label for="cf-name">Your name <span class="req" aria-hidden="true">*</span></label>
+        <input id="cf-name" name="name" type="text" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label for="cf-email">Work email <span class="req" aria-hidden="true">*</span></label>
+        <input id="cf-email" name="email" type="email" autocomplete="email" required>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="cf-company">Company name</label>
+          <input id="cf-company" name="company" type="text" autocomplete="organization">
+        </div>
+        <div class="field">
+          <label for="cf-phone">WhatsApp number</label>
+          <input id="cf-phone" name="phone" type="tel" autocomplete="tel" dir="ltr">
+        </div>
+      </div>
+      <div class="field">
+        <label for="cf-interest">What are you interested in?</label>
+        <select id="cf-interest" name="interest">
+          <option value="">Select one</option>
+          <option value="Voice agents">Voice agents</option>
+          <option value="Chat agents">Chat agents</option>
+          <option value="AI automation solutions">AI automation solutions</option>
+          <option value="Custom AI solutions">Custom AI solutions</option>
+          <option value="Websites & CRMs">Websites &amp; CRMs</option>
+          <option value="Smart solutions">Smart solutions</option>
+          <option value="Marketing & advertising">Marketing &amp; advertising</option>
+          <option value="AI consulting services">AI consulting services</option>
+          <option value="Not sure yet">Not sure yet</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="cf-message">Tell us briefly about your business (optional)</label>
+        <textarea id="cf-message" name="message" rows="4"></textarea>
+      </div>
+      <!-- Hidden from people; bots fill it in, and the submission is dropped. -->
+      <input class="visually-hidden" type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn btn--primary btn--block btn--lg" type="submit">Send &amp; book my free demo <span aria-hidden="true" class="arrow">→</span></button>
+      <p class="form-note" data-ew="form-note">We reply within one business day.</p>
+      <div class="form-status" data-ew="form-status" role="status" aria-live="polite"></div>
+    </form>
+  </div>
+</section>
+<!-- /ew:contact -->
 
 </main>
 
+<!-- ew:footer -->
 <footer class="site-footer">
   <div class="container">
     <div class="footer-grid">
       <div class="site-footer__brand">
-        <img src="assets/img/everwake-lockup.svg" alt="Everwake">
+        <img src="assets/img/everwake-lockup.svg" alt="Everwake" width="188" height="31">
         <p class="site-footer__tagline">Building the AI workforce of tomorrow</p>
+        <p class="site-footer__blurb">AI agents, automation and custom AI — designed, built and handed over, in Arabic and English.</p>
       </div>
       <div>
-        <h4>Services</h4>
+        <h2 class="site-footer__heading">Services</h2>
         <ul>
-          <li><a href="services.html">Conversational AI agents</a></li>
-          <li><a href="services.html">AI commerce platform</a></li>
-          <li><a href="services.html">Knowledge engineering</a></li>
-          <li><a href="services.html">Workflow automation</a></li>
+          <li><a href="services.html#voice-agents">Voice agents</a></li>
+          <li><a href="services.html#chat-agents">Chat agents</a></li>
+          <li><a href="services.html#ai-automation">AI automation solutions</a></li>
+          <li><a href="services.html#custom-ai">Custom AI solutions</a></li>
+          <li><a href="services.html#websites-crms">Websites &amp; CRMs</a></li>
+          <li><a href="services.html#smart-solutions">Smart solutions</a></li>
+          <li><a href="services.html#marketing">Marketing &amp; advertising</a></li>
+          <li><a href="services.html#consulting">AI consulting services</a></li>
         </ul>
       </div>
       <div>
-        <h4>Company</h4>
+        <h2 class="site-footer__heading">Company</h2>
         <ul>
-          <li><a href="approach.html">Approach</a></li>
-          <li><a href="work.html">Work</a></li>
-          <li><a href="agent.html">The Agent</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="blog.html">Blog</a></li>
           <li><a href="contact.html">Contact</a></li>
         </ul>
       </div>
       <div>
-        <h4>Talk to us</h4>
+        <h2 class="site-footer__heading">Talk to us</h2>
         <ul data-ew="footer-contacts"></ul>
-        <div data-ew="social" style="margin-top:var(--ew-space-5)"></div>
+        <div data-ew="social" class="site-footer__social"></div>
       </div>
     </div>
     <div class="footer-base">
-      <span>© 2026 Everwake. All rights reserved.</span>
+      <span>© <span data-ew="year">2026</span> Everwake. All rights reserved.</span>
       <span>Qatar &amp; the GCC · Egypt · remote delivery worldwide</span>
     </div>
   </div>
 </footer>
-
-<script src="site-config.js"></script>
-<script src="assets/js/site.js" defer></script>
-<script src="assets/js/agent-widget.js" defer></script>
+<!-- /ew:footer -->
 </body>
 </html>

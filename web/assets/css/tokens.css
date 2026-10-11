@@ -47,37 +47,48 @@
   --ew-critical-wash:   #FAECEA;
 
   /* ---- Typography -------------------------------------------------------
-     Inter Tight carries the headlines (the neutral grotesque voice the
-     Everwake documents already use). Lora carries the body — it is what
-     gives the brand its considered, consultative tone. Keep the pairing.
-     Arabic falls back to IBM Plex Sans Arabic / Noto Naskh Arabic. */
-  --ew-font-display: "Inter Tight", "Inter", "Helvetica Neue", Arial, sans-serif;
-  --ew-font-ui:      "Inter", "Helvetica Neue", Arial, sans-serif;
-  --ew-font-body:    "Lora", Georgia, "Times New Roman", serif;
-  --ew-font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --ew-font-ar-ui:   "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif;
-  --ew-font-ar-body: "Noto Naskh Arabic", "Amiri", serif;
+     Apple's type system. On Mac, iPhone and iPad, -apple-system renders
+     San Francisco itself — the exact font apple.com uses. SF Pro cannot be
+     legally embedded on a website, so every other device falls back to
+     Inter, the closest openly licensed match (it has the same optical-size
+     behaviour: tighter at display sizes, looser at text sizes).
+     One family for everything, as Apple does: no separate serif body. */
+  --ew-font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter",
+                     "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ew-font-ui:      -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter",
+                     "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ew-font-body:    var(--ew-font-ui);
+  --ew-font-mono:    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --ew-font-ar:      -apple-system, BlinkMacSystemFont, "SF Arabic", "IBM Plex Sans Arabic",
+                     "Noto Sans Arabic", Tahoma, sans-serif;
 
-  /* Fluid type scale — 1.25 ratio, clamped between 360px and 1440px */
-  --ew-text-xs:   0.75rem;                                  /* 12 — micro labels */
-  --ew-text-sm:   0.8125rem;                                /* 13 — eyebrows */
-  --ew-text-base: 1rem;                                     /* 16 */
-  --ew-text-md:   clamp(1.0625rem, 0.99rem + 0.31vw, 1.1875rem);
-  --ew-text-lg:   clamp(1.25rem,  1.15rem + 0.44vw, 1.5rem);
-  --ew-text-xl:   clamp(1.5rem,   1.33rem + 0.76vw, 1.95rem);
-  --ew-text-2xl:  clamp(1.875rem, 1.58rem + 1.30vw, 2.6rem);
-  --ew-text-3xl:  clamp(2.25rem,  1.75rem + 2.22vw, 3.5rem);
-  --ew-text-4xl:  clamp(2.75rem,  1.95rem + 3.55vw, 4.75rem);
+  /* Type scale, taken from apple.com's own sizes and clamped for mobile. */
+  --ew-text-xs:   0.75rem;                                    /* 12 */
+  --ew-text-sm:   0.875rem;                                   /* 14 */
+  --ew-text-base: 1rem;                                       /* 16 */
+  --ew-text-md:   1.0625rem;                                  /* 17 — Apple body */
+  --ew-text-lg:   clamp(1.1875rem, 1.12rem + 0.3vw,  1.3125rem); /* 19 → 21 */
+  --ew-text-xl:   clamp(1.5rem,    1.38rem + 0.5vw,  1.75rem);   /* 24 → 28 */
+  --ew-text-2xl:  clamp(2rem,      1.55rem + 1.9vw,  3rem);      /* 32 → 48 */
+  --ew-text-3xl:  clamp(2.5rem,    2rem + 2.1vw,     3.5rem);    /* 40 → 56 */
+  --ew-text-4xl:  clamp(2.75rem,   1.7rem + 4.4vw,   5rem);      /* 44 → 80 */
 
-  --ew-leading-tight:  1.1;
-  --ew-leading-snug:   1.25;
-  --ew-leading-normal: 1.5;
-  --ew-leading-relaxed:1.72;   /* body copy — Lora wants room */
+  --ew-leading-tight:   1.05;
+  --ew-leading-snug:    1.1;
+  --ew-leading-normal:  1.381;   /* Apple, 21px */
+  --ew-leading-relaxed: 1.4706;  /* Apple, 17px body */
 
-  /* Letterspacing. The wide-tracked caps label is an Everwake signature. */
-  --ew-track-label:  0.16em;
-  --ew-track-tight: -0.02em;
-  --ew-track-snug:  -0.01em;
+  /* Apple tracks San Francisco per size: tighter for big display type,
+     slightly negative for body. These are apple.com's values. */
+  --ew-track-hero:    -0.015em;  /* 80px */
+  --ew-track-heading: -0.003em;  /* 48px */
+  --ew-track-title:    0.009em;  /* 24px */
+  --ew-track-intro:    0.011em;  /* 21px */
+  --ew-track-body:    -0.022em;  /* 17px */
+  --ew-track-small:   -0.016em;  /* 14px */
+  --ew-track-label:    0.14em;   /* Everwake's wide caps label */
+  --ew-track-tight:   var(--ew-track-heading);
+  --ew-track-snug:    var(--ew-track-title);
 
   /* ---- Space — 4px base ------------------------------------------------- */
   --ew-space-1:  0.25rem;  --ew-space-2:  0.5rem;   --ew-space-3: 0.75rem;
@@ -95,7 +106,9 @@
   --ew-radius-sm: 3px;
   --ew-radius:    6px;
   --ew-radius-lg: 12px;
-  --ew-radius-pill: 999px;
+  --ew-radius-xl:  18px;
+  --ew-radius-2xl: 24px;
+  --ew-radius-pill: 980px;
 
   --ew-shadow-sm: 0 1px 2px rgba(11, 34, 46, 0.06);
   --ew-shadow:    0 2px 8px rgba(11, 34, 46, 0.07), 0 1px 2px rgba(11, 34, 46, 0.05);
@@ -109,12 +122,12 @@
 
 /* Arabic: swap the font stacks, keep every other token identical. */
 :lang(ar) {
-  --ew-font-display: var(--ew-font-ar-ui);
-  --ew-font-ui:      var(--ew-font-ar-ui);
-  --ew-font-body:    var(--ew-font-ar-body);
-  --ew-track-label:  0;          /* Arabic caps tracking does not apply */
-  --ew-track-tight:  0;
-  --ew-track-snug:   0;
+  --ew-font-display: var(--ew-font-ar);
+  --ew-font-ui:      var(--ew-font-ar);
+  --ew-font-body:    var(--ew-font-ar);
+  --ew-track-hero: 0; --ew-track-heading: 0; --ew-track-title: 0;
+  --ew-track-intro: 0; --ew-track-body: 0; --ew-track-small: 0; --ew-track-label: 0;
+  --ew-leading-tight: 1.25; --ew-leading-snug: 1.3;   /* Arabic needs taller lines */
 }
 
 @media (prefers-reduced-motion: reduce) {

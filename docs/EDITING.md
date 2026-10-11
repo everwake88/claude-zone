@@ -1,233 +1,209 @@
 # How to change things on your website
 
-No coding knowledge needed. Almost everything you will want to change lives in
-**one file**: `web/site-config.js`.
-
----
+No coding knowledge needed. Most changes happen in **one file**:
+`web/site-config.js`. Open it in VS Code (free) or any text editor.
 
 ## The golden rules
 
-1. **Only change the text between the quote marks** `"like this"`.
+1. **Change only the text between the quote marks** `"like this"`.
 2. **Keep the quote marks and the comma** at the end of each line.
-3. **Leave something empty** (`""`) and it disappears from the website
-   automatically. Nothing breaks.
-4. If something goes wrong, undo your change and save again. You cannot
-   permanently damage anything — every old version is kept in GitHub.
+3. **Leave something empty** (`""`) and it disappears from the site. Nothing breaks.
+4. Every saved version is kept in GitHub, so you can always go back.
+
+After any change: **save → commit → push** in GitHub Desktop. The live site
+updates in about a minute.
+
+> **Every push goes live.** Your Cloudflare site rebuilds from this branch
+> automatically, so check your change locally first (double-click
+> `web/index.html`) before you push.
 
 ---
 
-## Changing your contact details
-
-Open `web/site-config.js` and find section 2. It looks like this:
+## Contact details — section 2
 
 ```js
 contact: {
-  email: "",
-  whatsapp: "",
-  location: "",
+  email: "everwake88@gmail.com",
+  whatsapp: "+201144017735",     // the number the green button opens
+  phones: [
+    "+201144017735",
+    "+201554354929"
+  ],
+  location: ""                   // optional, e.g. "Cairo, Egypt"
+},
 ```
 
-Fill in what you have:
+- Numbers in **international format, no spaces**: Egypt `01144017735` → `+201144017735`.
+  The site formats them nicely for visitors itself.
+- Add another phone: copy a line inside `phones`, change the number. Every line
+  except the last ends with a comma.
+- To change which number the green WhatsApp button opens, change `whatsapp`.
+
+These appear in the footer of every page and in the contact section at the
+bottom of every page.
+
+## Social media — section 3
+
+Paste the full address of each profile:
 
 ```js
-contact: {
-  email: "hello@everwake.tech",
-  whatsapp: "+201554354929",
-  location: "Cairo, Egypt",
+linkedin:  "https://www.linkedin.com/company/everwake",
+instagram: "https://www.instagram.com/everwake",
 ```
 
-**The WhatsApp number must be written in full international format** with no
-spaces — `+201554354929`, not `0155 435 4929`. The website formats it nicely
-for visitors by itself.
+Icons appear for whichever you fill in. Until you fill in at least one, the
+social row is hidden entirely — no empty space, no dead icons.
 
-Save the file. Your email and number now appear in the footer of every page and
-on the contact page. You did not touch six separate pages — just this one.
-
-### The people clients can call
+## The green WhatsApp button — section 4
 
 ```js
-people: [
-  { name: "Abdelrhman Basem", role: "Co-founder", phone: "+201554354929" },
-  { name: "Ahmed El-Qady",    role: "Co-founder", phone: "+201144017735" }
-]
-```
-
-- Leave `phone` empty and that person shows with their role instead of a number.
-- To remove someone, delete their whole `{ ... },` line.
-- To add someone, copy an existing line and change the details. Make sure every
-  line except the last ends with a comma.
-
----
-
-## Adding your social media
-
-Find section 3 and paste the **full web address** of each profile:
-
-```js
-social: {
-  linkedin:  "https://www.linkedin.com/company/everwake",
-  instagram: "https://www.instagram.com/everwake",
-  facebook:  "",
-  x:         "",
-  youtube:   "",
-  tiktok:    ""
+whatsappButton: {
+  show: true,
+  label: "Chat on WhatsApp",
+  message: "Hello Everwake, I would like to know more about your services."
 }
 ```
 
-Icons appear automatically for whichever ones you fill in. Empty ones are
-hidden — so there is no half-finished row of dead icons.
+`message` is what is already typed for the visitor when WhatsApp opens. It is
+translated automatically when the visitor is reading in another language.
+Set `show: false` to hide the button.
 
-**You do not need to fill in `whatsapp` here.** If you entered a WhatsApp number
-in section 2, the WhatsApp icon is created for you.
+## The contact form — section 5
 
-The address must start with `https://`. Anything else is ignored for safety.
+The form at the bottom of every page works **today**: with nothing else set
+up, pressing Send opens WhatsApp with the visitor's enquiry already written,
+addressed to your WhatsApp number.
 
----
+**Strongly recommended — have enquiries arrive in your inbox (2 minutes, free):**
 
-## Where enquiries go
-
-Find section 4. You have three choices:
-
-| `mode` | What happens when someone submits the form |
-|---|---|
-| `"email"` | Opens their email app with the message filled in, addressed to you. **Works immediately, nothing to set up.** |
-| `"whatsapp"` | Opens WhatsApp with the message ready to send to you. |
-| `"formspree"` | The message is emailed to you silently, like a real form. Needs a free account. |
-
-`"email"` is the default and needs nothing from you except an email address.
-
-**To use Formspree** (nicer experience for the visitor):
-1. Go to [formspree.io](https://formspree.io) and create a free account.
-2. Create a new form. They give you an address like `https://formspree.io/f/abcdwxyz`.
-3. Paste it into `formspreeUrl` and change `mode` to `"formspree"`.
-
----
-
-## Putting your AI agent on the website
-
-Find section 5. This is the chat bubble in the bottom corner.
-
-**Right now it is hidden**, because there is nothing for it to talk to yet. It
-appears by itself as soon as you fill in one of the two options below.
-
-### Option A — connect your real agent (what you actually want)
-
-You already build these with n8n. Point the website at one:
-
-1. In n8n, create a workflow starting with a **Webhook** node, method `POST`.
-2. Connect it to your AI agent logic.
-3. End the workflow with a **Respond to Webhook** node returning JSON:
-   ```json
-   { "reply": "your agent's answer here" }
+1. Go to **[web3forms.com](https://web3forms.com)**.
+2. Type the email address enquiries should go to, and submit.
+3. They email you an **Access Key** (a long code).
+4. Paste it into `web3formsKey`:
+   ```js
+   web3formsKey: "a1b2c3d4-....",
    ```
-4. Copy the webhook's Production URL.
-5. Paste it into `webhookUrl` in `site-config.js`.
+5. Save, commit, push.
+
+Now the form sends silently, shows the visitor a "Thank you" message, and
+emails you the name, email, company, WhatsApp number, service and message.
+If sending ever fails, the visitor is offered your WhatsApp instead, and what
+they typed is kept.
+
+## Languages
+
+The site speaks **English, Arabic, Spanish and French**. Visitors switch with
+the globe button in the top bar; their choice is remembered on every page.
+Visitors whose browser is set to Arabic, Spanish or French get that language
+automatically on their first visit.
+
+Arabic switches the whole layout to right-to-left.
+
+### Changing a translation
+
+Translations live in `web/i18n/` — one file per language: `ar.js`, `es.js`,
+`fr.js`. Each line is a pair:
 
 ```js
-agent: {
-  mode: "auto",
-  webhookUrl: "https://n8n.everwake.tech/webhook/site-agent",
+"Book a free demo": "احجز عرضًا تجريبيًا مجانيًا",
 ```
 
-That is all. The bubble appears on every page.
+Change only the text on the **right**. The English on the left is how the
+site finds the line, so leave it exactly as it is.
 
-**What the website sends your workflow** on each message:
+### When you change English text on a page
+
+If you edit an English sentence in a page, its old translations no longer
+match, so that sentence shows in English in every language until you update
+the three language files: find the old English on the left, replace it with
+your new English, and update the translation on the right.
+
+Nothing breaks in the meantime — the sentence just stays in English.
+
+**To find every untranslated sentence on a page**, open it with `?i18n-debug=1`
+at the end of the address, plus the language, e.g.
+
+```
+web/pricing.html?lang=ar&i18n-debug=1
+```
+
+then press `F12` → **Console**. It lists every sentence still waiting for a
+translation. Zero means the page is fully translated.
+
+### Blog articles
+
+Article pages are published in English only, and show a short notice saying so
+in the other languages. The blog list, headings and everything around the
+articles are translated.
+
+## The AI chat on the website — section 7
+
+Hidden until you paste your agent's webhook address:
+
+```js
+webhookUrl: "https://n8n.everwake.tech/webhook/site-agent",
+```
+
+Then a chat panel appears in the opposite corner to the WhatsApp button. Each
+message is sent to your webhook as:
 
 ```json
-{
-  "message":   "what the visitor typed",
-  "sessionId": "a code identifying this visitor's conversation",
-  "history":   [ { "role": "user", "content": "..." } ],
-  "source":    "website",
-  "page":      "/services.html"
-}
+{ "message": "...", "sessionId": "...", "history": [...],
+  "language": "ar", "source": "website", "page": "/pricing" }
 ```
 
-Use `sessionId` to keep each visitor's conversation separate, and `history` so
-the agent remembers what was already said.
+`language` tells your agent which language the visitor is reading in, so it can
+answer in the same one. Reply with JSON such as `{ "reply": "..." }`.
 
-**What your workflow should send back** — any of these field names work, so you
-do not have to reshape an existing workflow: `reply`, `output`, `message`,
-`text`, `answer`, or `response`.
+> **CORS:** if the chat appears but every message fails, your webhook must allow
+> requests from `https://everwake.tech`. In n8n, set the response header
+> `Access-Control-Allow-Origin` to that address.
 
-> **One thing to check:** your n8n webhook must allow requests from your website
-> address (CORS). If the bubble appears but every message fails, that is almost
-> always the cause. In n8n, add a response header
-> `Access-Control-Allow-Origin` set to your website address.
+## Changing words on a page
 
-### Option B — WhatsApp instead (works today, zero setup)
+Pages are in the `web` folder:
 
-If you just fill in your WhatsApp number in section 2 and leave `webhookUrl`
-empty, the bubble becomes a "Chat with us" button that opens WhatsApp. That is
-a perfectly good starting point while the real agent is being built.
-
-### Changing what the agent says first
-
-```js
-greeting: "Ask me anything about what Everwake builds.",
-suggestions: [
-  "What exactly do you build?",
-  "How long does a project take?",
-  "Can I own the system outright?"
-]
-```
-
-The suggestions are the clickable buttons shown before the visitor types.
-
-### Turning it off
-
-Set `mode: "off"`.
-
----
-
-## Changing the words on a page
-
-The headings and paragraphs live inside the page files in the `web` folder:
-
-| File | The page |
+| File | Page |
 |---|---|
 | `index.html` | Home |
-| `services.html` | Services |
-| `agent.html` | The Agent |
-| `approach.html` | Approach |
-| `work.html` | Work |
+| `services.html` | Services (the eight service sections) |
+| `agent.html` | Chat agent product detail |
+| `pricing.html` | Pricing bundles |
+| `faq.html` | FAQ |
+| `blog.html` | Blog list |
+| `blog/*.html` | Blog articles |
+| `about.html` | About |
 | `contact.html` | Contact |
 
-Open a file and look for the text you want to change. It sits between tags that
-look like `<h2>` and `</h2>`, or `<p>` and `</p>`:
+Find the text and change only the words between tags like `<h2>` and `</h2>`.
+Write `&amp;` instead of `&`. Then update the translations (see above).
 
-```html
-<h2>Five services, one knowledge base.</h2>
-<p>In practice a client starts with one...</p>
-```
+**Don't edit anything between `<!-- ew:header -->` and `<!-- /ew:header -->`**
+(or `ew:head`, `ew:contact`, `ew:footer`). Those parts are shared by every page
+and are overwritten — see below.
 
-**Change only the words.** Leave the `<h2>` and `</h2>` parts alone.
+## Changing the top bar, footer or contact form
 
-> **Careful with symbols.** If your text needs an `&`, write `&amp;` instead.
-> `<` and `>` should be written `&lt;` and `&gt;`. Everything else is fine.
-
----
-
-## Changing the colours or fonts
-
-These live in `brand/tokens/everwake.css`. After changing anything there, run
-this once so every part of the brand updates together:
+The top bar, the Services dropdown, the footer and the contact form exist **once**,
+in `src/partials/`. After editing one, stamp it into every page:
 
 ```sh
-./sync-tokens.sh
+python3 tools/sync_chrome.py
 ```
 
-**One warning:** the gold `#B8913F` is not readable as text on a white
-background. If you want gold text on a light page, use `--ew-gold-ink` instead.
-This is already handled everywhere on the current site.
+It updates all pages, then checks every link and `#section` anchor on the site
+and tells you if anything is broken. If running commands isn't comfortable,
+ask Claude to make the change — this is exactly the kind of edit to hand over.
 
----
+## Colours and fonts
 
-## Checking your work
+In `brand/tokens/everwake.css`, then run `./sync-tokens.sh`.
 
-1. Open the `web` folder and double-click `index.html`. It opens in your browser.
-2. Look at the footer — are your details there?
-3. Press `F12`, click **Console**. If anything is still unfilled, a line tells
-   you exactly which setting it is waiting for. Visitors never see this.
+The site uses Apple's fonts: on a Mac, iPhone or iPad visitors see
+**San Francisco**, the exact font apple.com uses. San Francisco can't legally be
+embedded in a website, so everyone else gets **Inter**, the closest freely
+licensed match. Arabic uses San Francisco Arabic on Apple devices and
+IBM Plex Sans Arabic elsewhere.
 
-Then follow `docs/PUBLISH.md` to put the changes online.
+Gold `#B8913F` is unreadable as text on white — use `--ew-gold-ink` for gold
+text on light backgrounds.

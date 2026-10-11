@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://everwake.tech/</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://everwake.tech/services.html</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://everwake.tech/agent.html</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://everwake.tech/approach.html</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://everwake.tech/work.html</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://everwake.tech/contact.html</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://everwake.tech/</loc></url>
+  <url><loc>https://everwake.tech/services</loc></url>
+  <url><loc>https://everwake.tech/pricing</loc></url>
+  <url><loc>https://everwake.tech/faq</loc></url>
+  <url><loc>https://everwake.tech/blog</loc></url>
+  <url><loc>https://everwake.tech/about</loc></url>
+  <url><loc>https://everwake.tech/contact</loc></url>
+  <url><loc>https://everwake.tech/agent</loc></url>
+  <url><loc>https://everwake.tech/blog/model-persuades-code-calculates</loc></url>
+  <url><loc>https://everwake.tech/blog/baseline-first</loc></url>
+  <url><loc>https://everwake.tech/blog/answer-coverage</loc></url>
 </urlset>

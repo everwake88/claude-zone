@@ -6,28 +6,15 @@
   publish = "web"
   command = ""
 
-# Send the browser to the right page for addresses typed without ".html",
-# so everwake.tech/services works as well as everwake.tech/services.html
+# Pages that no longer exist, sent somewhere useful.
 [[redirects]]
-  from = "/services"
-  to = "/services.html"
-  status = 200
+  from = "/approach.html"
+  to = "/pricing.html#how-pricing-works"
+  status = 301
 [[redirects]]
-  from = "/agent"
-  to = "/agent.html"
-  status = 200
-[[redirects]]
-  from = "/approach"
-  to = "/approach.html"
-  status = 200
-[[redirects]]
-  from = "/work"
-  to = "/work.html"
-  status = 200
-[[redirects]]
-  from = "/contact"
-  to = "/contact.html"
-  status = 200
+  from = "/work.html"
+  to = "/index.html#proof"
+  status = 301
 
 [[headers]]
   for = "/*"

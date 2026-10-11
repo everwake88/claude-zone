@@ -2,16 +2,16 @@
    EVERWAKE — SITE SETTINGS
    ===========================================================================
 
-   This is the ONLY file you need to edit to change your contact details,
-   social media links, and the AI agent on your website.
+   The ONLY file you need to edit for contact details, social media, the
+   WhatsApp button, the contact form, languages and the AI agent.
 
    HOW TO EDIT:
      - Change only the text between the quote marks "like this".
      - Keep the quote marks and the comma at the end of each line.
-     - Leave something as ""  (empty) and it is hidden from the website
-       automatically. Nothing breaks. Fill it in whenever you are ready.
+     - Leave something as ""  (empty) and it is hidden from the website.
+       Nothing breaks. Fill it in whenever you are ready.
 
-   After editing, save the file and refresh your website.
+   Save the file, commit and push. The live site updates in about a minute.
    =========================================================================== */
 
 window.EVERWAKE = {
@@ -20,48 +20,37 @@ window.EVERWAKE = {
      1. COMPANY
      ----------------------------------------------------------------------- */
   company: {
-    name:     "Everwake",
-    tagline:  "Building the AI workforce of tomorrow",
-    markets:  "Qatar & the GCC · Egypt · remote delivery worldwide",
-    languages:"Arabic, including Gulf dialect · English"
+    name:      "Everwake",
+    tagline:   "Building the AI workforce of tomorrow",
+    markets:   "Qatar & the GCC · Egypt · remote delivery worldwide",
+    languages: "Arabic, including Gulf and Egyptian dialects · English"
   },
 
   /* -----------------------------------------------------------------------
      2. CONTACT DETAILS
-     Leave any line empty ("") and it disappears from the site.
+     Phone numbers in full international format: + then country code,
+     no spaces. Egypt 01144017735 becomes "+201144017735".
      ----------------------------------------------------------------------- */
   contact: {
-    // Your main email address. Example: "hello@everwake.tech"
     email: "everwake88@gmail.com",
 
-    // Your main WhatsApp / phone number, in full international format
-    // with no spaces or symbols except the leading +.
-    // Example: "+201554354929"
-    whatsapp: "",
+    // The number the WhatsApp button opens — your AI agent's line.
+    whatsapp: "+201144017735",
 
-    // Office or city line shown on the contact page. Example: "Cairo, Egypt"
-    location: "",
+    // Every number shown on the website. Add or remove lines freely.
+    phones: [
+      "+201144017735",
+      "+201554354929"
+    ],
 
-    // The people a client can call directly. Add or remove whole blocks.
-    // Delete a block by removing everything from { to },
-    people: [
-      {
-        name:  "Abdelrhman Basem",
-        role:  "Co-founder",
-        phone: ""            // Example: "+201554354929"
-      },
-      {
-        name:  "Ahmed El-Qady",
-        role:  "Co-founder",
-        phone: ""
-      }
-    ]
+    // Optional city line on the contact page. Example: "Cairo, Egypt"
+    location: ""
   },
 
   /* -----------------------------------------------------------------------
      3. SOCIAL MEDIA
-     Paste the FULL web address of each profile, starting with https://
-     Any line left empty is hidden from the website.
+     Paste the FULL address of each profile, starting with https://
+     Empty lines are hidden.
      ----------------------------------------------------------------------- */
   social: {
     linkedin:  "",   // https://www.linkedin.com/company/everwake
@@ -70,67 +59,73 @@ window.EVERWAKE = {
     x:         "",   // https://x.com/everwake
     youtube:   "",   // https://www.youtube.com/@everwake
     tiktok:    "",   // https://www.tiktok.com/@everwake
-    whatsapp:  ""    // Leave empty to build this automatically from the
-                     // WhatsApp number above.
+    whatsapp:  ""    // Optional — the green button already covers WhatsApp
   },
 
   /* -----------------------------------------------------------------------
-     4. THE CONTACT FORM
-     Where enquiries are delivered when someone fills in the form.
+     4. THE GREEN WHATSAPP BUTTON
+     Floats in the bottom corner of every page and opens a chat with the
+     WhatsApp number in section 2.
+     ----------------------------------------------------------------------- */
+  whatsappButton: {
+    show: true,                // true = visible, false = hidden
+    label: "Chat on WhatsApp",
+    // The message already typed for the visitor when WhatsApp opens.
+    message: "Hello Everwake, I would like to know more about your services."
+  },
+
+  /* -----------------------------------------------------------------------
+     5. THE CONTACT FORM (bottom of every page)
      ----------------------------------------------------------------------- */
   form: {
-    // "formspree"  — free, no server needed. Sign up at formspree.io, create
-    //                a form, and paste the address they give you below.
-    // "email"      — no form at all; the page shows your email instead.
-    // "whatsapp"   — the form button opens WhatsApp with the message ready.
-    mode: "email",
+    // "auto" is recommended. It picks the best option you have filled in:
+    //   Web3Forms key  →  messages arrive in your inbox (best)
+    //   Formspree URL  →  same, through Formspree
+    //   otherwise      →  the form opens WhatsApp with the message ready
+    mode: "auto",
 
-    // Only used when mode is "formspree". Looks like:
-    // "https://formspree.io/f/abcdwxyz"
-    formspreeUrl: ""
+    // RECOMMENDED — free, two minutes: go to web3forms.com, enter your
+    // email, and they email you an "Access Key". Paste it here.
+    web3formsKey: "",
+
+    // Alternative: a Formspree form address, e.g. "https://formspree.io/f/abcd1234"
+    formspreeUrl: "",
+
+    // The subject line of the email you receive.
+    subject: "New enquiry from everwake.tech"
   },
 
   /* -----------------------------------------------------------------------
-     5. YOUR AI AGENT ON THE WEBSITE
-     The chat bubble in the bottom corner. This is your own product, so the
-     website should demonstrate it.
+     6. LANGUAGES
+     Translations live in the web/i18n/ folder, one file per language.
+     ----------------------------------------------------------------------- */
+  languages: {
+    // Open the site in the visitor's own browser language when we have it.
+    autoDetect: true
+  },
 
-     mode options:
-       "auto"     — recommended. Uses the webhook below if you have filled
-                    it in; otherwise falls back to WhatsApp; otherwise stays
-                    hidden. You do not have to change this.
-       "webhook"  — always use your own AI endpoint (n8n, API, anything).
-       "whatsapp" — the bubble opens a WhatsApp chat instead.
-       "off"      — no bubble at all.
+  /* -----------------------------------------------------------------------
+     7. AI AGENT CHAT ON THE WEBSITE
+     A chat panel in the bottom corner that talks to your own AI agent.
+     It stays hidden until you paste a webhook address below.
      ----------------------------------------------------------------------- */
   agent: {
-    mode: "auto",
-
-    // The name shown at the top of the chat panel.
     name: "Everwake Agent",
-
-    // The first message the visitor sees.
     greeting: "Ask me anything about what Everwake builds — what it costs, how long it takes, or whether it fits your business.",
-
-    // Suggested questions shown as buttons. Remove any you do not want.
     suggestions: [
       "What exactly do you build?",
       "How long does a project take?",
       "Can I own the system outright?"
     ],
 
-    // ---- Connecting your real agent --------------------------------------
-    // Paste your n8n Webhook URL (or any API address) here. It should accept
-    // a POST request and reply with JSON.
+    // Your n8n Production Webhook URL (or any API address).
     // Example: "https://n8n.everwake.tech/webhook/site-agent"
     webhookUrl: "",
 
-    // The name of the field in YOUR reply that contains the answer text.
-    // n8n commonly returns { "reply": "..." } or { "output": "..." }.
-    // The widget also tries "message", "text" and "answer" automatically.
+    // The field in your agent's reply that holds the answer text.
+    // "reply", "output", "message", "text" and "answer" are all tried.
     responseField: "reply",
 
-    // Shown if your agent cannot be reached.
     errorMessage: "I could not reach the server just now. Please try again, or message us on WhatsApp."
   }
 };

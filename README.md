@@ -9,17 +9,17 @@ transformation and intelligent automation studio.
 
 ```
 brand/
-  logo/            7 logo variants, true vector
-  tokens/          everwake.css — the single source of truth
-web/
-  site-config.js   contacts, social links, form and AI agent — edit this
-  *.html           the six pages
-  assets/          styles, scripts, images
-templates/         proposal template            (Phase 4)
-deck/              company presentation         (Phase 5)
-social/            social media kit             (Phase 6)
-docs/ROADMAP.md    what is done and what is next
-sync-tokens.sh     push token changes to every deliverable
+  logo/              7 logo variants, true vector
+  tokens/            everwake.css — colour and type, single source of truth
+web/                 the website (static, no build step)
+  site-config.js     contacts, WhatsApp button, form, social, AI chat — edit this
+  i18n/              translations: ar.js, es.js, fr.js (+ i18n.js, the engine)
+  *.html, blog/      the pages
+  assets/            styles, scripts, images
+src/partials/        the shared top bar, footer, contact form and <head>
+tools/sync_chrome.py stamps src/partials into every page, then checks all links
+docs/                editing, publishing and go-live guides
+templates/ deck/ social/   upcoming phases
 ```
 
 ## Run the site locally
@@ -49,7 +49,8 @@ left empty is hidden from the site rather than shown as a placeholder.
 
 Step-by-step, assuming no coding knowledge:
 
-- **[docs/EDITING.md](docs/EDITING.md)** — how to change anything on the site
+- **[docs/EDITING.md](docs/EDITING.md)** — contacts, WhatsApp, the form, languages, page text
+
 - **[docs/GO-LIVE.md](docs/GO-LIVE.md)** — putting everwake.tech online via Cloudflare
 - **[docs/PUBLISH.md](docs/PUBLISH.md)** — GitHub basics and other hosting options
 

@@ -1,0 +1,63 @@
+<section class="section contact-band" id="get-in-touch" aria-labelledby="get-in-touch-title">
+  <div class="container contact-band__grid">
+    <div class="contact-band__intro">
+      <p class="eyebrow">Free demo</p>
+      <h2 id="get-in-touch-title">Tell us where the manual work is.</h2>
+      <p class="lede">Thirty minutes, no retainer, and an honest answer about whether automation is the right call for it. We reply within one business day.</p>
+
+      <ol class="contact-steps">
+        <li><span class="contact-steps__num" aria-hidden="true">01</span><span><strong>Discovery call.</strong> Where the manual work is, and what it costs you today.</span></li>
+        <li><span class="contact-steps__num" aria-hidden="true">02</span><span><strong>Free demo.</strong> The agent answering your own customers' questions.</span></li>
+        <li><span class="contact-steps__num" aria-hidden="true">03</span><span><strong>Written proposal.</strong> Scope, timeline and price. No retainer to receive it.</span></li>
+      </ol>
+
+      <div class="contact-direct" data-ew="contact-direct"></div>
+      <div data-ew="social" class="contact-band__social"></div>
+    </div>
+
+    <form class="form-card" data-ew="contact-form" action="#" method="post">
+      <div class="field">
+        <label for="cf-name">Your name <span class="req" aria-hidden="true">*</span></label>
+        <input id="cf-name" name="name" type="text" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label for="cf-email">Work email <span class="req" aria-hidden="true">*</span></label>
+        <input id="cf-email" name="email" type="email" autocomplete="email" required>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="cf-company">Company name</label>
+          <input id="cf-company" name="company" type="text" autocomplete="organization">
+        </div>
+        <div class="field">
+          <label for="cf-phone">WhatsApp number</label>
+          <input id="cf-phone" name="phone" type="tel" autocomplete="tel" dir="ltr">
+        </div>
+      </div>
+      <div class="field">
+        <label for="cf-interest">What are you interested in?</label>
+        <select id="cf-interest" name="interest">
+          <option value="">Select one</option>
+          <option value="Voice agents">Voice agents</option>
+          <option value="Chat agents">Chat agents</option>
+          <option value="AI automation solutions">AI automation solutions</option>
+          <option value="Custom AI solutions">Custom AI solutions</option>
+          <option value="Websites & CRMs">Websites &amp; CRMs</option>
+          <option value="Smart solutions">Smart solutions</option>
+          <option value="Marketing & advertising">Marketing &amp; advertising</option>
+          <option value="AI consulting services">AI consulting services</option>
+          <option value="Not sure yet">Not sure yet</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="cf-message">Tell us briefly about your business (optional)</label>
+        <textarea id="cf-message" name="message" rows="4"></textarea>
+      </div>
+      <!-- Hidden from people; bots fill it in, and the submission is dropped. -->
+      <input class="visually-hidden" type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn btn--primary btn--block btn--lg" type="submit">Send &amp; book my free demo <span aria-hidden="true" class="arrow">→</span></button>
+      <p class="form-note" data-ew="form-note">We reply within one business day.</p>
+      <div class="form-status" data-ew="form-status" role="status" aria-live="polite"></div>
+    </form>
+  </div>
+</section>

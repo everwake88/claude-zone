@@ -1,0 +1,58 @@
+<a class="ew-skip" href="#main">Skip to content</a>
+<div class="ew-band" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container site-header__inner">
+    <a class="brand" href="{{root}}index.html" aria-label="Everwake — home">
+      <img src="{{root}}assets/img/everwake-lockup-navy.svg" alt="Everwake" width="188" height="31">
+    </a>
+
+    <nav class="topnav" id="nav" aria-label="Primary">
+      <ul class="topnav__list">
+        <li><a class="topnav__link" href="{{root}}index.html" data-nav="home">Home</a></li>
+        <li class="topnav__item" data-ew-menu>
+          <button class="topnav__link topnav__trigger" type="button" aria-expanded="false" aria-controls="menu-services" data-nav="services">
+            Services
+            <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg>
+          </button>
+          <div class="menu" id="menu-services">
+            <ul class="menu__grid">
+              <li><a class="menu__link" href="{{root}}services.html#voice-agents"><span class="menu__icon">{{icon:voice}}</span><span><span class="menu__title">Voice agents</span><span class="menu__desc">Answer and place calls in Arabic and English</span></span></a></li>
+              <li><a class="menu__link" href="{{root}}services.html#chat-agents"><span class="menu__icon">{{icon:chat}}</span><span><span class="menu__title">Chat agents</span><span class="menu__desc">Sell and support on WhatsApp, Instagram and the web</span></span></a></li>
+              <li><a class="menu__link" href="{{root}}services.html#ai-automation"><span class="menu__icon">{{icon:automation}}</span><span><span class="menu__title">AI automation solutions</span><span class="menu__desc">Orders, follow-up and operations on autopilot</span></span></a></li>
+              <li><a class="menu__link" href="{{root}}services.html#custom-ai"><span class="menu__icon">{{icon:custom}}</span><span><span class="menu__title">Custom AI solutions</span><span class="menu__desc">Built around your data, rules and workflows</span></span></a></li>
+              <li><a class="menu__link" href="{{root}}services.html#websites-crms"><span class="menu__icon">{{icon:web}}</span><span><span class="menu__title">Websites &amp; CRMs</span><span class="menu__desc">Sites that convert, pipelines that fit how you sell</span></span></a></li>
+              <li><a class="menu__link" href="{{root}}services.html#smart-solutions"><span class="menu__icon">{{icon:smart}}</span><span><span class="menu__title">Smart solutions</span><span class="menu__desc">Dashboards, document processing and smart devices</span></span></a></li>
+              <li><a class="menu__link" href="{{root}}services.html#marketing"><span class="menu__icon">{{icon:marketing}}</span><span><span class="menu__title">Marketing &amp; advertising</span><span class="menu__desc">Campaigns and content in your brand's voice</span></span></a></li>
+              <li><a class="menu__link" href="{{root}}services.html#consulting"><span class="menu__icon">{{icon:consulting}}</span><span><span class="menu__title">AI consulting services</span><span class="menu__desc">An honest roadmap before anything is built</span></span></a></li>
+            </ul>
+            <a class="menu__all" href="{{root}}services.html">All services <span aria-hidden="true" class="arrow">→</span></a>
+          </div>
+        </li>
+        <li><a class="topnav__link" href="{{root}}pricing.html" data-nav="pricing">Pricing</a></li>
+        <li><a class="topnav__link" href="{{root}}faq.html" data-nav="faq">FAQ</a></li>
+        <li><a class="topnav__link" href="{{root}}blog.html" data-nav="blog">Blog</a></li>
+        <li><a class="topnav__link" href="{{root}}about.html" data-nav="about">About</a></li>
+        <li><a class="topnav__link" href="{{root}}contact.html" data-nav="contact">Contact</a></li>
+      </ul>
+    </nav>
+
+    <div class="header-tools">
+      <div class="lang" data-ew-menu>
+        <button class="lang__trigger" type="button" aria-expanded="false" aria-controls="menu-lang" aria-label="Change language">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg>
+          <span data-ew="lang-current" data-i18n-skip>EN</span>
+        </button>
+        <ul class="menu menu--lang" id="menu-lang" data-i18n-skip>
+          <li><button type="button" class="lang__option" data-lang="en" lang="en">English</button></li>
+          <li><button type="button" class="lang__option" data-lang="ar" lang="ar" dir="rtl">العربية</button></li>
+          <li><button type="button" class="lang__option" data-lang="es" lang="es">Español</button></li>
+          <li><button type="button" class="lang__option" data-lang="fr" lang="fr">Français</button></li>
+        </ul>
+      </div>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav">
+        <span class="nav-toggle__bars" aria-hidden="true"></span>
+        <span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </div>
+</header>

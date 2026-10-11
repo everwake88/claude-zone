@@ -1,7 +1,5 @@
-# Clean URLs — works on Netlify AND Cloudflare Pages, so the site behaves
-# identically whichever host it is on.
-/services    /services.html    200
-/agent       /agent.html       200
-/approach    /approach.html    200
-/work        /work.html        200
-/contact     /contact.html     200
+# Pages that no longer exist, sent somewhere useful (permanent redirects).
+/approach        /pricing#how-pricing-works   301
+/approach.html   /pricing#how-pricing-works   301
+/work            /#proof                      301
+/work.html       /#proof                      301
