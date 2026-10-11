@@ -8,9 +8,25 @@ About 30 minutes.
 Coolify project
 ├── n8n                (already there)
 ├── Evolution API      (already there)
-├── Postgres           (already there — the 2B agent's database)
+├── Postgres (agent)   (already there — the AI's database, untouched)
+├── Postgres (desk)    ← new: one click, for the desk's own data
 └── 2B Desk            ← new: this folder, built from its Dockerfile
 ```
+
+**No domain needed.** Coolify gives every app a free public HTTPS link on
+`sslip.io`, the same kind of address your n8n already uses. You can even pick
+a readable one: any name in front of your server's IP works, for example
+`https://2b-desk.<your-server-ip>.sslip.io`. A real domain can be added later
+in one field.
+
+## Step 0 — A database for the desk (2 min)
+
+In the same Coolify project: **+ New → Database → PostgreSQL** → Start.
+Copy its **Postgres URL (internal)** — you need it in Step 2.
+
+The desk keeps all its data in its own `desk` schema, so it can also share the
+AI's existing Postgres if you prefer. A separate one is simpler: nothing to
+look up, and the AI's database is never touched.
 
 ---
 
@@ -26,9 +42,12 @@ In Coolify: **+ New → Application → (your GitHub source) →
 | Base directory | `/2b-desk` |
 | Dockerfile location | `/Dockerfile` |
 | Ports exposes | `8080` |
-| Domain | e.g. `https://desk.everwake.tech` or `https://desk.<2b-domain>` — or keep the generated sslip.io address to start |
+| Domains | `https://2b-desk.<your-server-ip>.sslip.io` (free, works at once — keep the `https://` so Coolify issues a certificate). Later: your own domain. |
 
-Under **Advanced**, if the app cannot reach your Postgres by its internal name,
+If the repository is private, choose **Private Repository (with GitHub App)**
+and give Coolify's GitHub App access to `claude-zone`.
+
+Under **Advanced**, if the app cannot reach the Postgres by its internal name,
 enable **Connect to predefined network** (it puts the app on the same Docker
 network as the Postgres service).
 
@@ -38,7 +57,7 @@ In the app → **Environment Variables**:
 
 | Name | Value |
 |---|---|
-| `DATABASE_URL` | the **internal** connection URL shown on your Postgres service page in Coolify (the same database the AI uses) |
+| `DATABASE_URL` | the **Postgres URL (internal)** you copied in Step 0 |
 | `DESK_INGEST_SECRET` | a long random string — on any Mac/Linux: `openssl rand -hex 24` |
 | `N8N_SEND_SECRET` | another long random string |
 | `N8N_SEND_URL` | leave empty for now (Step 5 of [N8N.md](N8N.md) gives it to you) |
