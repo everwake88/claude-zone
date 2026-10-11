@@ -1,0 +1,6 @@
+node_modules/
+.env
+.env.*
+!.env.example
+# written by scripts/import-users.js — hand the passwords out, never commit them
+credentials-*.csv

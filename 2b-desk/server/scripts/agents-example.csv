@@ -1,0 +1,5 @@
+employee_id,full_name,username,role,max_chats
+2B-001,Ahmed Hassan,ahmed.hassan,agent,
+2B-002,Sara Mahmoud,sara.mahmoud,agent,
+2B-003,Omar Khaled,omar.khaled,agent,20
+2B-S01,Heba Farouk,heba.farouk,supervisor,

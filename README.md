@@ -20,7 +20,13 @@ deck/              company presentation         (Phase 5)
 social/            social media kit             (Phase 6)
 docs/ROADMAP.md    what is done and what is next
 sync-tokens.sh     push token changes to every deliverable
+2b-desk/           client project: 2B Desk, the human reply dashboard behind
+                   2B's WhatsApp / Messenger / Instagram AI agent
 ```
+
+> **2B Desk** has its own guide: [2b-desk/README.md](2b-desk/README.md). It is a
+> separate app (a Node.js server plus a dashboard) and deploys on its own —
+> nothing in it affects the Everwake website.
 
 ## Run the site locally
 

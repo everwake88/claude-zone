@@ -97,6 +97,24 @@ the stack, the ask.
 
 ---
 
+## Client delivery — 2B Desk ✅ BUILT (11 Oct 2026)
+
+The human side of 2B's AI agent: a reply dashboard for ~25–30 agents, with
+capacity routing (max 25 chats each), the 15-minute rule (reminders, hand-over
+at 10 minutes, hops every minute, LATE at 15), transfers between agents,
+Ready / Not ready with timers, check-in / check-out, typing activity, a
+busy / idle journey per chat, and day reports by category, channel and agent.
+Lives in `2b-desk/`; see `2b-desk/README.md`.
+
+| Item | Status |
+|---|---|
+| Server: routing + SLA engine, realtime, auth, reports (45 tests) | ✅ |
+| Dashboard: agent inbox, Live, Reports, Team, Settings, phone + dark mode | ✅ |
+| n8n: import-ready sender workflow + add-on nodes for both 2B agents | ✅ |
+| Deploy on the Coolify VPS, add the team, connect n8n | ⏳ with the client |
+
+---
+
 ## Working agreements
 
 - `brand/tokens/everwake.css` is the **only** place colour and type are defined.

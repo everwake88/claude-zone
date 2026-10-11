@@ -1,0 +1,24 @@
+{
+  "name": "2b-desk-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "2B Desk — the human reply dashboard behind the 2B AI agent: routing, SLA, realtime and analytics.",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "migrate": "node src/migrate.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "users:create": "node scripts/create-user.js",
+    "users:import": "node scripts/import-users.js",
+    "demo:seed": "node scripts/demo-seed.js",
+    "demo:live": "node scripts/demo-live.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.0",
+    "ws": "^8.18.0"
+  }
+}

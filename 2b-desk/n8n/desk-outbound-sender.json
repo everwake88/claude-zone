@@ -1,0 +1,329 @@
+{
+  "name": "2B — Desk Outbound Sender",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "desk-send",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "fbcf4255-281b-4fec-9755-e5b2212bf3dc",
+      "name": "Webhook: Desk Reply",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "2B Desk → n8n (X-Desk-Secret)"
+        }
+      },
+      "webhookId": "e1136339-704e-42b2-bf35-5b364e4b87db"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ╔══════════════════════════════════════════════════════════════════╗\n// ║  EDIT THIS BLOCK — copy the values from your two 2B workflows.   ║\n// ╚══════════════════════════════════════════════════════════════════╝\nconst CONFIG = {\n  // From \"2B — WhatsApp AI Sales Agent\" → node \"HTTP: Send Text\" (the part before /message/...).\n  EVO_BASE_URL : 'https://YOUR-EVOLUTION-API-HOST',\n  // The instance name at the end of that same URL.\n  EVO_INSTANCE : 'YOUR-INSTANCE-NAME',\n\n  // From \"2B — Meta Comments & DM Agent (FB + IG)\" → node \"Code: CONFIG\".\n  GRAPH_VERSION       : 'v26.0',\n  FB_PAGE_ID          : 'YOUR-FACEBOOK-PAGE-ID',\n  IG_USER_ID          : 'YOUR-INSTAGRAM-USER-ID',\n  IG_SEND_VIA_PAGE_ID : true,\n\n  // Meta lets a business answer within 24h of the customer's last message.\n  // With the \"Human Agent\" permission approved for your app, human replies\n  // may go out for 7 days: set this to true once Meta approves it.\n  USE_HUMAN_AGENT_TAG : false,\n};\nreturn [{ json: CONFIG }];"
+      },
+      "id": "9bfb2fa6-5b48-45d0-9a58-7aed08f9fbb6",
+      "name": "Code: CONFIG",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns the desk's reply into the exact request each channel needs.\nconst cfg = $('Code: CONFIG').first().json;\nconst b = $('Webhook: Desk Reply').first().json.body || {};\nconst channel = String(b.channel || '');\nconst text = String(b.text || '').trim();\nif (!text) throw new Error('The desk sent an empty reply.');\n\nconst out = { channel, text, message_id: b.message_id, customer_ref: String(b.customer_ref || '') };\nif (channel === 'whatsapp') {\n  out.number = String(b.phone || String(b.external_id || '').split('@')[0]).replace(/\\D/g, '');\n  out.url = cfg.EVO_BASE_URL.replace(/\\/+$/, '') + '/message/sendText/' + cfg.EVO_INSTANCE;\n} else if (channel === 'messenger' || channel === 'instagram') {\n  const sendId = channel === 'instagram' && !cfg.IG_SEND_VIA_PAGE_ID ? cfg.IG_USER_ID : cfg.FB_PAGE_ID;\n  out.url = 'https://graph.facebook.com/' + cfg.GRAPH_VERSION + '/' + sendId + '/messages';\n  out.payload = cfg.USE_HUMAN_AGENT_TAG\n    ? { recipient: { id: String(b.external_id) }, message: { text }, messaging_type: 'MESSAGE_TAG', tag: 'HUMAN_AGENT' }\n    : { recipient: { id: String(b.external_id) }, message: { text }, messaging_type: 'RESPONSE' };\n} else {\n  throw new Error('Unknown channel: ' + channel);\n}\nreturn [{ json: out }];"
+      },
+      "id": "90ed0de0-e2d0-4dde-ba33-2b8dd37c6885",
+      "name": "Code: Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4db25f95-a1be-40d9-9902-2abe972406f8",
+              "leftValue": "={{ $json.channel }}",
+              "rightValue": "whatsapp",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "f0a67c16-e056-41f9-980e-72bbfa84b495",
+      "name": "IF: WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.number, text: $json.text, delay: 500, linkPreview: /https?:\\/\\//.test($json.text) }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "id": "8d34f81f-5067-486c-954e-a4bfd4920037",
+      "name": "HTTP: Send WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Evolution API key (header: apikey)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "id": "23fba808-70e5-4dd7-a181-a0eff3dd2c21",
+      "name": "HTTP: Send Messenger / Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Meta Page token (the one the Meta agent uses)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One answer for the desk: did the customer get it?\nconst prep = $('Code: Prepare').first().json;\nconst r = $json || {};\nlet id = null;\nlet error = null;\nif (prep.channel === 'whatsapp') {\n  id = (r.key && r.key.id) || null;\n  const detail = r.response && r.response.message;\n  if (!id) error = Array.isArray(detail) && detail.some((d) => d && d.exists === false)\n    ? 'This number is not on WhatsApp.'\n    : (detail && JSON.stringify(detail)) || r.error || r.message || 'WhatsApp (Evolution API) did not confirm the message.';\n} else {\n  id = r.message_id || null;\n  if (!id) error = (r.error && (r.error.message || JSON.stringify(r.error))) || 'Meta did not confirm the message (24-hour window, or the page token expired?).';\n}\nreturn [{ json: {\n  ok: !!id,\n  external_message_id: id,\n  error: error ? String(error).slice(0, 300) : null,\n  customer_ref: prep.customer_ref,\n  text: prep.text,\n} }];"
+      },
+      "id": "d711c08a-cd92-40a6-94fe-04f4e0efc43f",
+      "name": "Code: Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: $json.ok, external_message_id: $json.external_message_id, error: $json.error }) }}",
+        "options": {}
+      },
+      "id": "c9468f2a-715a-47ea-8008-a95326cd2fa4",
+      "name": "Respond: Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- So the AI knows what the human said when it takes the customer back.\nSELECT agent.fn_log_outbound(($1::jsonb->>'customer_ref')::bigint, $1::jsonb->>'text', NULL::uuid) AS logged\n WHERE ($1::jsonb->>'ok')::boolean\n   AND COALESCE($1::jsonb->>'customer_ref', '') ~ '^[0-9]+$';",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify({ ok: $json.ok, customer_ref: $json.customer_ref, text: $json.text }) }}"
+        }
+      },
+      "id": "edaf5c83-704a-439c-9e43-b18b6da466d8",
+      "name": "Postgres: Remember for the AI",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1580,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "Postgres (the 2B agent database)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## 2B — Desk Outbound Sender\nThe 2B Desk calls this when a human agent replies.\n\n1. Fill **Code: CONFIG** (copy from your two agent workflows).\n2. Pick the credentials on the three marked nodes.\n3. Activate, then copy the **Production URL** of the webhook into the desk's `N8N_SEND_URL`.\n\nAnswers the desk with `{ ok, external_message_id, error }`.",
+        "height": 250,
+        "width": 420,
+        "color": 5
+      },
+      "id": "d01b71d6-127e-4014-814c-08fe9aebeb29",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        20
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: Desk Reply": {
+      "main": [
+        [
+          {
+            "node": "Code: CONFIG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: CONFIG": {
+      "main": [
+        [
+          {
+            "node": "Code: Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Prepare": {
+      "main": [
+        [
+          {
+            "node": "IF: WhatsApp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: Send Messenger / Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Send WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Code: Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Send Messenger / Instagram": {
+      "main": [
+        [
+          {
+            "node": "Code: Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Result": {
+      "main": [
+        [
+          {
+            "node": "Respond: Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond: Result": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Remember for the AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}

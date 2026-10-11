@@ -1,0 +1,38 @@
+# Run 2B Desk with its own Postgres — for trying it out, or on a plain VPS.
+#   docker compose up -d                 then open http://localhost:8080
+# In production on Coolify you normally point DATABASE_URL at the Postgres
+# that the 2B agent already uses instead (see docs/DEPLOY.md).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: desk
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-this-db-password}
+    volumes:
+      - desk-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d desk"]
+      interval: 5s
+      retries: 20
+
+  desk:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-change-this-db-password}@db:5432/desk
+      DESK_INGEST_SECRET: ${DESK_INGEST_SECRET:-}
+      N8N_SEND_URL: ${N8N_SEND_URL:-}
+      N8N_SEND_SECRET: ${N8N_SEND_SECRET:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Desk Admin}
+      DEMO_MODE: ${DEMO_MODE:-false}
+
+volumes:
+  desk-db:

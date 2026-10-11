@@ -1,0 +1,89 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-DESK-ADDRESS/api/ingest/message",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: 'whatsapp', external_id: $('Code: Normalize Inbound').item.json.wa_jid, phone: $('Code: Normalize Inbound').item.json.phone, customer_ref: String($json.customer_id), customer_name: $('Code: Normalize Inbound').item.json.push_name || '', text: $('Code: Normalize Inbound').item.json.text, external_message_id: $('Code: Normalize Inbound').item.json.wa_message_id }) }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "12454c8f-03ea-49c7-9a4e-ee151a61b717",
+      "name": "HTTP: Desk Mirror",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "2B Desk ingest (X-Desk-Secret)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Puts the desk's answer next to the customer row, so \"IF: Human Handoff?\"\n// keeps working unchanged: handoff = true while a human has this customer.\nconst row = $('Postgres: Upsert Customer').item.json;\nconst desk = $json || {};\nreturn { json: Object.assign({}, row, {\n  desk_active: desk.human_active === true,\n  handoff: row.handoff === true || desk.human_active === true,\n}) };"
+      },
+      "id": "a3d64b8f-5dfe-44cf-a223-62ceff3ea492",
+      "name": "Code: Desk Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Hand this customer to a human colleague in 2B Desk. Call it ONLY when: (complaint) something is broken, late, wrong, double-charged, or the customer is upset; (followup) they ask about an existing order, delivery, replacement or refund; (sales) they clearly commit to buying — call get_product_link first; (inquiry) they ask for a person, or you could not help after two tries. Never for browsing or price questions you can answer. The answer tells you: assigned (a colleague has it now), agents_ready (0 = nobody on shift), queue_position.",
+        "method": "POST",
+        "url": "https://YOUR-DESK-ADDRESS/api/ingest/handoff",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: 'whatsapp', external_id: $('Code: Build Agent Input').first().json.wa_jid, phone: $('Code: Build Agent Input').first().json.phone, customer_ref: String($('Code: Build Agent Input').first().json.customer_id), customer_name: $('Code: Build Agent Input').first().json.name || $('Code: Normalize Inbound').first().json.push_name || '', category: $fromAI('category', 'Why a human is needed. Exactly one of: sales, complaint, followup, inquiry.', 'string'), summary: $fromAI('summary', 'Note for your colleague, 1-3 short Arabic lines: what the customer wants, order number or product, budget, mood.', 'string'), history: ((($('Postgres: Load Context').first().json.ctx) || {}).history || []).slice(-20) }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "adeadf1e-a7ae-4fae-ab7c-35e9b5ca774e",
+      "name": "handoff_to_human",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        220
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "2B Desk ingest (X-Desk-Secret)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "HTTP: Desk Mirror": {
+      "main": [
+        [
+          {
+            "node": "Code: Desk Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
