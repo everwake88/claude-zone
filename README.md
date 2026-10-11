@@ -53,6 +53,11 @@ Step-by-step, assuming no coding knowledge:
 - **[docs/GO-LIVE.md](docs/GO-LIVE.md)** — putting everwake.tech online via Cloudflare
 - **[docs/PUBLISH.md](docs/PUBLISH.md)** — GitHub basics and other hosting options
 
+## Programmes and credits
+
+- **[docs/CLAUDE-STARTUPS.md](docs/CLAUDE-STARTUPS.md)** — Claude for Startups:
+  every eligibility requirement, benefit and term, and what to watch out for
+
 ## Changing the brand
 
 Colour, typography, spacing and motion live in `brand/tokens/everwake.css`.
