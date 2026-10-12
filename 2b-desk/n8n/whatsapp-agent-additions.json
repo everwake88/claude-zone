@@ -31,8 +31,8 @@
     },
     {
       "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "// Puts the desk's answer next to the customer row, so \"IF: Human Handoff?\"\n// keeps working unchanged: handoff = true while a human has this customer.\nconst row = $('Postgres: Upsert Customer').item.json;\nconst desk = $json || {};\nreturn { json: Object.assign({}, row, {\n  desk_active: desk.human_active === true,\n  handoff: row.handoff === true || desk.human_active === true,\n}) };"
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Puts the desk's answer next to the customer row, so \"IF: Human Handoff?\"\n// keeps working unchanged: handoff = true while a human has this customer.\n// If the desk could not be reached, the row passes through and the AI answers.\nlet rows = [];\ntry { rows = $('Postgres: Upsert Customer').all(); } catch (e) { rows = []; }\nreturn $input.all().map((item, i) => {\n  const row = ((rows[i] || rows[0]) || {}).json || {};\n  const desk = item.json || {};\n  return {\n    json: Object.assign({}, row, {\n      desk_active: desk.human_active === true,\n      handoff: row.handoff === true || desk.human_active === true,\n    }),\n    pairedItem: { item: i },\n  };\n});\n"
       },
       "id": "a3d64b8f-5dfe-44cf-a223-62ceff3ea492",
       "name": "Code: Desk Gate",
