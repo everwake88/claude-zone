@@ -3,7 +3,7 @@
 # to type a build command or a publish directory when connecting the site.
 
 [build]
-  publish = "web"
+  publish = "EVERWAKE WEBSITE/web"
   command = ""
 
 # Pages that no longer exist, sent somewhere useful.

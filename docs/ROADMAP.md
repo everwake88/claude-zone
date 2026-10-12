@@ -24,7 +24,7 @@ PDF, not traced — it is mathematically identical to the original at any size.
 ## Phase 2 — Website ✅ DONE
 
 Six pages, no build step, no dependencies. Deploys to Netlify, Vercel, Cloudflare
-Pages or GitHub Pages by pointing at `web/`.
+Pages or GitHub Pages by pointing at `EVERWAKE WEBSITE/web`.
 
 | Page | Purpose |
 |---|---|
@@ -42,12 +42,12 @@ every text/background pair, keyboard-navigable, print stylesheet included.
 
 | Item | Status |
 |---|---|
-| All contacts moved into one settings file | ✅ `web/site-config.js` |
+| All contacts moved into one settings file | ✅ `EVERWAKE WEBSITE/web/site-config.js` |
 | Social links with auto-hiding icons | ✅ |
 | Contact form with email / WhatsApp / Formspree modes | ✅ |
 | AI agent chat widget, ready for an n8n webhook | ✅ |
-| Beginner guide to editing the site | ✅ `docs/EDITING.md` |
-| Beginner guide to GitHub and going live | ✅ `docs/PUBLISH.md` |
+| Beginner guide to editing the site | ✅ `EVERWAKE WEBSITE/docs/EDITING.md` |
+| Beginner guide to GitHub and going live | ✅ `EVERWAKE WEBSITE/docs/PUBLISH.md` |
 | Netlify configuration so deploy settings cannot be mistyped | ✅ `netlify.toml` |
 
 Contacts, social links and the agent endpoint are deliberately left empty. The
@@ -67,7 +67,7 @@ later.
 | Contact form at the bottom of every page | ✅ |
 | English · Arabic (right-to-left) · Spanish · French | ✅ 501 strings each |
 | Apple's typography (San Francisco / Inter) | ✅ |
-| Shared chrome in one place, link checker | ✅ `tools/sync_chrome.py` |
+| Shared chrome in one place, link checker | ✅ `EVERWAKE WEBSITE/tools/sync_chrome.py` |
 
 ## Phase 3 — Brand book — NEXT
 

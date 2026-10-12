@@ -1,4 +1,4 @@
-# Publishes the web/ folder to GitHub Pages on every push to main.
+# Publishes the "EVERWAKE WEBSITE/web" folder to GitHub Pages on every push to main.
 # GitHub Pages serves from github.io, which is rarely blocked by ISPs, so this
 # is a useful alternative if netlify.app is unreachable from your network.
 #
@@ -30,6 +30,6 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: "EVERWAKE WEBSITE/web"
       - id: deployment
         uses: actions/deploy-pages@v4

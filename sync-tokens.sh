@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 SRC="brand/tokens/everwake.css"
 
 for dest in \
-  "web/assets/css/tokens.css" \
+  "EVERWAKE WEBSITE/web/assets/css/tokens.css" \
   "deck/assets/tokens.css" \
   "templates/proposal/assets/tokens.css"
 do

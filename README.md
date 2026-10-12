@@ -8,24 +8,25 @@ transformation and intelligent automation studio.
 ## Layout
 
 ```
-brand/
-  logo/              7 logo variants, true vector
-  tokens/            everwake.css — colour and type, single source of truth
-web/                 the website (static, no build step)
-  site-config.js     contacts, WhatsApp button, form, social, AI chat — edit this
-  i18n/              translations: ar.js, es.js, fr.js (+ i18n.js, the engine)
-  *.html, blog/      the pages
-  assets/            styles, scripts, images
-src/partials/        the shared top bar, footer, contact form and <head>
-tools/sync_chrome.py stamps src/partials into every page, then checks all links
-docs/                editing, publishing and go-live guides
-templates/ deck/ social/   upcoming phases
+EVERWAKE WEBSITE/        everything for the website
+  web/                   the live site — what visitors see
+    site-config.js       contacts, WhatsApp, form, social, AI chat — edit this
+    i18n/                Arabic, Spanish and French translations
+  src/partials/          the shared top bar, footer, contact form and <head>
+  tools/sync_chrome.py   stamps the shared parts into every page, checks links
+  docs/                  how to edit, publish and go live
+brand/                   logo and colours — shared by website, proposals, deck
+docs/ROADMAP.md          what is done and what is next
+templates/ deck/ social/ upcoming phases
+wrangler.jsonc           Cloudflare deploy settings (must stay at the top level)
+netlify.toml, .github/   other hosts' settings (must stay at the top level)
+sync-tokens.sh           push brand colour changes to every deliverable
 ```
 
 ## Run the site locally
 
 ```sh
-cd web && python3 -m http.server 8000
+cd "EVERWAKE WEBSITE/web" && python3 -m http.server 8000
 ```
 
 Then open <http://localhost:8000>.
@@ -33,26 +34,26 @@ Then open <http://localhost:8000>.
 ## Deploy
 
 The site is plain HTML, CSS and one small JavaScript file. Point any static
-host at the `web/` directory — no build command, no install step.
+host at the `EVERWAKE WEBSITE/web` directory — no build command, no install step.
 
 | Host | Setting |
 |---|---|
-| Netlify / Vercel | Publish directory `web`, build command empty |
-| Cloudflare Pages | Build output directory `web` |
+| Netlify / Vercel | Publish directory `EVERWAKE WEBSITE/web`, build command empty |
+| Cloudflare | Already configured by `wrangler.jsonc` |
 | GitHub Pages | Serve from `/web` on the default branch |
 
 ## Changing your details — start here
 
 Contact details, social links, the enquiry form and the AI agent are all set in
-**one file**: `web/site-config.js`. Nothing else needs touching, and anything
+**one file**: `EVERWAKE WEBSITE/web/site-config.js`. Nothing else needs touching, and anything
 left empty is hidden from the site rather than shown as a placeholder.
 
 Step-by-step, assuming no coding knowledge:
 
-- **[docs/EDITING.md](docs/EDITING.md)** — contacts, WhatsApp, the form, languages, page text
+- **[EVERWAKE WEBSITE/docs/EDITING.md](EVERWAKE%20WEBSITE/docs/EDITING.md)** — contacts, WhatsApp, the form, languages, page text
 
-- **[docs/GO-LIVE.md](docs/GO-LIVE.md)** — putting everwake.tech online via Cloudflare
-- **[docs/PUBLISH.md](docs/PUBLISH.md)** — GitHub basics and other hosting options
+- **[EVERWAKE WEBSITE/docs/GO-LIVE.md](EVERWAKE%20WEBSITE/docs/GO-LIVE.md)** — putting everwake.tech online via Cloudflare
+- **[EVERWAKE WEBSITE/docs/PUBLISH.md](EVERWAKE%20WEBSITE/docs/PUBLISH.md)** — GitHub basics and other hosting options
 
 ## Changing the brand
 

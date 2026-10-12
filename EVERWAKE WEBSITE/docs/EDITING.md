@@ -1,7 +1,7 @@
 # How to change things on your website
 
 No coding knowledge needed. Most changes happen in **one file**:
-`web/site-config.js`. Open it in VS Code (free) or any text editor.
+`EVERWAKE WEBSITE/web/site-config.js`. Open it in VS Code (free) or any text editor.
 
 ## The golden rules
 
@@ -15,7 +15,7 @@ updates in about a minute.
 
 > **Every push goes live.** Your Cloudflare site rebuilds from this branch
 > automatically, so check your change locally first (double-click
-> `web/index.html`) before you push.
+> `EVERWAKE WEBSITE` → `web` → `index.html`) before you push.
 
 ---
 
@@ -101,7 +101,7 @@ Arabic switches the whole layout to right-to-left.
 
 ### Changing a translation
 
-Translations live in `web/i18n/` — one file per language: `ar.js`, `es.js`,
+Translations live in `EVERWAKE WEBSITE/web/i18n/` — one file per language: `ar.js`, `es.js`,
 `fr.js`. Each line is a pair:
 
 ```js
@@ -124,7 +124,7 @@ Nothing breaks in the meantime — the sentence just stays in English.
 at the end of the address, plus the language, e.g.
 
 ```
-web/pricing.html?lang=ar&i18n-debug=1
+https://everwake.tech/pricing?lang=ar&i18n-debug=1
 ```
 
 then press `F12` → **Console**. It lists every sentence still waiting for a
@@ -161,7 +161,7 @@ answer in the same one. Reply with JSON such as `{ "reply": "..." }`.
 
 ## Changing words on a page
 
-Pages are in the `web` folder:
+Pages are in `EVERWAKE WEBSITE/web`:
 
 | File | Page |
 |---|---|
@@ -185,10 +185,10 @@ and are overwritten — see below.
 ## Changing the top bar, footer or contact form
 
 The top bar, the Services dropdown, the footer and the contact form exist **once**,
-in `src/partials/`. After editing one, stamp it into every page:
+in `EVERWAKE WEBSITE/src/partials/`. After editing one, stamp it into every page:
 
 ```sh
-python3 tools/sync_chrome.py
+python3 "EVERWAKE WEBSITE/tools/sync_chrome.py"
 ```
 
 It updates all pages, then checks every link and `#section` anchor on the site

@@ -58,7 +58,7 @@ This is where your website currently lives. (After Part 4 you will work on
 
 ### 1.4 Look at it
 
-Open the project folder, go into `web`, and double-click `index.html`. Your
+Open the project folder, go into `EVERWAKE WEBSITE`, then `web`, and double-click `index.html`. Your
 website opens in your browser. It is working — it is just only on your computer.
 
 ---
@@ -67,7 +67,7 @@ website opens in your browser. It is working — it is just only on your compute
 
 Let's add your email address.
 
-1. Open the project folder → `web` → `site-config.js`.
+1. Open the project folder → `EVERWAKE WEBSITE` → `web` → `site-config.js`.
    Open it with **Notepad** (Windows), **TextEdit** (Mac) or, better,
    **[VS Code](https://code.visualstudio.com)** — free and much easier to read.
 2. Find `email: ""` and put your address between the quotes:
@@ -102,7 +102,7 @@ yours, and it gives you a working address in about three minutes.
 Good for seeing it live right now.
 
 1. Go to **[app.netlify.com/drop](https://app.netlify.com/drop)**.
-2. Drag your **`web` folder** onto the page.
+2. Drag the **`web` folder** (inside `EVERWAKE WEBSITE`) onto the page.
 3. Done. You get an address like `https://random-name-123.netlify.app`.
 
 The catch: every time you change something you must drag the folder again.
@@ -121,9 +121,9 @@ Netlify watches GitHub and updates your site automatically every time you push.
    |---|---|
    | Branch to deploy | `main` (or `claude/jolly-darwin-i1bnww` for now) |
    | Build command | **leave completely empty** |
-   | Publish directory | `web` |
+   | Publish directory | `EVERWAKE WEBSITE/web` |
 
-   > The publish directory **must** be `web`, not blank. That is the folder your
+   > The publish directory **must** be `EVERWAKE WEBSITE/web`, not blank. That is the folder your
    > website actually lives in. This is the single most common mistake.
 
 5. Click **Deploy**.
@@ -185,7 +185,7 @@ Set it up, then put the address in `site-config.js`.
 Every change you ever make follows the same four steps:
 
 1. **Edit** the file on your computer and save it.
-2. **Check** it by opening `web/index.html` in your browser.
+2. **Check** it by opening `EVERWAKE WEBSITE/web/index.html` in your browser.
 3. **Commit** in GitHub Desktop with a short note about what you changed.
 4. **Push**.
 
@@ -245,11 +245,11 @@ professional on a proposal.
    |---|---|
    | Framework preset | **None** |
    | Build command | **leave empty** |
-   | Build output directory | `web` |
+   | Build output directory | `EVERWAKE WEBSITE/web` |
 
 4. **Save and Deploy.**
 
-Nothing in the project needs changing — `web/_redirects` and `web/_headers`
+Nothing in the project needs changing — `EVERWAKE WEBSITE/web/_redirects` and `_headers`
 already configure Cloudflare exactly as they configure Netlify.
 
 **Option C — GitHub Pages.** Served from `github.io`, which is almost never
@@ -257,7 +257,7 @@ blocked because developers everywhere depend on it.
 
 1. On github.com open your repository → **Settings → Pages**.
 2. Under **Source**, choose **GitHub Actions**.
-3. Push to `main`. The included workflow publishes `web/` automatically.
+3. Push to `main`. The included workflow publishes `EVERWAKE WEBSITE/web` automatically.
 
 Your address becomes `https://everwake88.github.io/claude-zone/`.
 
@@ -289,7 +289,7 @@ Check in order: did you commit? did you push? Then open Netlify and look at
 
 **The agent bubble does not appear.**
 That is deliberate until it is configured. See the agent section of
-`docs/EDITING.md`.
+`EDITING.md` (in this same folder).
 
 **The agent appears but every message fails.**
 Almost always CORS on your n8n webhook. See the same section.

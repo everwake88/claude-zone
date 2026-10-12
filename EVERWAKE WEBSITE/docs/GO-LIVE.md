@@ -57,7 +57,7 @@ Then click **Deploy**. That is all.
 
 There is no "output directory" box on this screen, and you do not need one —
 the `wrangler.jsonc` file in the repository tells Cloudflare that the website is
-in the `web/` folder. It is already committed, so Cloudflare reads it when it
+in the `EVERWAKE WEBSITE/web` folder. It is already committed, so Cloudflare reads it when it
 clones the project.
 
 > **Branch:** your repository's default branch is
@@ -75,7 +75,7 @@ directory**, fill it in like this:
 | Production branch | `claude/jolly-darwin-i1bnww` |
 | Framework preset | **None** |
 | Build command | **leave empty** |
-| Build output directory | `web` |
+| Build output directory | `EVERWAKE WEBSITE/web` |
 
 ### Either way
 
@@ -85,7 +85,7 @@ this guide is only about putting your own name on it.
 
 **If you get a "page not found" or a file listing instead**, Cloudflare served
 the wrong folder. On Screen A, check that `wrangler.jsonc` exists in your
-repository. On Screen B, set the build output directory to `web` and redeploy.
+repository. On Screen B, set the build output directory to `EVERWAKE WEBSITE/web` and redeploy.
 Tell me what you see and I will sort it.
 
 ## Step 2 — Move everwake.tech to Cloudflare DNS
@@ -237,7 +237,7 @@ Buying the domain does **not** include email. Options:
 Whichever you choose, it gives you **MX records** to add in Cloudflare:
 **DNS → Records → Add record**, type **MX**, with the values they give you.
 
-Then update `web/site-config.js`:
+Then update `EVERWAKE WEBSITE/web/site-config.js`:
 
 ```js
 email: "hello@everwake.tech",
@@ -262,7 +262,7 @@ Cloudflare rebuilds the live site within about a minute. Nothing else to do.
 **"Page not found" on the pages.dev address.**
 Cloudflare is serving the wrong folder. Either `wrangler.jsonc` is missing from
 the repository, or (on the classic screen) the build output directory is not
-set to `web`. Fix it, then **Retry deployment**.
+set to `EVERWAKE WEBSITE/web`. Fix it, then **Retry deployment**.
 
 **The domain still shows a Hostinger parking page.**
 DNS has not propagated yet. Wait. To confirm what the world sees, check
