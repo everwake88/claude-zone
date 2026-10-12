@@ -331,12 +331,18 @@ function ReassignMenu({ conv }) {
   <//>`;
 }
 
+// A real number shows as +20…; WhatsApp's private ids ("…@lid") are not phone numbers.
+function phoneLabel(conv) {
+  const p = String(conv.customer_phone || '').replace(/^\+/, '');
+  return /^\d{6,}$/.test(p) ? `+${p}` : null;
+}
+
 function Header({ conv, me, onDetails }) {
   const t = useNow(1000);
   const mineNow = conv.assigned_to === me.user.id;
   const sup = isSup(me);
   const canAct = conv.status !== 'closed' && (mineNow || sup);
-  const contact = conv.customer_phone ? `+${String(conv.customer_phone).replace(/^\+/, '')}` : conv.external_id.replace(/@.*/, '');
+  const contact = phoneLabel(conv) || (conv.external_id.endsWith('@lid') ? 'WhatsApp (number hidden)' : conv.external_id.replace(/@.*/, ''));
   return html`<header class="convo__head">
     <button class="btn ghost icon only-sm" onClick=${() => go('inbox')} aria-label="Back"><${Icon} name="chevronLeft" /></button>
     <${Avatar} name=${customerName(conv)} size="lg" />
@@ -397,7 +403,7 @@ function Details({ conv, thread, onClose, asDrawer }) {
       <div class="kv">
         <div><span>Name</span><b dir="auto">${conv.customer_name || '—'}</b></div>
         <div><span>Source</span><b>${CHANNEL_NAMES[conv.channel]}</b></div>
-        ${conv.customer_phone ? html`<div><span>Phone</span><b>+${String(conv.customer_phone).replace(/^\+/, '')}</b></div>` : null}
+        ${phoneLabel(conv) ? html`<div><span>Phone</span><b>${phoneLabel(conv)}</b></div>` : null}
         <div><span>${conv.channel === 'whatsapp' ? 'WhatsApp ID' : 'Account ID'}</span><b>${conv.external_id.replace(/@.*/, '')}</b></div>
         ${conv.customer_ref ? html`<div><span>Customer no.</span><b>${conv.customer_ref}</b></div>` : null}
       </div>
