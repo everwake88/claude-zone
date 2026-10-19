@@ -1,0 +1,439 @@
+{
+  "name": "Everwake — Outbox + Housekeeping",
+  "nodes": [
+    {
+      "name": "Sticky — Outbox",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "content": "## Everwake · Outbox\nEverything the dashboard and the system send — staff replies from the inbox, order status messages, the \"we're back\" message after the agent is switched on again — is written to `everwake.outbox` first, so nothing is lost while WhatsApp or n8n is down.\nRuns **every minute** (plus housekeeping: idle takeovers return to the agent, stuck locks and sends are freed, expired out-of-stock items come back) and **immediately** when the dashboard pings **POST /webhook/everwake-outbox** (header auth: the *Everwake Outbox Secret* credential, the same value as the dashboard's N8N_OUTBOX_SECRET).\nFailed sends retry 3 times, 30 s apart, then show as failed in the dashboard with the reason.",
+        "width": 1400,
+        "height": 240,
+        "color": 5
+      },
+      "id": "d2342c47-53e1-5c0e-a0a4-90ea8a764d1c"
+    },
+    {
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        340
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "70fb68cf-ad84-5b48-a0b5-477bcc4a1238"
+    },
+    {
+      "name": "Ping From Dashboard",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        560
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "everwake-outbox",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EVERWAKE_OUTBOX",
+          "name": "Everwake Outbox Secret"
+        }
+      },
+      "id": "f534d5ae-708c-5f13-abd6-4485ab576d63",
+      "webhookId": "423e39be-b0b2-546e-a408-8bd60c6f549f"
+    },
+    {
+      "name": "Housekeeping",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        340
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.housekeeping() as r;",
+        "options": {}
+      },
+      "id": "0e59d855-bdcb-50e9-ae9b-b1afcf6eaa9d"
+    },
+    {
+      "name": "Claim Batch",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        460
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.outbox_claim(25, 'n8n') as r;",
+        "options": {}
+      },
+      "id": "4a178808-0fd6-5580-a701-6ef8f3204745"
+    },
+    {
+      "name": "One Item Per Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        460
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Outbox · NODE: One Item Per Message\n// The claimed batch → one item per message, each with the restaurant's\n// own WhatsApp connection. Nothing claimed → nothing to do.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\nconst batch = arr(parseJson(obj($input.first().json).r, []));\nreturn batch.map(m => {\n  const ch = obj(m.channel);\n  return {\n    json: {\n      id: m.id, tenant_id: m.tenant_id, wa_id: m.wa_id, to: m.to, purpose: m.purpose,\n      kind: m.kind === 'document' ? 'document' : (m.kind === 'image' ? 'image' : 'text'),\n      text: str(m.body), media_url: m.media_url || null, mime: m.media_mime || (m.kind === 'document' ? 'application/pdf' : 'image/jpeg'),\n      file_name: m.file_name || (m.kind === 'document' ? 'file.pdf' : 'photo.jpg'),\n      base_url: str(ch.base_url), instance: str(ch.instance), api_key: str(ch.api_key),\n      delay_ms: Math.min(1500, Math.max(400, Math.round(str(m.body).length * 8)))\n    }\n  };\n});\n"
+      },
+      "id": "f462987d-277a-5d4c-a00c-8b28f77f9bc8"
+    },
+    {
+      "name": "Send Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        460
+      ],
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "47c738a9-893e-5db9-af93-86f01dc44873"
+    },
+    {
+      "name": "Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {},
+      "id": "e6c1efa1-61e3-5ab8-a95f-b0a0bb8fb63d"
+    },
+    {
+      "name": "Route: Text?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1100,
+        500
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "18a21ca7-ae7e-5de2-a164-711268f2e084",
+              "leftValue": "={{ $json.kind === 'text' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9107e681-9910-5be0-a626-7d5709a627ed"
+    },
+    {
+      "name": "Evolution — Send Text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1320,
+        420
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.base_url }}/message/sendText/{{ $json.instance }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.to, text: $json.text, delay: $json.delay_ms, linkPreview: /https?:\\/\\//.test($json.text) }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "7a7b6ab2-8d10-58b5-a30e-6823f486c406"
+    },
+    {
+      "name": "Evolution — Send Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1320,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.base_url }}/message/sendMedia/{{ $json.instance }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.to, mediatype: $json.kind, mimetype: $json.mime, media: $json.media_url, fileName: $json.file_name, caption: $json.text || undefined, delay: $json.delay_ms }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "3ec22659-215b-5bde-ada1-37c06ad9026f"
+    },
+    {
+      "name": "Record Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        500
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Outbox · NODE: Record Result\n// Evolution's answer → sent, or a retry (up to 3 attempts), or failed\n// with the reason the dashboard shows next to the message.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\nconst item = $('Send Loop').first().json;\nconst r = $input.first().json || {};\nconst body = obj(r.body && typeof r.body === 'object' ? r.body : r);\nconst id = str(obj(body.key).id) || null;\nconst ok = !!id && !r.error;\nlet error = null;\nif (!ok) {\n  const detail = obj(body.response).message;\n  error = Array.isArray(detail) && detail.some(d => d && d.exists === false)\n    ? 'This number is not on WhatsApp.'\n    : str(obj(r.error).message || r.error || (detail && JSON.stringify(detail)) || body.message || 'WhatsApp (Evolution) did not confirm the message.');\n}\nreturn [{ json: { b64_result: b64({ id: item.id, ok, external_id: id, error: error ? error.slice(0, 300) : null }) } }];\n"
+      },
+      "id": "5f5a0ed4-9704-5f1e-a491-dbf571747878"
+    },
+    {
+      "name": "Save Result",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1760,
+        500
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.outbox_result(convert_from(decode($1::text, 'base64'), 'UTF8')::jsonb) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $json.b64_result ] }}"
+        }
+      },
+      "id": "cf360a18-8911-5c17-abad-2d99d55307c0"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Housekeeping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Housekeeping": {
+      "main": [
+        [
+          {
+            "node": "Claim Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ping From Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Claim Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Batch": {
+      "main": [
+        [
+          {
+            "node": "One Item Per Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One Item Per Message": {
+      "main": [
+        [
+          {
+            "node": "Send Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Loop": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route: Text?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Text?": {
+      "main": [
+        [
+          {
+            "node": "Evolution — Send Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Evolution — Send Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution — Send Text": {
+      "main": [
+        [
+          {
+            "node": "Record Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution — Send Media": {
+      "main": [
+        [
+          {
+            "node": "Record Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Result": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Result": {
+      "main": [
+        [
+          {
+            "node": "Send Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
