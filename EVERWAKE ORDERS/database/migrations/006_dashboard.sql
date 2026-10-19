@@ -532,3 +532,44 @@ begin
   end if;
   delete from everwake.tenant_members where tenant_id = p_tenant and user_id = p_user;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- A dish's choices, saved as a whole (levels in the order given)
+-- p_groups = [{"label_ar","label_en","required","min","max",
+--              "options":[{"name_ar","name_en","aliases":[],"price_delta","extra_charge","is_available"}]}]
+-- ---------------------------------------------------------------------
+create or replace function everwake.save_item_choices(p_item uuid, p_groups jsonb)
+returns int language plpgsql security definer set search_path = everwake, pg_temp as $$
+declare
+  v_tenant uuid;
+  g jsonb; o jsonb;
+  v_group uuid;
+  v_level int := 0;
+  v_sort int;
+begin
+  select tenant_id into v_tenant from everwake.menu_items where id = p_item;
+  if v_tenant is null then raise exception 'dish not found'; end if;
+  perform everwake.require_role(v_tenant, array['owner', 'manager']);
+  delete from everwake.menu_option_groups where item_id = p_item;
+  for g in select * from jsonb_array_elements(coalesce(p_groups, '[]'::jsonb)) loop
+    continue when jsonb_array_length(coalesce(g -> 'options', '[]'::jsonb)) = 0 or coalesce(btrim(g ->> 'label_ar'), '') = '';
+    v_level := v_level + 1;
+    insert into everwake.menu_option_groups (tenant_id, item_id, level, label_ar, label_en, required, min_select, max_select)
+    values (v_tenant, p_item, v_level, btrim(g ->> 'label_ar'), nullif(btrim(g ->> 'label_en'), ''),
+            coalesce((g ->> 'required')::boolean, false),
+            greatest(0, coalesce(nullif(g ->> 'min', '')::int, case when coalesce((g ->> 'required')::boolean, false) then 1 else 0 end)),
+            nullif(g ->> 'max', '')::int)
+    returning id into v_group;
+    v_sort := 0;
+    for o in select * from jsonb_array_elements(g -> 'options') loop
+      continue when coalesce(btrim(o ->> 'name_ar'), '') = '';
+      v_sort := v_sort + 10;
+      insert into everwake.menu_options (tenant_id, group_id, name_ar, name_en, aliases, price_delta, extra_charge, is_available, sort)
+      values (v_tenant, v_group, btrim(o ->> 'name_ar'), nullif(btrim(o ->> 'name_en'), ''),
+              coalesce((select array_agg(btrim(a)) from jsonb_array_elements_text(o -> 'aliases') a where btrim(a) <> ''), '{}'),
+              coalesce(nullif(o ->> 'price_delta', '')::numeric, 0), coalesce((o ->> 'extra_charge')::boolean, false),
+              coalesce((o ->> 'is_available')::boolean, true), v_sort);
+    end loop;
+  end loop;
+  return v_level;
+end $$;

@@ -17,12 +17,19 @@ export const DB_NAME = process.env.ENGINE_TEST_DB || 'everwake_engine_test';
 const conn = { host: process.env.PGHOST || 'localhost', user: process.env.PGUSER || 'tester',
                password: process.env.PGPASSWORD || 'tester' };
 
+const pgEnv = () => ({ ...process.env, PGHOST: conn.host, PGUSER: conn.user, PGPASSWORD: conn.password });
+
+// a SQL file from database/, run with psql against the test database
+export function psqlFile(path) {
+  execFileSync('psql', ['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-d', DB_NAME, '-f', join(DB_DIR, path)], { env: pgEnv() });
+}
+
 export function freshDatabase() {
-  const env = { ...process.env, PGHOST: conn.host, PGUSER: conn.user, PGPASSWORD: conn.password };
-  execFileSync('psql', ['-X', '-q', '-d', 'postgres', '-c', `drop database if exists ${DB_NAME}`, '-c', `create database ${DB_NAME}`], { env });
+  execFileSync('psql', ['-X', '-q', '-d', 'postgres', '-c', `drop database if exists ${DB_NAME}`, '-c', `create database ${DB_NAME}`], { env: pgEnv() });
   const files = readdirSync(join(DB_DIR, 'migrations')).filter(f => /^0[0-8]\d_.*\.sql$/.test(f)).sort();
-  for (const f of files) execFileSync('psql', ['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-d', DB_NAME, '-f', join(DB_DIR, 'migrations', f)], { env });
-  execFileSync('psql', ['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-d', DB_NAME, '-f', join(DB_DIR, 'seed', 'demo_restaurant.sql')], { env });
+  for (const f of files) psqlFile(join('migrations', f));
+  psqlFile(join('seed', 'demo_restaurant.sql'));
+  psqlFile(join('tools', 'import_legacy.sql'));
 }
 
 export async function connect() {

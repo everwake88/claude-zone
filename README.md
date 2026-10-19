@@ -15,6 +15,11 @@ EVERWAKE WEBSITE/        everything for the website
   src/partials/          the shared top bar, footer, contact form and <head>
   tools/sync_chrome.py   stamps the shared parts into every page, checks links
   docs/                  how to edit, publish and go live
+EVERWAKE ORDERS/         WhatsApp ordering for restaurant chains — see its README
+  database/              the schema and every function the engine calls, with tests
+  engine/                the n8n workflows, generated from src/ and prompts/
+  dashboard/             the restaurant dashboard (Next.js + Supabase)
+  docs/                  how it works, setup, signing up a restaurant, operations
 brand/                   logo and colours — shared by website, proposals, deck
 docs/ROADMAP.md          what is done and what is next
 templates/ deck/ social/ upcoming phases
@@ -41,6 +46,13 @@ host at the `EVERWAKE WEBSITE/web` directory — no build command, no install st
 | Netlify / Vercel | Publish directory `EVERWAKE WEBSITE/web`, build command empty |
 | Cloudflare | Already configured by `wrangler.jsonc` |
 | GitHub Pages | Serve from `/web` on the default branch |
+
+## Everwake Orders
+
+The WhatsApp ordering platform: one AI ordering agent serving every
+restaurant, and a dashboard each restaurant runs it from. Start at
+**[EVERWAKE ORDERS/README.md](EVERWAKE%20ORDERS/README.md)**, then
+[docs/SETUP.md](EVERWAKE%20ORDERS/docs/SETUP.md) to set it up.
 
 ## Changing your details — start here
 

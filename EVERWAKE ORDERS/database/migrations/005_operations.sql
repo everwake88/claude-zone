@@ -459,6 +459,12 @@ begin
        set is_available = p_available or p_until is not null,
            sold_out_until = case when p_available then null else p_until end
      where id = p_item;
+    -- back on everywhere means every branch too
+    if p_available then
+      update everwake.menu_item_branches
+         set is_available = true, sold_out_until = null, updated_at = now()
+       where item_id = p_item and (not is_available or sold_out_until is not null);
+    end if;
   else
     insert into everwake.menu_item_branches (tenant_id, item_id, branch_id, is_available, sold_out_until)
     values (v_tenant, p_item, p_branch, p_available or p_until is not null, case when p_available then null else p_until end)

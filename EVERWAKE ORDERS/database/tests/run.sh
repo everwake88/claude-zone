@@ -17,6 +17,7 @@ for f in migrations/0*.sql; do
   "${PSQL[@]}" -f "$f"
 done
 "${PSQL[@]}" -f seed/demo_restaurant.sql
+"${PSQL[@]}" -f tools/import_legacy.sql
 
 pass=0
 for t in tests/[0-9]*.sql; do

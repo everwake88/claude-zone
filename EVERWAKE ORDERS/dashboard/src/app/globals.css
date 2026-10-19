@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* Everwake brand tokens (brand/tokens/everwake.css), as Tailwind colours */
+@theme {
+  --color-navy: #0B222E;
+  --color-navy-deep: #071822;
+  --color-navy-raised: #102C3A;
+  --color-navy-soft: #16384A;
+  --color-gold: #B8913F;
+  --color-gold-bright: #D4A94B;
+  --color-gold-ink: #8A6B23;
+  --color-gold-wash: #F6F0E2;
+  --color-gold-line: #E3D4AE;
+  --color-paper: #F3F5F6;
+  --color-paper-sunk: #E9EDEF;
+  --color-hairline: #DFE5E8;
+  --color-ink: #0B222E;
+  --color-muted: #51666F;
+  --color-on-navy-muted: #9FB3BC;
+  --color-positive: #2E7D5B;
+  --color-positive-wash: #E8F2ED;
+  --color-caution: #9A6B1E;
+  --color-caution-wash: #FBF2E2;
+  --color-critical: #A33B32;
+  --color-critical-wash: #FAECEA;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-ar: -apple-system, BlinkMacSystemFont, "SF Arabic", "IBM Plex Sans Arabic", "Noto Sans Arabic", Tahoma, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html, body { background: var(--color-paper); color: var(--color-ink); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; letter-spacing: -0.011em; }
+
+/* Arabic text (dishes, chats) gets the Arabic stack and reads right to left */
+[dir="rtl"], .ar { font-family: var(--font-ar); }
+
+.label-caps { font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-muted); }
+
+/* the inbox thread wraps long Arabic and links cleanly */
+.bubble { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Leaflet needs its own height */
+.leaflet-container { height: 100%; width: 100%; border-radius: 12px; }
+
+@keyframes ew-ring { 0%, 100% { box-shadow: 0 0 0 0 rgba(184, 145, 63, 0.55); } 50% { box-shadow: 0 0 0 8px rgba(184, 145, 63, 0); } }
+.ring-new { animation: ew-ring 1.6s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) { .ring-new { animation: none; } }

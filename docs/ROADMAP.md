@@ -112,6 +112,33 @@ the stack, the ask.
 
 ---
 
+## Everwake Orders — WhatsApp ordering platform
+
+The Seagull agent rebuilt as one engine for every restaurant, with a
+dashboard each restaurant runs. Everything is in `EVERWAKE ORDERS/`.
+
+### Built ✅
+
+| Item | Where |
+|---|---|
+| Multi-restaurant database: menus with choice levels and branch prices, zones, customers by number or private id, orders, conversations; row-level security; a read-only schema per restaurant | `database/` |
+| Engine: Brain → Agent → tools → Check Reply → Rewrite, zones from a pin or an area name, offers, "same as last time", photos and menu pages on request | `engine/` |
+| Agent ON / OFF with a warm apology and a "we're back" message for everyone who wrote | `engine/`, `database/` |
+| Take over a chat, reply from the dashboard, hand back; the agent sees what was said | `engine/`, `dashboard/` |
+| Dashboard: live order board, inbox, menu with stock switches, AI menu import (PDF, photos, link, text, spreadsheet), offers, branches, zones on a map, customers, analytics, settings, team | `dashboard/` |
+| Moving Seagull-style clients over with their menu, customers and order history | `database/tools/import_legacy.sql` |
+| Tests: 6 SQL test files, 9 whole-conversation engine tests | `database/tests/`, `engine/test/` |
+
+### Next
+
+- **First live run:** import the workflows into n8n, connect a test number, place real test orders
+- **Move Seagull, Bazooka and 5 Roosters** over with the importer
+- **Official WhatsApp Cloud API** for paying restaurants: Meta's embedded signup, a second webhook, an approved template for "we're back" after 24 hours
+- **Plans and billing** per restaurant
+- **Growth kit:** QR codes and `wa.me` links per restaurant from the dashboard
+
+---
+
 ## Working agreements
 
 - `brand/tokens/everwake.css` is the **only** place colour and type are defined.

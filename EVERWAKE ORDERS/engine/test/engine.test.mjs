@@ -1,7 +1,7 @@
 // End-to-end conversations through the real engine code and database.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshDatabase, connect, turn, evolutionPayload, runCode, sql, callB64, unb64, manageCart } from './harness.mjs';
+import { freshDatabase, connect, turn, evolutionPayload, runCode, sql, callB64, unb64, manageCart, psqlFile } from './harness.mjs';
 
 let db;
 const ZAMALEK_PIN = { lat: 30.0610, lng: 31.2200 };
@@ -270,6 +270,56 @@ test('a promo code, a typed area, and a dish sold by weight', async () => {
   assert.equal(details.delivery_area.status, 'INSIDE_A_ZONE');
   assert.equal(details.delivery_area.branch, 'المعادي');
   assert.equal(details.address_from, 'typed');
+});
+
+test('moved over from Seagull: known by number or private id, and "same as last time" rebuilds the old order', async () => {
+  psqlFile('tests/fixtures/legacy_seagull.sql');
+  const tenant = (await sql(db, `insert into everwake.tenants (slug, name_ar, name_en, status, live_at)
+                                 values ('seagull', 'سيجال', 'Seagull', 'live', now()) returning id as r`)).r;
+  await db.query(`insert into everwake.whatsapp_channels (tenant_id, provider, label, phone_number, instance_name, base_url,
+                                                          api_key, webhook_token, status)
+                  values ($1, 'evolution', 'Main line', '201555000000', 'seagull', 'https://evo.example.com/', 'k', 'sg-token', 'connected')`,
+                 [tenant]);
+  const report = (await sql(db, `select everwake.import_legacy_schema($1::uuid, 'legacy_sg') as r`, [tenant])).r;
+  assert.equal(report.orders_imported, 4);
+  const sg = { instance: 'seagull', token: 'sg-token' };
+
+  // she writes from the private id the old system knew her by
+  let t = await turn(db, evolutionPayload({ lid: '123456789012345', pushName: 'Mona', text: 'زي المرة اللي فاتت', ...sg }), async (brief) => {
+    assert.match(brief.facts_text, /RETURNING CUSTOMER: 1 previous order\(s\)/);
+    assert.match(brief.facts_text, /SG-1042/);
+    assert.match(brief.facts_text, /name on file from previous orders: منى/);
+    return { plan: { stage: 'building_cart' }, tools: [{ tool: 'manage_cart', action: 'reorder_last' }],
+             reply: quiet('رجعتلك نفس طلبك اللي فات من فرع جليم. تحبي أكمل عليه؟') };
+  });
+  assert.equal(String(t.intake.customer_id), (await sql(db, `select id::text as r from everwake.customers where tenant_id = $1 and lid = '123456789012345'`, [tenant])).r,
+               'the imported customer, not a new one');
+  let re = t.steps[0].result;
+  assert.equal(re.status, 'REORDERED', JSON.stringify(re));
+  assert.equal(re.branch, 'جليم', 'the branch of her last order');
+  assert.deepEqual(re.cart.map(l => [l.menu_id, l.quantity]), [['M002', 2]]);
+  assert.deepEqual(t.checked.violations, []);
+
+  // he writes from his number: a weighed fish with two choice levels, priced from today's menu
+  t = await turn(db, evolutionPayload({ phone: '201011111111', pushName: 'Omar', text: 'نفس الأوردر بتاع المرة اللي فاتت', ...sg }), async (brief) => {
+    assert.match(brief.facts_text, /RETURNING CUSTOMER: 2 previous order\(s\)/);
+    assert.match(brief.facts_text, /SG-1041/);
+    return { plan: { stage: 'building_cart' }, tools: [{ tool: 'manage_cart', action: 'reorder_last' }],
+             reply: quiet('رجعتلك نفس الطلب من فرع المكس. أكمل؟') };
+  });
+  re = t.steps[0].result;
+  assert.equal(re.status, 'REORDERED', JSON.stringify(re));
+  assert.equal(re.branch, 'المكس');
+  const fish = re.cart.find(l => l.menu_id === 'M001');
+  assert.ok(fish, JSON.stringify(re.cart));
+  assert.equal(fish.quantity, 1.5);
+  assert.ok(fish.choices.join(' ').includes('مشوي') && fish.choices.join(' ').includes('رز'), JSON.stringify(fish));
+  assert.equal(fish.line_total, 675);
+  assert.equal(fish.notes, 'من غير شطة');
+  assert.ok(re.cart.some(l => l.menu_id === 'M002'));
+
+  // the next order carries on the old numbering
+  assert.equal((await sql(db, `select order_no_prefix || '-' || (order_seq + 1) as r from everwake.tenants where id = $1`, [tenant])).r, 'SG-1044');
 });
 
 test('normalize: groups, reactions, voice notes and the restaurant\'s own phone', async () => {

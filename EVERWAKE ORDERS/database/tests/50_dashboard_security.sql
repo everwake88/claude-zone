@@ -126,6 +126,11 @@ begin
   assert (select valid_until from everwake.menu_snapshot where tenant_id = t and scope = zam) is not null, 'rebuilds when it expires';
   assert exists (select 1 from everwake.audit_log where tenant_id = t and entity = 'menu_item_branches'
                   and user_id = '33333333-3333-3333-3333-333333333333'), 'the change is in the audit log';
+  -- back on everywhere clears the branch's own mark too
+  perform everwake.set_item_availability((select id from everwake.menu_items where tenant_id = t and code = 'M001'), true);
+  assert (select mb.is_available and mb.sold_out_until is null
+            from everwake.menu_item_branches mb join everwake.menu_items i on i.id = mb.item_id
+           where i.tenant_id = t and i.code = 'M001' and mb.branch_id = zam::uuid), 'back on everywhere clears the branch mark';
 
   -- reports
   ctx := everwake.analytics(t, now() - interval '1 day', now() + interval '1 day');
