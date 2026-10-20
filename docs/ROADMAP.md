@@ -115,7 +115,7 @@ the stack, the ask.
 ## Everwake Orders — WhatsApp ordering platform
 
 The Seagull agent rebuilt as one engine for every restaurant, with a
-dashboard each restaurant runs. Everything is in `EVERWAKE ORDERS/`.
+dashboard each restaurant runs. Everything is in `EVERWAKE-ORDERS/`.
 
 ### Built ✅
 

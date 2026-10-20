@@ -14,7 +14,7 @@ export default async function Home() {
       <main className="mx-auto max-w-xl p-10">
         <h1 className="text-2xl font-semibold">Everwake Orders is not configured yet</h1>
         <p className="mt-3 text-muted">Copy <code>.env.example</code> to <code>.env.local</code> and fill in the Supabase values.
-          The setup guide is in <code>EVERWAKE ORDERS/docs/SETUP.md</code>.</p>
+          The setup guide is in <code>EVERWAKE-ORDERS/docs/SETUP.md</code>.</p>
       </main>
     );
   }

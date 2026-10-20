@@ -53,14 +53,14 @@ You need:
 ### Hosting: Vercel
 
 1. New project from the GitHub repo.
-2. Root directory: `EVERWAKE ORDERS/dashboard`. Framework: Next.js.
+2. Root directory: `EVERWAKE-ORDERS/dashboard`. Framework: Next.js.
 3. Add the variables above and deploy.
 4. The AI menu import can take up to a few minutes on a big menu. Enable Fluid compute (or use a plan that allows 300-second functions).
 
 ### Hosting: Docker on your VPS
 
 ```sh
-cd "EVERWAKE ORDERS/dashboard"
+cd "EVERWAKE-ORDERS/dashboard"
 docker build -t everwake-dashboard \
   --build-arg NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co \
   --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=... .
