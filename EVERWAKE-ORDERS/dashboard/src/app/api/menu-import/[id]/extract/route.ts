@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { extractMenu, pageParts } from '@/lib/menu-extract';
+import { extractMenu, nameMenu, pageParts, siteMenu } from '@/lib/menu-extract';
 import { serverClient } from '@/lib/supabase/server';
 import type { MenuImport } from '@/lib/types';
 
@@ -20,6 +20,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   await db.from('menu_imports').update({ status: 'extracting', error: null }).eq('id', id);
   try {
+    // a link to an ordering site we read exactly: every dish with its levels, no guessing
+    if (row.source_kind === 'url' && row.source_url && !(row.files || []).length && !row.raw_text) {
+      const site = await siteMenu(row.source_url).catch(() => null);
+      if (site) {
+        const { menu, usage, model } = await nameMenu(site);
+        const count = menu.categories.reduce((n, c) => n + c.items.length, 0);
+        await db.from('menu_imports').update({ status: 'review', extracted: menu, usage, model }).eq('id', id);
+        return NextResponse.json({ ok: true, menu, count });
+      }
+    }
     const parts: Record<string, unknown>[] = [{ type: 'input_text', text: 'Here is the menu. Return every dish.' }];
     for (const f of row.files || []) {
       const dl = await db.storage.from('imports').download(f.path);

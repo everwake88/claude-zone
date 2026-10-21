@@ -1,4 +1,5 @@
 import 'server-only';
+import { popupSiteMenu } from './menu-sites';
 import type { ExtractedMenu } from './types';
 
 // The menu the AI returns — strict JSON schema, so the reply always parses.
@@ -50,26 +51,108 @@ Rules:
 - description_ar: the printed description, or null. Keep it short.
 - notes: anything the restaurant should check (unreadable prices, prices that differ by branch, taxes or service mentioned on the menu), or null.`;
 
-export async function extractMenu(parts: Record<string, unknown>[]): Promise<{ menu: ExtractedMenu; usage: unknown; model: string }> {
+async function openai(body: Record<string, unknown>, timeoutMs: number) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('OPENAI_API_KEY is not set on the server.');
-  const model = process.env.MENU_AI_MODEL || 'gpt-5.6-luna';
-  const effort = process.env.MENU_AI_REASONING ?? 'medium';
   const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      instructions: INSTRUCTIONS,
-      input: [{ role: 'user', content: parts }],
-      text: { format: { type: 'json_schema', name: 'restaurant_menu', strict: true, schema: MENU_SCHEMA } },
-      ...(effort ? { reasoning: { effort } } : {}),
-      max_output_tokens: 60000
-    }),
-    signal: AbortSignal.timeout(280000)
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs)
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error?.message || `OpenAI answered ${res.status}`);
+  return data;
+}
+
+// A menu read exactly from an ordering site: the AI only names things.
+// Dishes, prices and every level's choices stay as the site has them; per
+// category it adds an Arabic category name, English names, search words, and
+// a label for each level ("Level 1" → "الساندوتش التشيكن") so the agent can ask
+// for it. A category it cannot name keeps the site's own words.
+const NAMES_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['name_ar', 'name_en', 'items'],
+  properties: {
+    name_ar: { type: 'string' }, name_en: { type: 'string' },
+    items: { type: 'array', items: {
+      type: 'object', additionalProperties: false, required: ['name_en', 'aliases', 'tags', 'is_signature', 'levels'],
+      properties: {
+        name_en: { type: 'string' }, aliases: { type: 'array', items: { type: 'string' } },
+        tags: { type: 'array', items: { type: 'string' } }, is_signature: { type: 'boolean' },
+        levels: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['label_ar', 'label_en'],
+                  properties: { label_ar: { type: 'string' }, label_en: { type: 'string' } } } }
+      } } }
+  }
+};
+const NAMES_INSTRUCTIONS = `You get one category of a restaurant's menu, read exactly from its ordering site. Never change a dish, a price or a choice. Return:
+- name_ar: the category's Arabic name (an English name becomes the word Egyptian customers use: offers → عروض, Extras → إضافات). name_en: its English name.
+- items: one per dish, in the same order. name_en: the given English name, tidied (no prices, no emojis), or a short translation. aliases: 1–4 ways customers might write the dish (Arabic, Franco-Arabic, short names). tags: 2–5 lowercase English words (chicken, beef, sandwich, combo, drink, dessert, spicy…). is_signature: true only when the name or description says best seller / most popular / الأكثر طلبا / new.
+- levels: one per choice level of the dish, in the same order: a short label for what the customer picks there, from its choices (Chicken BBQ S, Jalapeno Chicken S → label_ar "الساندوتش التشيكن", label_en "Chicken sandwich"; Spicy, Regular → "حار ولا عادي", "Spicy or regular"; drinks with prices → "المشروب", "Drink"). A level named الحجم stays "الحجم" / "Size".`;
+
+async function nameCategory(c: ExtractedMenu['categories'][number], model: string) {
+  const input = { category: c.name_ar, items: c.items.map(i => ({
+    name: i.name_ar, name_en: i.name_en, description: i.description_ar,
+    levels: i.options.map(g => `${g.label_ar}: ${g.choices.map(x => x.name_ar).join(', ')}`)
+  })) };
+  const data = await openai({
+    model, instructions: NAMES_INSTRUCTIONS,
+    input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify(input) }] }],
+    text: { format: { type: 'json_schema', name: 'menu_names', strict: true, schema: NAMES_SCHEMA } },
+    reasoning: { effort: 'low' }, max_output_tokens: 30000
+  }, 150000);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const text: string = data.output_text || (data.output || []).flatMap((o: any) => o.content || []).filter((x: any) => x.type === 'output_text').map((x: any) => x.text).join('');
+  return { names: JSON.parse(text) as { name_ar: string; name_en: string; items: { name_en: string; aliases: string[]; tags: string[]; is_signature: boolean; levels: { label_ar: string; label_en: string }[] }[] }, usage: data.usage };
+}
+
+export async function nameMenu(menu: ExtractedMenu): Promise<{ menu: ExtractedMenu; usage: unknown[]; model: string }> {
+  const model = process.env.MENU_AI_MODEL || 'gpt-5.6-luna';
+  const usage: unknown[] = [];
+  let unnamed = 0;
+  const categories = await Promise.all(menu.categories.map(async c => {
+    try {
+      const { names, usage: u } = await nameCategory(c, model);
+      usage.push(u);
+      if (names.items.length !== c.items.length) throw new Error('count');
+      return {
+        name_ar: names.name_ar.trim() || c.name_ar, name_en: names.name_en.trim() || c.name_en,
+        items: c.items.map((i, k) => {
+          const n = names.items[k];
+          return { ...i, name_en: i.name_en || n.name_en.trim() || null, aliases: n.aliases, tags: n.tags, is_signature: n.is_signature,
+                   options: n.levels.length === i.options.length
+                     ? i.options.map((g, j) => ({ ...g, label_ar: n.levels[j].label_ar.trim() || g.label_ar, label_en: n.levels[j].label_en.trim() || g.label_en }))
+                     : i.options };
+        })
+      };
+    } catch { unnamed++; return c; }
+  }));
+  const notes = [menu.notes, unnamed ? `${unnamed} categories kept the site's own level names (Level 1, Level 2…) — rename them if you like.` : null]
+    .filter(Boolean).join(' ') || null;
+  return { menu: tidy({ categories, notes }), usage, model };
+}
+
+// a link to an ordering site we can read exactly (dish pop-ups and all), or null
+export async function siteMenu(url: string): Promise<ExtractedMenu | null> {
+  const res = await fetchPublic(url);
+  if (!res.ok) return null;
+  const html = await res.text();
+  return popupSiteMenu(res.url || url, html, async (u, headers) => {
+    const r = await fetchPublic(u, 20000, headers);
+    return r.ok ? r.text() : null;
+  });
+}
+
+export async function extractMenu(parts: Record<string, unknown>[]): Promise<{ menu: ExtractedMenu; usage: unknown; model: string }> {
+  const model = process.env.MENU_AI_MODEL || 'gpt-5.6-luna';
+  const effort = process.env.MENU_AI_REASONING ?? 'medium';
+  const data = await openai({
+    model,
+    instructions: INSTRUCTIONS,
+    input: [{ role: 'user', content: parts }],
+    text: { format: { type: 'json_schema', name: 'restaurant_menu', strict: true, schema: MENU_SCHEMA } },
+    ...(effort ? { reasoning: { effort } } : {}),
+    max_output_tokens: 60000
+  }, 280000);
   if (data.status === 'incomplete') {
     throw new Error('The menu is too long to read in one go — import it in parts (a few pages or one section at a time).');
   }
@@ -132,11 +215,11 @@ function publicUrl(raw: string): URL {
 const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; Everwake menu import)' };
 const MENU_WORD = /menu|food|منيو|قائمة|المنيو|منيو/i;
 
-async function fetchPublic(url: string, timeoutMs = 20000): Promise<Response> {
+async function fetchPublic(url: string, timeoutMs = 20000, headers?: Record<string, string>): Promise<Response> {
   // follow redirects ourselves, so each hop is checked too
   let target = publicUrl(url);
   for (let hop = 0; hop < 4; hop++) {
-    const res = await fetch(target, { headers: UA, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+    const res = await fetch(target, { headers: { ...UA, ...headers }, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
     const next = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
     if (!next) return res;
     target = publicUrl(new URL(next, target).toString());
