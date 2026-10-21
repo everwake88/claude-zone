@@ -375,6 +375,7 @@ declare
   v_body  text;
   v_sent  boolean := false;
   v_bname text;
+  v_line  text;
 begin
   select * into o from everwake.orders where id = p_order for update;
   if not found then raise exception 'order not found'; end if;
@@ -416,7 +417,9 @@ begin
   if coalesce(p_notify, true) then
     v_lang := everwake.customer_language(o.tenant_id, o.wa_id);
     v_tpl := s -> 'templates' ->> ('status_' || p_status || '_' || v_lang);
-    if nullif(btrim(coalesce(v_tpl, '')), '') is not null then
+    -- on its way with one of the restaurant's drivers: their name, number and how far
+    if p_status = 'out_for_delivery' then v_line := everwake.driver_line(o, v_lang); end if;
+    if nullif(btrim(coalesce(v_tpl, '')), '') is not null or v_line is not null then
       select case when v_lang = 'en' then coalesce(nullif(name_en, ''), name_ar) else name_ar end
         into v_bname from everwake.branches where id = o.branch_id;
       v_body := everwake.render_template(v_tpl, jsonb_build_object(
@@ -429,6 +432,7 @@ begin
                        when v_lang = 'en' then ' ' || btrim(p_note) || '.'
                        else ' ' || btrim(p_note) || '.' end,
         'name', ''));
+      v_body := concat_ws(E'\n', nullif(btrim(coalesce(v_body, '')), ''), v_line);
       perform everwake.queue_customer_message(o.tenant_id, o.wa_id, 'order_status', v_body,
                                               p_user => everwake.current_user_id());
       v_sent := true;

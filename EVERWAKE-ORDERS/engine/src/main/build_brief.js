@@ -177,8 +177,11 @@ const UNIT_EN = { kg: 'kg', piece: 'pcs', person: 'ppl' };
 const orderLine = (o) => {
   const items = arr(o.items).filter(i => !i.gift).map(i => `${i.name} ${UNIT_EN[i.unit] ? fmt(i.quantity) + ' ' + UNIT_EN[i.unit] : '×' + fmt(i.quantity)}`
     + (arr(i.choices).length ? ` (${arr(i.choices).map(c => arr(c.selected).map(s => str(obj(s).name || s)).join('+')).join(', ')})` : '')).join('، ');
+  const driver = obj(o.driver), track = obj(o.tracking);
   return `${o.order_no} · ${str(o.placed_at).slice(0, 10)} · ${o.branch_name || ''} · ${o.delivery_method || ''} · total ${money$(o.total)} · status ${o.status}`
     + (o.last_update_at ? ` (last update ${String(o.last_update_at).slice(0, 16).replace('T', ' ')} UTC)` : '')
+    + (driver.name ? `\n    driver: ${driver.name} (${driver.phone || 'no number'})`
+       + (track.eta_min != null ? ` · about ${track.km_left} km / ${track.eta_min} min from the customer (position from ${num(track.minutes_ago)} min ago)` : '') : '')
     + `\n    items: ${items || '—'}`;
 };
 const historyFacts = [];
@@ -207,7 +210,8 @@ const lang = ar && la ? (ar >= la ? 'Arabic (some English words)' : 'English (so
 const clip = (s, n) => { s = str(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const who = (m) => m.direction === 'inbound' ? 'customer: '
   : (m.sender === 'staff' ? `team member${m.staff_name ? ' (' + m.staff_name + ')' : ''}: `
-  : (m.sender === 'system' ? 'automatic message from the restaurant: ' : 'you: '));
+  : (m.sender === 'system' ? 'automatic message from the restaurant: '
+  : (m.sender === 'driver' ? 'the delivery driver (via the restaurant number): ' : 'you: ')));
 const historyLines = recent.slice(-18).map(m => who(m) + clip(m.text || `[${m.kind}]`, m.direction === 'inbound' ? 600 : 450).replace(/\n+/g, ' ⏎ '));
 const memory = arr(state.memory_notes).slice(-10);
 

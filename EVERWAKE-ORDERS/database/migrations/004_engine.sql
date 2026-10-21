@@ -635,6 +635,11 @@ begin
                   'delivery_method', o.delivery_method, 'payment_method', o.payment_method,
                   'address_text', o.address_text, 'eta_text', o.eta_text,
                   'last_update_at', greatest(o.accepted_at, o.ready_at, o.out_for_delivery_at, o.completed_at, o.cancelled_at),
+                  -- the restaurant's driver on it, and how far they were at their last position
+                  'driver', (select jsonb_build_object('name', d.name, 'phone', d.phone) from everwake.drivers d where d.id = o.driver_id),
+                  'tracking', case when o.delivery_track_at > now() - interval '10 minutes' then
+                                jsonb_build_object('km_left', o.delivery_km_left, 'eta_min', o.delivery_eta_min,
+                                                   'minutes_ago', floor(extract(epoch from now() - o.delivery_track_at) / 60)) end,
                   'items', coalesce((select jsonb_agg(jsonb_build_object(
                                        'code', oi.item_code, 'name', oi.name, 'quantity', oi.quantity, 'unit', oi.unit,
                                        'choices', oi.choices, 'notes', oi.notes, 'line_total', oi.line_total,
