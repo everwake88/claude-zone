@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { extractMenu, pageText } from '@/lib/menu-extract';
+import { extractMenu, pageParts } from '@/lib/menu-extract';
 import { serverClient } from '@/lib/supabase/server';
 import type { MenuImport } from '@/lib/types';
 
@@ -28,7 +28,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       if ((f.mime || '').includes('pdf')) parts.push({ type: 'input_file', filename: f.name || 'menu.pdf', file_data: `data:application/pdf;base64,${b64}` });
       else parts.push({ type: 'input_image', image_url: `data:${f.mime || 'image/jpeg'};base64,${b64}`, detail: 'high' });
     }
-    if (row.source_kind === 'url' && row.source_url) parts.push({ type: 'input_text', text: `Menu page ${row.source_url}:\n\n${await pageText(row.source_url)}` });
+    if (row.source_kind === 'url' && row.source_url) parts.push(...await pageParts(row.source_url));
     if (row.raw_text) parts.push({ type: 'input_text', text: row.raw_text.slice(0, 120000) });
     if (parts.length === 1) throw new Error('Nothing to read — add a file, a link or the menu text.');
 

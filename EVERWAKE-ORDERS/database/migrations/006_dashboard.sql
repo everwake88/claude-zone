@@ -173,7 +173,7 @@ begin
                        'done', n_br > 0 and n_br_ok = n_br,
                        'detail', n_br_ok || ' of ' || n_br || ' branches complete', 'href', 'branches'),
     jsonb_build_object('key', 'zones', 'label', 'Delivery zones', 'required', n_br_deliv > 0,
-                       'done', n_br_deliv = 0 or n_br_zoned = n_br_deliv,
+                       'done', n_br > 0 and (n_br_deliv = 0 or n_br_zoned = n_br_deliv),
                        'detail', n_br_zoned || ' of ' || n_br_deliv || ' delivering branches have a zone or a map pin', 'href', 'zones'),
     jsonb_build_object('key', 'menu', 'label', 'Menu with prices', 'required', true,
                        'done', n_cat > 0 and n_priced >= 3,

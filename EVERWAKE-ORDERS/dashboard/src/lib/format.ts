@@ -1,3 +1,4 @@
+import { currentLang, tt } from './i18n-core';
 import type { OrderStatus } from './types';
 
 export function money(n: number | string | null | undefined, sym = 'ج'): string {
@@ -9,21 +10,30 @@ export function money(n: number | string | null | undefined, sym = 'ج'): string
 export function timeAgo(iso: string | null | undefined): string {
   if (!iso) return '';
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 45) return 'just now';
-  if (s < 3600) return `${Math.round(s / 60)}m ago`;
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
-  return `${Math.round(s / 86400)}d ago`;
+  if (s < 45) return tt('just now');
+  if (s < 3600) return tt('{n}m ago', { n: Math.round(s / 60) });
+  if (s < 86400) return tt('{n}h ago', { n: Math.round(s / 3600) });
+  return tt('{n}d ago', { n: Math.round(s / 86400) });
 }
+
+// Arabic month names, Western digits (as on Egyptian receipts and menus)
+const locale = () => (currentLang() === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB');
 
 export function clock(iso: string | null | undefined, tz?: string): string {
   if (!iso) return '';
-  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
+  return new Intl.DateTimeFormat(locale(), { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
 }
 
 export function dateTime(iso: string | null | undefined, tz?: string): string {
   if (!iso) return '';
-  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+  return new Intl.DateTimeFormat(locale(), { timeZone: tz, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
     .format(new Date(iso));
+}
+
+// a day, without the time: "21 Oct" / "21 أكتوبر"
+export function day(iso: string | null | undefined, tz?: string): string {
+  if (!iso) return '';
+  return new Intl.DateTimeFormat(locale(), { timeZone: tz, day: 'numeric', month: 'short' }).format(new Date(iso));
 }
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -31,19 +41,21 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   out_for_delivery: 'On the way', delivered: 'Delivered', picked_up: 'Picked up', rejected: 'Rejected', cancelled: 'Cancelled'
 };
 
+export const statusLabel = (s: OrderStatus) => tt(STATUS_LABEL[s] || s);
+
 export const UNIT_LABEL: Record<string, string> = { portion: '', piece: 'pcs', kg: 'kg', person: 'per person' };
 
 export function qty(q: number, unit: string): string {
-  return unit === 'kg' ? `${q} kg` : `×${q}`;
+  return unit === 'kg' ? tt('{q} kg', { q }) : `×${q}`;
 }
 
-export function displayName(c?: { full_name?: string | null; display_name?: string | null } | null, fallback = 'Customer'): string {
-  return (c?.full_name || c?.display_name || fallback).trim();
+export function displayName(c?: { full_name?: string | null; display_name?: string | null } | null, fallback?: string): string {
+  return (c?.full_name || c?.display_name || fallback || tt('Customer')).trim();
 }
 
 export function phoneLabel(waId: string, phone?: string | null, hidden?: boolean): string {
   if (phone) return '+' + phone;
-  return hidden ? 'Number hidden by WhatsApp' : '+' + waId;
+  return hidden ? tt('Number hidden by WhatsApp') : '+' + waId;
 }
 
 // "https://maps.google.com/?q=30.06,31.22" or "…/@30.06,31.22,17z" → [lat, lng]

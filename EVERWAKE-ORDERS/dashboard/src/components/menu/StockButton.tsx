@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { clock } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import { Badge, Button, Modal, useAction } from '../ui';
 import { useTenant } from '../tenant';
@@ -23,6 +24,7 @@ export function StockButton({ itemId, available, soldOutUntil, branchId, label, 
   const { tenant } = useTenant();
   const [open, setOpen] = useState(false);
   const { busy, run } = useAction();
+  const t = useT();
   const out = !available || (!!soldOutUntil && new Date(soldOutUntil) > new Date());
 
   const set = (avail: boolean, until: Date | null) => run(async () => {
@@ -31,24 +33,24 @@ export function StockButton({ itemId, available, soldOutUntil, branchId, label, 
     if (error) throw new Error(error.message);
     setOpen(false);
     onDone();
-  }, avail ? 'Back on the menu — the agent offers it again' : 'Marked out of stock — the agent stops offering it now');
+  }, avail ? t('Back on the menu — the agent offers it again') : t('Marked out of stock — the agent stops offering it now'));
 
   return (
     <>
       {out ? (
-        <button onClick={() => set(true, null)} disabled={busy} title="Click when it is back">
-          <Badge tone="critical">{soldOutUntil && available ? `Out until ${clock(soldOutUntil, tenant.timezone)}` : 'Out of stock'}</Badge>
+        <button onClick={() => set(true, null)} disabled={busy} title={t('Click when it is back')}>
+          <Badge tone="critical">{soldOutUntil && available ? t('Out until {time}', { time: clock(soldOutUntil, tenant.timezone) }) : t('Out of stock')}</Badge>
         </button>
       ) : (
-        <button onClick={() => setOpen(true)} title="Mark out of stock"><Badge tone="positive">{label || 'Available'}</Badge></button>
+        <button onClick={() => setOpen(true)} title={t('Mark out of stock')}><Badge tone="positive">{label || t('Available')}</Badge></button>
       )}
-      <Modal open={open} onClose={() => setOpen(false)} title="Out of stock">
-        <p className="mb-4 text-sm text-muted">The agent stops offering it on the next message, and takes it out of any open cart.</p>
+      <Modal open={open} onClose={() => setOpen(false)} title={t('Out of stock')}>
+        <p className="mb-4 text-sm text-muted">{t('The agent stops offering it on the next message, and takes it out of any open cart.')}</p>
         <div className="grid gap-2">
-          <Button variant="outline" busy={busy} onClick={() => set(false, new Date(Date.now() + 3600e3))}>For 1 hour</Button>
-          <Button variant="outline" busy={busy} onClick={() => set(false, new Date(Date.now() + 3 * 3600e3))}>For 3 hours</Button>
-          <Button variant="outline" busy={busy} onClick={() => set(false, tomorrowMorning(tenant.timezone))}>For today (back tomorrow morning)</Button>
-          <Button variant="danger" busy={busy} onClick={() => set(false, null)}>Until I switch it back on</Button>
+          <Button variant="outline" busy={busy} onClick={() => set(false, new Date(Date.now() + 3600e3))}>{t('For 1 hour')}</Button>
+          <Button variant="outline" busy={busy} onClick={() => set(false, new Date(Date.now() + 3 * 3600e3))}>{t('For 3 hours')}</Button>
+          <Button variant="outline" busy={busy} onClick={() => set(false, tomorrowMorning(tenant.timezone))}>{t('For today (back tomorrow morning)')}</Button>
+          <Button variant="danger" busy={busy} onClick={() => set(false, null)}>{t('Until I switch it back on')}</Button>
         </div>
       </Modal>
     </>

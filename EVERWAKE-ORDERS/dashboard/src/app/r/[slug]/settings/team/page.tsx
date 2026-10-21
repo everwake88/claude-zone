@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Card, Field, Input, Select, Spinner, useAction } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { timeAgo } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch, Invite, Member, Role } from '@/lib/types';
 
@@ -22,6 +23,7 @@ export default function TeamSettings() {
   const [role, setRole] = useState<Role>('staff');
   const [branch, setBranch] = useState('');
   const { busy, run } = useAction();
+  const t = useT();
 
   const load = useCallback(async () => {
     const [m, i, b] = await Promise.all([
@@ -40,11 +42,11 @@ export default function TeamSettings() {
   }, done);
 
   if (!members) return <Spinner />;
-  const bName = (ids: string[] | null) => !ids?.length ? 'All branches' : ids.map(id => branches.find(b => b.id === id)?.name_en || '?').join(', ');
+  const bName = (ids: string[] | null) => !ids?.length ? t('All branches') : ids.map(id => branches.find(b => b.id === id)?.name_en || '?').join(', ');
 
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-      <Card title="Team">
+      <Card title={t('Team')}>
         <ul className="divide-y divide-hairline">
           {members.map(m => (
             <li key={m.user_id} className="flex flex-wrap items-center gap-3 py-3">
@@ -54,18 +56,18 @@ export default function TeamSettings() {
               </div>
               {can.owner ? (
                 <>
-                  <Select className="w-32" value={m.role} onChange={e => rpc('update_member', { p_tenant: tenant.id, p_user: m.user_id, p_role: e.target.value, p_branch_ids: m.branch_ids, p_display_name: null }, 'Role updated')}>
-                    <option value="owner">Owner</option><option value="manager">Manager</option><option value="staff">Staff</option>
+                  <Select className="w-32" value={m.role} onChange={e => rpc('update_member', { p_tenant: tenant.id, p_user: m.user_id, p_role: e.target.value, p_branch_ids: m.branch_ids, p_display_name: null }, t('Role updated'))}>
+                    <option value="owner">{t('Owner')}</option><option value="manager">{t('Manager')}</option><option value="staff">{t('Staff')}</option>
                   </Select>
                   {branches.length > 1 && (
-                    <Select className="w-40" value={m.branch_ids?.[0] || ''} onChange={e => rpc('update_member', { p_tenant: tenant.id, p_user: m.user_id, p_role: m.role, p_branch_ids: e.target.value ? [e.target.value] : null, p_display_name: null }, 'Branch access updated')}>
-                      <option value="">All branches</option>
-                      {branches.map(b => <option key={b.id} value={b.id}>{b.name_en || b.name_ar} only</option>)}
+                    <Select className="w-40" value={m.branch_ids?.[0] || ''} onChange={e => rpc('update_member', { p_tenant: tenant.id, p_user: m.user_id, p_role: m.role, p_branch_ids: e.target.value ? [e.target.value] : null, p_display_name: null }, t('Branch access updated'))}>
+                      <option value="">{t('All branches')}</option>
+                      {branches.map(b => <option key={b.id} value={b.id}>{t('{branch} only', { branch: b.name_en || b.name_ar })}</option>)}
                     </Select>
                   )}
-                  <Button size="sm" variant="ghost" className="text-critical" onClick={() => rpc('remove_member', { p_tenant: tenant.id, p_user: m.user_id }, 'Removed')}><Trash2 className="size-4" /></Button>
+                  <Button size="sm" variant="ghost" className="text-critical" onClick={() => rpc('remove_member', { p_tenant: tenant.id, p_user: m.user_id }, t('Removed'))}><Trash2 className="size-4" /></Button>
                 </>
-              ) : <Badge>{m.role}</Badge>}
+              ) : <Badge>{t(m.role)}</Badge>}
             </li>
           ))}
         </ul>
@@ -73,26 +75,26 @@ export default function TeamSettings() {
 
       {can.owner && (
         <div className="space-y-4">
-          <Card title="Invite someone">
+          <Card title={t('Invite someone')}>
             <div className="space-y-3">
-              <Field label="E-mail"><Input type="email" dir="ltr" value={email} onChange={e => setEmail(e.target.value)} /></Field>
-              <Field label="Role" hint={ROLE_HELP[role]}>
-                <Select value={role} onChange={e => setRole(e.target.value as Role)}><option value="staff">Staff</option><option value="manager">Manager</option><option value="owner">Owner</option></Select>
+              <Field label={t('E-mail')}><Input type="email" dir="ltr" value={email} onChange={e => setEmail(e.target.value)} /></Field>
+              <Field label={t('Role')} hint={t(ROLE_HELP[role])}>
+                <Select value={role} onChange={e => setRole(e.target.value as Role)}><option value="staff">{t('Staff')}</option><option value="manager">{t('Manager')}</option><option value="owner">{t('Owner')}</option></Select>
               </Field>
               {branches.length > 1 && (
-                <Field label="Branch" hint="Branch staff see only that branch's orders.">
-                  <Select value={branch} onChange={e => setBranch(e.target.value)}><option value="">All branches</option>{branches.map(b => <option key={b.id} value={b.id}>{b.name_en || b.name_ar}</option>)}</Select>
+                <Field label={t('Branch')} hint={t("Branch staff see only that branch's orders.")}>
+                  <Select value={branch} onChange={e => setBranch(e.target.value)}><option value="">{t('All branches')}</option>{branches.map(b => <option key={b.id} value={b.id}>{b.name_en || b.name_ar}</option>)}</Select>
                 </Field>
               )}
-              <Button variant="gold" busy={busy} onClick={() => rpc('invite_member', { p_tenant: tenant.id, p_email: email, p_role: role, p_branch_ids: branch ? [branch] : null }, 'Invited').then(() => setEmail(''))}>
-                <Mail className="size-4" /> Invite
+              <Button variant="gold" busy={busy} onClick={() => rpc('invite_member', { p_tenant: tenant.id, p_email: email, p_role: role, p_branch_ids: branch ? [branch] : null }, t('Invited')).then(() => setEmail(''))}>
+                <Mail className="size-4" /> {t('Invite')}
               </Button>
-              <p className="text-xs text-muted">Tell them to sign up at this dashboard with this e-mail — they join automatically.</p>
+              <p className="text-xs text-muted">{t('Tell them to sign up at this dashboard with this e-mail — they join automatically.')}</p>
             </div>
           </Card>
           {invites.length > 0 && (
-            <Card title="Waiting to join">
-              <ul className="space-y-1 text-sm">{invites.map(i => <li key={i.id} className="flex justify-between"><span>{i.email}</span><span className="text-muted">{i.role} · {timeAgo(i.created_at)}</span></li>)}</ul>
+            <Card title={t('Waiting to join')}>
+              <ul className="space-y-1 text-sm">{invites.map(i => <li key={i.id} className="flex justify-between"><span>{i.email}</span><span className="text-muted">{t(i.role)} · {timeAgo(i.created_at)}</span></li>)}</ul>
             </Card>
           )}
         </div>

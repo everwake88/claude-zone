@@ -122,23 +122,94 @@ function publicUrl(raw: string): URL {
   return u;
 }
 
-export async function pageText(url: string): Promise<string> {
+// A restaurant's menu page → everything the AI can read from it:
+//  · the visible text
+//  · the data a modern site ships for its own JavaScript (JSON-LD, Next.js /
+//    Nuxt page data). Ordering sites keep sizes and add-ons there, behind the
+//    "add to cart" pop-ups, even when the visible page is nearly empty
+//  · the menu pictures shown on the page, and a menu PDF it links to
+const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; Everwake menu import)' };
+const MENU_WORD = /menu|food|منيو|قائمة|المنيو|منيو/i;
+
+async function fetchPublic(url: string, timeoutMs = 20000): Promise<Response> {
   // follow redirects ourselves, so each hop is checked too
   let target = publicUrl(url);
-  let res: Response | null = null;
   for (let hop = 0; hop < 4; hop++) {
-    res = await fetch(target, { headers: { 'User-Agent': 'Mozilla/5.0 (Everwake menu import)' }, redirect: 'manual',
-                                signal: AbortSignal.timeout(20000) });
+    const res = await fetch(target, { headers: UA, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
     const next = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
-    if (!next) break;
+    if (!next) return res;
     target = publicUrl(new URL(next, target).toString());
   }
-  if (!res) throw new Error('That page did not answer');
+  throw new Error('That link redirects too many times');
+}
+
+// a file from the page, as a data URL the AI reads, or null when it is not usable
+async function fetchAsDataUrl(url: string, kind: 'image' | 'pdf', maxBytes: number): Promise<string | null> {
+  try {
+    const res = await fetchPublic(url, 20000);
+    if (!res.ok) return null;
+    const type = (res.headers.get('content-type') || '').split(';')[0].trim();
+    if (kind === 'image' && !/^image\/(jpeg|png|webp|gif)$/.test(type)) return null;
+    if (kind === 'pdf' && type !== 'application/pdf') return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > maxBytes || buf.length < 2000) return null;   // too big, or an icon
+    return `data:${type};base64,${buf.toString('base64')}`;
+  } catch { return null; }
+}
+
+const decode = (t: string) => t.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+
+export async function pageParts(url: string): Promise<Record<string, unknown>[]> {
+  const res = await fetchPublic(url);
   if (!res.ok) throw new Error(`That page answered ${res.status}`);
+  const base = res.url || url;
   const html = await res.text();
-  return html
+
+  const text = decode(html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<(br|\/p|\/div|\/li|\/tr|\/h\d)[^>]*>/gi, '\n').replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#\d+;/g, ' ')
-    .replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim().slice(0, 120000);
+    .replace(/<(br|\/p|\/div|\/li|\/tr|\/h\d)[^>]*>/gi, '\n').replace(/<[^>]+>/g, ' '))
+    .replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+
+  // the page's own data: JSON-LD menus, __NEXT_DATA__, __NUXT_DATA__ …
+  const data: string[] = [];
+  for (const m of html.matchAll(/<script[^>]*type=["']application\/(?:ld\+)?json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    const body = m[1].trim();
+    if (body.length > 40) data.push(body);
+  }
+  const dataText = data.join('\n').replace(/\s+/g, ' ').slice(0, 150000);
+
+  const abs = (u: string) => { try { return publicUrl(new URL(decode(u), base).toString()).toString(); } catch { return null; } };
+  // menu pictures: an <img> whose address, alt text or class says "menu"
+  const images: string[] = [];
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = m[0];
+    const src = /(?:data-src|src)=["']([^"']+)["']/i.exec(tag)?.[1];
+    if (!src || src.startsWith('data:') || /\.svg(\?|$)/i.test(src) || !MENU_WORD.test(tag)) continue;
+    const u = abs(src);
+    if (u && !images.includes(u)) images.push(u);
+  }
+  // a menu PDF the page links to
+  const pdfs: string[] = [];
+  for (const m of html.matchAll(/<a\b[^>]*href=["']([^"']+\.pdf(?:\?[^"']*)?)["'][^>]*>/gi)) {
+    const u = abs(m[1]);
+    if (u && !pdfs.includes(u)) pdfs.push(u);
+  }
+
+  const parts: Record<string, unknown>[] = [];
+  if (text.length > 80) parts.push({ type: 'input_text', text: `Menu page ${base} — the visible text:\n\n${text.slice(0, 120000)}` });
+  if (dataText) parts.push({ type: 'input_text', text: `The same page's built-in data (JSON). Ordering sites keep the full menu here, with sizes, add-ons and their prices — use it:\n\n${dataText}` });
+  for (const u of pdfs.slice(0, 2)) {
+    const d = await fetchAsDataUrl(u, 'pdf', 20_000_000);
+    if (d) parts.push({ type: 'input_file', filename: 'menu.pdf', file_data: d });
+  }
+  for (const u of images.slice(0, 8)) {
+    const d = await fetchAsDataUrl(u, 'image', 8_000_000);
+    if (d) parts.push({ type: 'input_image', image_url: d, detail: 'high' });
+  }
+  if (!parts.length || (parts.length === 1 && text.length < 600 && !dataText)) {
+    throw new Error('This page builds its menu in the browser, so the link alone shows no dishes. ' +
+                    'Take screenshots of the menu (or download its PDF) and use "PDF or photos" instead.');
+  }
+  return parts;
 }

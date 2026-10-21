@@ -6,10 +6,12 @@ import { Badge, Button, Card, Checkbox, Field, Input, PageHeader, Select, Spinne
 import { useTenant } from '@/components/tenant';
 import type { Shape } from '@/components/zones/ZoneMap';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch, Zone } from '@/lib/types';
 
-const ZoneMap = dynamic(() => import('@/components/zones/ZoneMap'), { ssr: false, loading: () => <Spinner label="Loading the map…" /> });
+function MapLoading() { const t = useT(); return <Spinner label={t('Loading the map…')} />; }
+const ZoneMap = dynamic(() => import('@/components/zones/ZoneMap'), { ssr: false, loading: () => <MapLoading /> });
 const PALETTE = ['#B8913F', '#2E7D5B', '#3B6FA0', '#A33B32', '#7A4FA0', '#9A6B1E', '#16384A'];
 
 interface Hit { zone_name: string; branch_name: string; delivery_fee: number | null; min_order: number | null; branch_state: string }
@@ -25,6 +27,7 @@ export default function ZonesPage() {
   const [testPoint, setTestPoint] = useState<[number, number] | null>(null);
   const [hits, setHits] = useState<Hit[] | null>(null);
   const { busy, run } = useAction();
+  const t = useT();
 
   const load = useCallback(async () => {
     const [b, z] = await Promise.all([
@@ -48,8 +51,8 @@ export default function ZonesPage() {
   const edited = (id: string, s: Shape) => setForm(f => f && f.id === id ? { ...f, ...s } : f);
 
   const save = () => run(async () => {
-    if (!form?.name_ar?.trim()) throw new Error('Give the zone a name');
-    if (!form.branch_id) throw new Error('Choose the branch that delivers here');
+    if (!form?.name_ar?.trim()) throw new Error(t('Give the zone a name'));
+    if (!form.branch_id) throw new Error(t('Choose the branch that delivers here'));
     const row = {
       tenant_id: tenant.id, branch_id: form.branch_id, name_ar: form.name_ar.trim(), name_en: form.name_en || null,
       kind: form.kind, polygon: form.kind === 'polygon' ? form.polygon : null,
@@ -65,14 +68,14 @@ export default function ZonesPage() {
     setDraft(null);
     await load();
     setSelected((data as { id: string }).id);
-  }, 'Zone saved — the agent uses it from the next message');
+  }, t('Zone saved — the agent uses it from the next message'));
 
   const remove = () => run(async () => {
     if (!form?.id) { setForm(null); setDraft(null); return; }
     const { error } = await sb().from('delivery_zones').delete().eq('id', form.id);
     if (error) throw new Error(error.message);
     setForm(null); setSelected(null); await load();
-  }, 'Zone deleted');
+  }, t('Zone deleted'));
 
   const test = async (lat: number, lng: number) => {
     setTestPoint([lat, lng]);
@@ -85,10 +88,10 @@ export default function ZonesPage() {
 
   return (
     <div>
-      <PageHeader title="Delivery zones" subtitle="Draw where each branch delivers. A customer's location pin (or the area they type) picks the zone, its fee and minimum, and the branch."
-        actions={<Button variant={testing ? 'primary' : 'outline'} onClick={() => { setTesting(t => !t); setHits(null); setTestPoint(null); }}>
-          <Crosshair className="size-4" /> {testing ? 'Stop testing' : 'Test an address'}</Button>} />
-      {branches.some(b => b.lat == null) && <p className="mb-3 rounded-lg bg-caution-wash px-3 py-2 text-sm text-caution">Some branches have no map pin yet — add their Google Maps link in Branches so distances are right.</p>}
+      <PageHeader title={t('Delivery zones')} subtitle={t("Draw where each branch delivers. A customer's location pin (or the area they type) picks the zone, its fee and minimum, and the branch.")}
+        actions={<Button variant={testing ? 'primary' : 'outline'} onClick={() => { setTesting(x => !x); setHits(null); setTestPoint(null); }}>
+          <Crosshair className="size-4" /> {testing ? t('Stop testing') : t('Test an address')}</Button>} />
+      {branches.some(b => b.lat == null) && <p className="mb-3 rounded-lg bg-caution-wash px-3 py-2 text-sm text-caution">{t('Some branches have no map pin yet — add their Google Maps link in Branches so distances are right.')}</p>}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="h-[70vh] min-h-[420px] rounded-xl border border-hairline bg-white p-1">
@@ -98,56 +101,56 @@ export default function ZonesPage() {
 
         <div className="space-y-3">
           {testing && (
-            <Card title="Test an address">
-              {!testPoint ? <p className="text-sm text-muted">Click anywhere on the map.</p> : hits && hits.length === 0
-                ? <p className="text-sm text-critical">Outside every zone — the agent offers pickup here.</p>
+            <Card title={t('Test an address')}>
+              {!testPoint ? <p className="text-sm text-muted">{t('Click anywhere on the map.')}</p> : hits && hits.length === 0
+                ? <p className="text-sm text-critical">{t('Outside every zone — the agent offers pickup here.')}</p>
                 : <ul className="space-y-1 text-sm">{(hits || []).map((h, i) => (
                     <li key={i} className={i === 0 ? 'font-semibold' : 'text-muted'} dir="auto">
-                      {h.zone_name} → {h.branch_name} · {h.delivery_fee == null ? 'fee by branch' : money(h.delivery_fee, tenant.currency_symbol)}{h.min_order ? ` · min ${money(h.min_order, tenant.currency_symbol)}` : ''} · {h.branch_state}
-                      {i === 0 && ' ← the agent uses this'}</li>))}</ul>}
+                      {h.zone_name} → {h.branch_name} · {h.delivery_fee == null ? t('fee by branch') : money(h.delivery_fee, tenant.currency_symbol)}{h.min_order ? ' · ' + t('min {v}', { v: money(h.min_order, tenant.currency_symbol) }) : ''} · {t(h.branch_state)}
+                      {i === 0 && ' ' + t('← the agent uses this')}</li>))}</ul>}
             </Card>
           )}
 
           {form ? (
-            <Card title={form.id ? 'Edit zone' : 'New zone'}>
+            <Card title={form.id ? t('Edit zone') : t('New zone')}>
               <div className="space-y-3">
-                <Field label="Name (Arabic)"><Input dir="rtl" value={form.name_ar || ''} onChange={e => setForm({ ...form, name_ar: e.target.value })} /></Field>
-                <Field label="Branch that delivers here">
+                <Field label={t('Name (Arabic)')}><Input dir="rtl" value={form.name_ar || ''} onChange={e => setForm({ ...form, name_ar: e.target.value })} /></Field>
+                <Field label={t('Branch that delivers here')}>
                   <Select value={form.branch_id || ''} onChange={e => setForm({ ...form, branch_id: e.target.value })}>
                     {branches.map(b => <option key={b.id} value={b.id}>{b.name_en || b.name_ar}</option>)}
                   </Select>
                 </Field>
-                <Field label="Area names in this zone" hint="Comma separated — matched when a customer types their area instead of sharing a pin.">
+                <Field label={t('Area names in this zone')} hint={t('Comma separated — matched when a customer types their area instead of sharing a pin.')}>
                   <Input dir="rtl" value={form.areasText || ''} onChange={e => setForm({ ...form, areasText: e.target.value })} placeholder="المعادي، دجلة، maadi" />
                 </Field>
                 <div className="grid grid-cols-2 gap-2">
-                  <Field label={`Delivery fee (${tenant.currency})`}><Input type="number" value={form.delivery_fee ?? ''} onChange={e => setForm({ ...form, delivery_fee: num(e.target.value) })} /></Field>
-                  <Field label="Minimum order"><Input type="number" value={form.min_order ?? ''} onChange={e => setForm({ ...form, min_order: num(e.target.value) })} /></Field>
-                  <Field label="Delivery from (min)"><Input type="number" value={form.eta_min ?? ''} onChange={e => setForm({ ...form, eta_min: num(e.target.value) })} /></Field>
-                  <Field label="to (min)"><Input type="number" value={form.eta_max ?? ''} onChange={e => setForm({ ...form, eta_max: num(e.target.value) })} /></Field>
+                  <Field label={t('Delivery fee ({currency})', { currency: tenant.currency })}><Input type="number" value={form.delivery_fee ?? ''} onChange={e => setForm({ ...form, delivery_fee: num(e.target.value) })} /></Field>
+                  <Field label={t('Minimum order')}><Input type="number" value={form.min_order ?? ''} onChange={e => setForm({ ...form, min_order: num(e.target.value) })} /></Field>
+                  <Field label={t('Delivery from (min)')}><Input type="number" value={form.eta_min ?? ''} onChange={e => setForm({ ...form, eta_min: num(e.target.value) })} /></Field>
+                  <Field label={t('to (min)')}><Input type="number" value={form.eta_max ?? ''} onChange={e => setForm({ ...form, eta_max: num(e.target.value) })} /></Field>
                 </div>
-                <Field label="Priority" hint="Where zones overlap, the lower number wins (if that branch is open)."><Input type="number" value={form.priority ?? 100} onChange={e => setForm({ ...form, priority: Number(e.target.value) })} /></Field>
-                <p className="text-xs text-muted">{form.kind === 'radius' ? `Circle of ${form.radius_km} km` : `Shape with ${form.polygon?.length || 0} corners`} — drag the corners on the map to adjust.</p>
-                <Checkbox checked={form.is_active === false} onChange={v => setForm({ ...form, is_active: !v })} label="Paused (not delivering here for now)" />
+                <Field label={t('Priority')} hint={t('Where zones overlap, the lower number wins (if that branch is open).')}><Input type="number" value={form.priority ?? 100} onChange={e => setForm({ ...form, priority: Number(e.target.value) })} /></Field>
+                <p className="text-xs text-muted">{form.kind === 'radius' ? t('Circle of {n} km', { n: form.radius_km }) : t('Shape with {n} corners', { n: form.polygon?.length || 0 })} — {t('drag the corners on the map to adjust.')}</p>
+                <Checkbox checked={form.is_active === false} onChange={v => setForm({ ...form, is_active: !v })} label={t('Paused (not delivering here for now)')} />
                 {can.edit && <div className="flex justify-between pt-2">
-                  <Button variant="ghost" className="text-critical" onClick={remove}><Trash2 className="size-4" /> {form.id ? 'Delete' : 'Discard'}</Button>
-                  <Button variant="gold" busy={busy} onClick={save}>Save zone</Button>
+                  <Button variant="ghost" className="text-critical" onClick={remove}><Trash2 className="size-4" /> {form.id ? t('Delete') : t('Discard')}</Button>
+                  <Button variant="gold" busy={busy} onClick={save}>{t('Save zone')}</Button>
                 </div>}
               </div>
             </Card>
           ) : (
-            <Card title="Zones">
-              {can.edit && <p className="mb-3 flex items-center gap-1.5 text-sm text-muted"><Plus className="size-4" /> Use the polygon, rectangle or circle tool at the top left of the map to draw a new zone.</p>}
-              {zones.length === 0 ? <p className="text-sm text-muted">No zones yet. Until you draw some, each branch delivers within its &quot;delivers up to&quot; distance.</p> : (
+            <Card title={t('Zones')}>
+              {can.edit && <p className="mb-3 flex items-center gap-1.5 text-sm text-muted"><Plus className="size-4" /> {t('Use the polygon, rectangle or circle tool at the top of the map to draw a new zone.')}</p>}
+              {zones.length === 0 ? <p className="text-sm text-muted">{t('No zones yet. Until you draw some, each branch delivers within its "delivers up to" distance.')}</p> : (
                 <ul className="space-y-1">
                   {branches.map((b, bi) => (
                     <li key={b.id}>
                       <p className="mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
                         <span className="size-2.5 rounded-full" style={{ background: PALETTE[bi % PALETTE.length] }} />{b.name_en || b.name_ar}</p>
                       {zones.filter(z => z.branch_id === b.id).map(z => (
-                        <button key={z.id} onClick={() => pick(z.id)} className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm hover:bg-paper">
+                        <button key={z.id} onClick={() => pick(z.id)} className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-start text-sm hover:bg-paper">
                           <span dir="auto">{z.name_ar}</span>
-                          <span className="flex items-center gap-1.5 text-muted">{z.delivery_fee != null && money(z.delivery_fee, tenant.currency_symbol)}{!z.is_active && <Badge>paused</Badge>}</span>
+                          <span className="flex items-center gap-1.5 text-muted">{z.delivery_fee != null && money(z.delivery_fee, tenant.currency_symbol)}{!z.is_active && <Badge>{t('paused')}</Badge>}</span>
                         </button>
                       ))}
                     </li>

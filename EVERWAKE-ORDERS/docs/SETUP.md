@@ -127,11 +127,27 @@ Evolution must be able to reach `https://<n8n>/webhook/everwake-evo` from the in
    - the ticket on the branch WhatsApp, if one is set
 4. Accept the order on the board. You receive the "accepted" message on WhatsApp within seconds.
 
+## Updating an existing database
+
+Fixes to the database ship in two places: the migration files (for new
+installs) and a dated file in `database/patches/` (for databases that are
+already running). After pulling an update, run each new patch once, oldest
+first, in Supabase → SQL Editor. `everwake_supabase_setup.sql` already
+contains every patch, so a fresh install needs none of them.
+
+## The dashboard's languages
+
+The dashboard has an English / العربية switch in the top bar and on the
+sign-in page; the choice is remembered per browser, and Arabic turns the
+whole layout right to left. Every text is in `dashboard/src/lib/i18n-ar.ts`
+(English text → Arabic). `npm run i18n:check` fails if a text in the code has
+no Arabic, so nothing ships half-translated.
+
 ## Tests (developers)
 
 ```sh
 # a local Postgres 16 is enough
 cd database && PGHOST=localhost PGUSER=postgres PGPASSWORD=... ./tests/run.sh
 cd engine && npm install && PGHOST=localhost PGUSER=postgres PGPASSWORD=... npm test
-cd dashboard && npm install && npm run typecheck && npm run build
+cd dashboard && npm install && npm run typecheck && npm run i18n:check && npm run build
 ```

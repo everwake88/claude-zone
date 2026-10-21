@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState, type ReactNode } from 'react';
 import { cx } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 
 // One data hue (single-series charts need no legend; the title names it).
 // #2a78d6 passes the dataviz validator on white: lightness band, chroma, ≥3:1.
@@ -21,16 +22,17 @@ function niceMax(v: number) {
 export function ChartCard({ title, subtitle, rows, children, valueHeader = 'Value' }:
   { title: string; subtitle?: string; rows: Point[]; children: ReactNode; valueHeader?: string }) {
   const [table, setTable] = useState(false);
+  const t = useT();
   return (
     <section className="rounded-xl border border-hairline bg-white p-4">
       <header className="mb-3 flex items-start justify-between gap-3">
         <div><h2 className="text-sm font-semibold">{title}</h2>{subtitle && <p className="text-xs text-muted">{subtitle}</p>}</div>
-        <button onClick={() => setTable(t => !t)} className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline">{table ? 'Chart' : 'Table'}</button>
+        <button onClick={() => setTable(x => !x)} className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline">{table ? t('Chart') : t('Table')}</button>
       </header>
       {table ? (
         <div className="max-h-72 overflow-y-auto">
-          <table className="w-full text-sm"><thead className="text-left text-xs text-muted"><tr><th className="py-1">Label</th><th className="py-1 text-right">{valueHeader}</th></tr></thead>
-            <tbody className="divide-y divide-hairline">{rows.map(r => <tr key={r.label}><td className="py-1" dir="auto">{r.label}</td><td className="py-1 text-right tabular-nums">{r.display ?? r.value}</td></tr>)}</tbody></table>
+          <table className="w-full text-sm"><thead className="text-start text-xs text-muted"><tr><th className="py-1">{t('Label')}</th><th className="py-1 text-end">{valueHeader}</th></tr></thead>
+            <tbody className="divide-y divide-hairline">{rows.map(r => <tr key={r.label}><td className="py-1" dir="auto">{r.label}</td><td className="py-1 text-end tabular-nums">{r.display ?? r.value}</td></tr>)}</tbody></table>
         </div>
       ) : children}
     </section>
@@ -52,7 +54,7 @@ export function ColumnChart({ data, height = 180, ariaLabel }: { data: Point[]; 
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={ariaLabel}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={ariaLabel} direction="ltr">
         {ticks.map(t => (
           <g key={t}>
             <line x1={padL} x2={W} y1={y(t)} y2={y(t)} stroke={GRID} strokeWidth={1} />
@@ -71,9 +73,13 @@ export function ColumnChart({ data, height = 180, ariaLabel }: { data: Point[]; 
               className="outline-none">
               <rect x={padL + band * i} y={padT} width={band} height={H - padT - padB} fill="transparent" />
               {path && <path d={path} fill={DATA} opacity={hover === null || hover === i ? 1 : 0.55} />}
-              {i === peak && d.value > 0 && hover === null && (
-                <text x={x + bw / 2} y={top - 5} textAnchor="middle" fontSize={11} fontWeight={600} fill="#0B222E">{d.display ?? compact(d.value)}</text>
-              )}
+              {i === peak && d.value > 0 && hover === null && (() => {
+                // kept inside the chart at either edge; Arabic and numbers read in their own direction
+                const label = d.display ?? compact(d.value);
+                const half = label.length * 3.2 + 2;
+                const cx = Math.min(W - half, Math.max(padL + half, x + bw / 2));
+                return <text x={cx} y={top - 5} textAnchor="middle" fontSize={11} fontWeight={600} fill="#0B222E" style={{ unicodeBidi: 'plaintext' }}>{label}</text>;
+              })()}
               {i % every === 0 && <text x={padL + band * i + band / 2} y={H - 6} textAnchor="middle" fontSize={10.5} fill="#51666F">{d.label}</text>}
             </g>
           );
@@ -92,17 +98,18 @@ export function ColumnChart({ data, height = 180, ariaLabel }: { data: Point[]; 
 
 // Horizontal bars as rows: label, a thin bar, the value at its tip
 export function BarList({ data, note }: { data: (Point & { note?: string })[]; note?: string }) {
+  const t = useT();
   const max = Math.max(1, ...data.map(d => d.value));
-  if (!data.length) return <p className="text-sm text-muted">No data in this period.</p>;
+  if (!data.length) return <p className="text-sm text-muted">{t('No data in this period.')}</p>;
   return (
     <ul className="space-y-2.5">
       {data.map(d => (
         <li key={d.label} className="text-sm" title={`${d.label}: ${d.display ?? d.value}`}>
           <div className="mb-1 flex justify-between gap-3">
             <span className="truncate" dir="auto">{d.label}</span>
-            <span className="shrink-0 tabular-nums font-medium">{d.display ?? d.value}{d.note && <span className="ml-1 font-normal text-muted">{d.note}</span>}</span>
+            <span className="shrink-0 tabular-nums font-medium">{d.display ?? d.value}{d.note && <span className="ms-1 font-normal text-muted">{d.note}</span>}</span>
           </div>
-          <div className="h-2 rounded-r bg-transparent">
+          <div className="h-2 rounded-e bg-transparent">
             <div className={cx('h-2 rounded-r-[4px]')} style={{ width: `${(d.value / max) * 100}%`, background: DATA }} />
           </div>
         </li>

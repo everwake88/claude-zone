@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { configured } from '@/lib/env';
+import { serverT } from '@/lib/i18n-server';
 import { serverClient } from '@/lib/supabase/server';
 import type { TenantSummary } from '@/lib/types';
 
@@ -18,6 +19,7 @@ export default async function Home() {
       </main>
     );
   }
+  const t = await serverT();
   const db = await serverClient();
   await db.rpc('accept_invites');
   const { data } = await db.rpc('my_tenants');
@@ -26,19 +28,19 @@ export default async function Home() {
   if (tenants.length === 1) redirect(`/r/${tenants[0].slug}`);
   return (
     <main className="mx-auto max-w-2xl p-6 sm:p-10">
-      <h1 className="text-2xl font-semibold">Your restaurants</h1>
+      <h1 className="text-2xl font-semibold">{t('Your restaurants')}</h1>
       <div className="mt-6 grid gap-3">
-        {tenants.map(t => (
-          <Link key={t.id} href={`/r/${t.slug}`} className="flex items-center justify-between rounded-xl border border-hairline bg-white px-5 py-4 hover:border-gold">
+        {tenants.map(r => (
+          <Link key={r.id} href={`/r/${r.slug}`} className="flex items-center justify-between rounded-xl border border-hairline bg-white px-5 py-4 hover:border-gold">
             <span>
-              <span className="block font-medium">{t.name_en || t.name_ar}</span>
-              <span className="block text-sm text-muted ar" dir="rtl">{t.name_ar}</span>
+              <span className="block font-medium">{r.name_en || r.name_ar}</span>
+              <span className="block text-sm text-muted ar" dir="rtl">{r.name_ar}</span>
             </span>
-            <span className="text-sm text-muted">{t.role} · {t.status}</span>
+            <span className="text-sm text-muted">{t(r.role)} · {t(r.status)}</span>
           </Link>
         ))}
         <Link href="/new" className="rounded-xl border border-dashed border-hairline px-5 py-4 text-center text-sm text-gold-ink hover:border-gold">
-          + Sign up another restaurant
+          + {t('Sign up another restaurant')}
         </Link>
       </div>
     </main>

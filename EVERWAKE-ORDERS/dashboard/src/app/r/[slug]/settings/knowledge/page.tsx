@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Empty, Field, Input, Spinner, Switch, Textarea, useAction } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { sb } from '@/lib/supabase/client';
+import { useT } from '@/lib/i18n';
 import type { Knowledge } from '@/lib/types';
 
 const IDEAS = ['Parking', 'Catering and parties', 'Allergens', 'Kids menu', 'Reservations', 'Halal', 'Vegetarian options', 'Payment on delivery'];
@@ -15,6 +16,7 @@ export default function KnowledgePage() {
   const [list, setList] = useState<Knowledge[] | null>(null);
   const [draft, setDraft] = useState<Partial<Knowledge> | null>(null);
   const { busy, run } = useAction();
+  const t = useT();
 
   const load = useCallback(async () => {
     const { data } = await sb().from('knowledge_entries').select('*').eq('tenant_id', tenant.id).order('sort');
@@ -23,13 +25,13 @@ export default function KnowledgePage() {
   useEffect(() => { load(); }, [load]);
 
   const save = (k: Partial<Knowledge>) => run(async () => {
-    if (!k.topic?.trim() || !(k.content_ar || k.content_en)?.trim()) throw new Error('Write the topic and the answer');
+    if (!k.topic?.trim() || !(k.content_ar || k.content_en)?.trim()) throw new Error(t('Write the topic and the answer'));
     const row = { tenant_id: tenant.id, topic: k.topic.trim(), content_ar: k.content_ar || null, content_en: k.content_en || null,
                   is_active: k.is_active !== false, sort: k.sort ?? ((list?.length || 0) + 1) * 10 };
     const { error } = k.id ? await sb().from('knowledge_entries').update(row).eq('id', k.id) : await sb().from('knowledge_entries').insert(row);
     if (error) throw new Error(error.message);
     setDraft(null); await load();
-  }, 'Saved — the agent knows on the next message');
+  }, t('Saved — the agent knows on the next message'));
   const remove = (k: Knowledge) => run(async () => {
     await sb().from('knowledge_entries').delete().eq('id', k.id); await load();
   });
@@ -37,8 +39,8 @@ export default function KnowledgePage() {
   if (!list) return <Spinner />;
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">The questions customers ask that are not about the menu. Write the answer once; the agent gives it in its own words, and says &quot;the branch will confirm&quot; for anything that is not here.</p>
-      {list.length === 0 && !draft && <Empty title="No answers yet">Ideas: {IDEAS.join(' · ')}.</Empty>}
+      <p className="text-sm text-muted">{t('The questions customers ask that are not about the menu. Write the answer once; the agent gives it in its own words, and says "the branch will confirm" for anything that is not here.')}</p>
+      {list.length === 0 && !draft && <Empty title={t('No answers yet')}>{t('Ideas:')} {IDEAS.map(x => t(x)).join(' · ')}.</Empty>}
       {list.map(k => (
         <Card key={k.id}>
           <div className="grid gap-3 sm:grid-cols-[200px_1fr_auto]">
@@ -46,21 +48,21 @@ export default function KnowledgePage() {
             <Textarea dir="auto" rows={2} defaultValue={k.content_ar || k.content_en || ''} disabled={!can.edit}
               onBlur={e => e.target.value !== (k.content_ar || '') && save({ ...k, content_ar: e.target.value })} />
             <div className="flex items-start gap-2">
-              <Switch checked={k.is_active} disabled={!can.edit} onChange={v => save({ ...k, is_active: v })} label="Active" />
+              <Switch checked={k.is_active} disabled={!can.edit} onChange={v => save({ ...k, is_active: v })} label={t('Active')} />
               {can.edit && <Button size="sm" variant="ghost" className="text-critical" onClick={() => remove(k)}><Trash2 className="size-4" /></Button>}
             </div>
           </div>
         </Card>
       ))}
       {draft ? (
-        <Card title="New answer">
+        <Card title={t('New answer')}>
           <div className="space-y-3">
-            <Field label="Topic"><Input value={draft.topic || ''} onChange={e => setDraft({ ...draft, topic: e.target.value })} placeholder="Parking" /></Field>
-            <Field label="The answer"><Textarea dir="auto" rows={3} value={draft.content_ar || ''} onChange={e => setDraft({ ...draft, content_ar: e.target.value })} /></Field>
-            <div className="flex gap-2"><Button variant="gold" busy={busy} onClick={() => save(draft)}>Save</Button><Button variant="ghost" onClick={() => setDraft(null)}>Cancel</Button></div>
+            <Field label={t('Topic')}><Input value={draft.topic || ''} onChange={e => setDraft({ ...draft, topic: e.target.value })} placeholder={t('Parking')} /></Field>
+            <Field label={t('The answer')}><Textarea dir="auto" rows={3} value={draft.content_ar || ''} onChange={e => setDraft({ ...draft, content_ar: e.target.value })} /></Field>
+            <div className="flex gap-2"><Button variant="gold" busy={busy} onClick={() => save(draft)}>{t('Save')}</Button><Button variant="ghost" onClick={() => setDraft(null)}>{t('Cancel')}</Button></div>
           </div>
         </Card>
-      ) : can.edit && <Button variant="outline" onClick={() => setDraft({})}><Plus className="size-4" /> Add an answer</Button>}
+      ) : can.edit && <Button variant="outline" onClick={() => setDraft({})}><Plus className="size-4" /> {t('Add an answer')}</Button>}
     </div>
   );
 }

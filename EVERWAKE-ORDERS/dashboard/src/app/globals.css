@@ -35,6 +35,9 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; lette
 /* Arabic text (dishes, chats) gets the Arabic stack and reads right to left */
 [dir="rtl"], .ar { font-family: var(--font-ar); }
 
+/* table headers start where the reading starts (left in English, right in Arabic) */
+th { text-align: start; }
+
 .label-caps { font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-muted); }
 
 /* the inbox thread wraps long Arabic and links cleanly */

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTenantRow } from '@/components/settings/useTenantRow';
 import { Button, Card, Field, Spinner, Tabs, Textarea } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
+import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 
 const GROUPS: { title: string; hint: string; keys: [string, string][] }[] = [
@@ -20,6 +21,7 @@ const render = (t: string) => Object.entries(SAMPLE).reduce((s, [k, v]) => s.rep
 export default function MessagesSettings() {
   const { can } = useTenant();
   const { row, save, busy } = useTenantRow();
+  const t = useT();
   const [tpl, setTpl] = useState<Record<string, string>>({});
   const [defaults, setDefaults] = useState<Record<string, string>>({});
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
@@ -37,26 +39,26 @@ export default function MessagesSettings() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted">Placeholders: <code>{'{name}'}</code> first name · <code>{'{order_no}'}</code> · <code>{'{branch}'}</code> · <code>{'{eta}'}</code> · <code>{'{reason}'}</code>. A customer gets the language they wrote in.</p>
-        <Tabs value={lang} onChange={setLang} tabs={[{ value: 'ar', label: 'Arabic' }, { value: 'en', label: 'English' }]} />
+        <p className="text-sm text-muted">{t('Placeholders:')} <code>{'{name}'}</code> {t('first name')} · <code>{'{order_no}'}</code> · <code>{'{branch}'}</code> · <code>{'{eta}'}</code> · <code>{'{reason}'}</code>. {t('A customer gets the language they wrote in.')}</p>
+        <Tabs value={lang} onChange={setLang} tabs={[{ value: 'ar', label: t('Arabic') }, { value: 'en', label: t('English') }]} />
       </div>
       {GROUPS.map(g => (
-        <Card key={g.title} title={g.title}>
-          <p className="mb-3 text-sm text-muted">{g.hint}</p>
+        <Card key={g.title} title={t(g.title)}>
+          <p className="mb-3 text-sm text-muted">{t(g.hint)}</p>
           <div className="space-y-4">
             {g.keys.map(([k, label]) => {
               const key = `${k}_${lang}`;
               return (
                 <div key={key} className="grid gap-3 lg:grid-cols-2">
-                  <Field label={label}>
+                  <Field label={t(label)}>
                     <Textarea dir={lang === 'ar' ? 'rtl' : 'ltr'} rows={3} disabled={!can.edit} value={tpl[key] ?? ''} onChange={e => setTpl({ ...tpl, [key]: e.target.value })} />
                   </Field>
                   <div>
-                    <p className="mb-1.5 flex items-center justify-between text-sm font-medium">Preview
-                      {can.edit && tpl[key] !== defaults[key] && <button className="flex items-center gap-1 text-xs text-muted hover:text-ink" onClick={() => setTpl({ ...tpl, [key]: defaults[key] || '' })}><RotateCcw className="size-3" /> Default</button>}
+                    <p className="mb-1.5 flex items-center justify-between text-sm font-medium">{t('Preview')}
+                      {can.edit && tpl[key] !== defaults[key] && <button className="flex items-center gap-1 text-xs text-muted hover:text-ink" onClick={() => setTpl({ ...tpl, [key]: defaults[key] || '' })}><RotateCcw className="size-3" /> {t('Default')}</button>}
                     </p>
-                    <div className="rounded-2xl rounded-br-md bg-[#d9fdd3] px-3.5 py-2 text-sm shadow-sm" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-                      {render(tpl[key]) || <span className="text-muted">(nothing is sent)</span>}
+                    <div className="rounded-2xl rounded-ee-md bg-[#d9fdd3] px-3.5 py-2 text-sm shadow-sm" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                      {render(tpl[key]) || <span className="text-muted">{t('(nothing is sent)')}</span>}
                     </div>
                   </div>
                 </div>
@@ -65,7 +67,7 @@ export default function MessagesSettings() {
           </div>
         </Card>
       ))}
-      {can.edit && <Button variant="gold" busy={busy} onClick={() => save({ settings: { ...row.settings, templates: tpl } }, 'Messages saved')}>Save</Button>}
+      {can.edit && <Button variant="gold" busy={busy} onClick={() => save({ settings: { ...row.settings, templates: tpl } }, t('Messages saved'))}>{t('Save')}</Button>}
     </div>
   );
 }

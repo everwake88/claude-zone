@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Card, Empty, Spinner, Tabs, Textarea, useAction, useToast } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
-import { STATUS_LABEL, clock, cx, dateTime, displayName, money, phoneLabel, qty, timeAgo } from '@/lib/format';
+import { clock, cx, dateTime, day, displayName, money, phoneLabel, qty, statusLabel, timeAgo } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Address, Conversation, Customer, Message, Order } from '@/lib/types';
 
@@ -16,6 +17,7 @@ function InboxInner() {
   const { tenant } = useTenant();
   const params = useSearchParams();
   const router = useRouter();
+  const t = useT();
   const [filter, setFilter] = useState<Filter>((params.get('filter') as Filter) || 'all');
   const [q, setQ] = useState('');
   const [list, setList] = useState<Conversation[] | null>(null);
@@ -59,30 +61,30 @@ function InboxInner() {
   return (
     <div className="-mx-4 -my-6 flex h-[calc(100vh-3.5rem)] lg:-mx-6">
       {/* the list */}
-      <aside className={cx('flex w-full flex-col border-r border-hairline bg-white md:w-80 md:shrink-0', selectedId && 'hidden md:flex')}>
+      <aside className={cx('flex w-full flex-col border-e border-hairline bg-white md:w-80 md:shrink-0', selectedId && 'hidden md:flex')}>
         <div className="space-y-2 border-b border-hairline p-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Name, number or message"
-              className="h-9 w-full rounded-lg border border-hairline pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50" />
+            <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('Name, number or message')}
+              className="h-9 w-full rounded-lg border border-hairline ps-9 pe-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50" />
           </div>
           <Tabs size="sm" value={filter} onChange={setFilter} tabs={[
-            { value: 'all', label: 'All' }, { value: 'attention', label: 'Needs you' }, { value: 'human', label: 'Taken over' }, { value: 'unread', label: 'Unread' }]} />
+            { value: 'all', label: t('All') }, { value: 'attention', label: t('Needs you') }, { value: 'human', label: t('Taken over') }, { value: 'unread', label: t('Unread') }]} />
         </div>
         <div className="flex-1 overflow-y-auto">
-          {!list ? <Spinner /> : shown.length === 0 ? <p className="p-6 text-center text-sm text-muted">No conversations here.</p> : shown.map(c => (
+          {!list ? <Spinner /> : shown.length === 0 ? <p className="p-6 text-center text-sm text-muted">{t('No conversations here.')}</p> : shown.map(c => (
             <button key={c.id} onClick={() => select(c.id)}
-              className={cx('flex w-full flex-col gap-0.5 border-b border-hairline px-4 py-3 text-left hover:bg-paper', selectedId === c.id && 'bg-gold-wash')}>
+              className={cx('flex w-full flex-col gap-0.5 border-b border-hairline px-4 py-3 text-start hover:bg-paper', selectedId === c.id && 'bg-gold-wash')}>
               <span className="flex items-center gap-2">
                 <span className="flex-1 truncate font-medium" dir="auto">{displayName(c.customers, '+' + c.wa_id)}</span>
                 <span className="text-xs text-muted">{timeAgo(c.last_message_at)}</span>
               </span>
               <span className="truncate text-sm text-muted" dir="auto">{c.last_message_preview}</span>
               <span className="flex flex-wrap gap-1">
-                {c.needs_attention && <Badge tone="critical"><AlertTriangle className="size-3" /> needs you</Badge>}
-                {c.mode === 'human' && <Badge tone="gold"><Hand className="size-3" /> taken over</Badge>}
-                {c.unread_count > 0 && <Badge tone="navy">{c.unread_count} new</Badge>}
-                {(c.customers?.orders_count || 0) > 0 && <Badge>{c.customers?.orders_count} orders</Badge>}
+                {c.needs_attention && <Badge tone="critical"><AlertTriangle className="size-3" /> {t('needs you')}</Badge>}
+                {c.mode === 'human' && <Badge tone="gold"><Hand className="size-3" /> {t('taken over')}</Badge>}
+                {c.unread_count > 0 && <Badge tone="navy">{t('{n} new', { n: c.unread_count })}</Badge>}
+                {(c.customers?.orders_count || 0) > 0 && <Badge>{t('{n} orders', { n: c.customers?.orders_count })}</Badge>}
               </span>
             </button>
           ))}
@@ -90,7 +92,7 @@ function InboxInner() {
       </aside>
 
       {selectedId ? <Thread key={selectedId} id={selectedId} onBack={() => select(null)} onChanged={loadList} />
-        : <div className="hidden flex-1 items-center justify-center md:flex"><Empty title="Pick a conversation">Every WhatsApp chat is here, live — the agent&apos;s replies, your team&apos;s, and the customer&apos;s.</Empty></div>}
+        : <div className="hidden flex-1 items-center justify-center md:flex"><Empty title={t('Pick a conversation')}>{t("Every WhatsApp chat is here, live — the agent's replies, your team's, and the customer's.")}</Empty></div>}
     </div>
   );
 }
@@ -110,6 +112,7 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
   const bottom = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const { busy, run } = useAction();
+  const t = useT();
 
   const load = useCallback(async () => {
     const db = sb();
@@ -191,23 +194,23 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
     <div className="flex min-w-0 flex-1">
       <section className="flex min-w-0 flex-1 flex-col bg-paper">
         <header className="flex flex-wrap items-center gap-2 border-b border-hairline bg-white px-4 py-2.5">
-          <button onClick={onBack} className="rounded-lg p-1 hover:bg-paper md:hidden" aria-label="Back"><ArrowLeft className="size-5" /></button>
+          <button onClick={onBack} className="rounded-lg p-1 hover:bg-paper md:hidden" aria-label={t('Back')}><ArrowLeft className="size-5 rtl:rotate-180" /></button>
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold" dir="auto">{name}</p>
             <p className="text-xs text-muted">{phoneLabel(conv.wa_id, customer?.phone, customer?.phone_hidden)}</p>
           </div>
           {human ? (
             <>
-              <Badge tone="gold"><Hand className="size-3" /> You have this chat</Badge>
-              <Button size="sm" variant="primary" busy={busy} onClick={() => rpc('hand_back', { p_conversation: id }, 'Handed back — the agent answers the next message and knows what you said.')}>
-                <Bot className="size-4" /> Hand back to the agent
+              <Badge tone="gold"><Hand className="size-3" /> {t('You have this chat')}</Badge>
+              <Button size="sm" variant="primary" busy={busy} onClick={() => rpc('hand_back', { p_conversation: id }, t('Handed back — the agent answers the next message and knows what you said.'))}>
+                <Bot className="size-4" /> {t('Hand back to the agent')}
               </Button>
             </>
           ) : (
             <>
-              <Badge tone="positive"><Bot className="size-3" /> The agent is answering</Badge>
-              <Button size="sm" variant="gold" busy={busy} onClick={() => rpc('take_over', { p_conversation: id, p_reason: null }, 'You have the chat. The agent stays quiet until you hand it back.')}>
-                <Hand className="size-4" /> Take over
+              <Badge tone="positive"><Bot className="size-3" /> {t('The agent is answering')}</Badge>
+              <Button size="sm" variant="gold" busy={busy} onClick={() => rpc('take_over', { p_conversation: id, p_reason: null }, t('You have the chat. The agent stays quiet until you hand it back.'))}>
+                <Hand className="size-4" /> {t('Take over')}
               </Button>
             </>
           )}
@@ -217,8 +220,8 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
         {conv.needs_attention && (
           <div className="flex items-center gap-2 border-b border-critical/20 bg-critical-wash px-4 py-2 text-sm text-critical">
             <ShieldAlert className="size-4" />
-            <span className="flex-1" dir="auto">The agent asked for a person: {conv.attention_reason || 'see the chat'}</span>
-            <Button size="sm" variant="outline" onClick={() => rpc('resolve_attention', { p_conversation: id }, 'Marked as handled')}>Handled</Button>
+            <span className="flex-1" dir="auto">{t('The agent asked for a person: {reason}', { reason: conv.attention_reason || t('see the chat') })}</span>
+            <Button size="sm" variant="outline" onClick={() => rpc('resolve_attention', { p_conversation: id }, t('Marked as handled'))}>{t('Handled')}</Button>
           </div>
         )}
 
@@ -229,25 +232,25 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
             const loc = (m.meta?.location || null) as { maps_url?: string } | null;
             return (
               <div key={m.id}>
-                {newDay && <p className="my-3 text-center text-xs text-muted">{dateTime(m.created_at, tenant.timezone).split(',')[0]}</p>}
+                {newDay && <p className="my-3 text-center text-xs text-muted">{day(m.created_at, tenant.timezone)}</p>}
                 <div className={cx('flex', mine ? 'justify-end' : 'justify-start')}>
                   <div className={cx('max-w-[80%] rounded-2xl px-3.5 py-2 text-sm shadow-sm',
-                    !mine && 'rounded-bl-md bg-white',
-                    mine && m.sender === 'agent' && 'rounded-br-md bg-navy text-white',
-                    mine && m.sender === 'staff' && 'rounded-br-md bg-gold-wash text-ink ring-1 ring-gold-line',
-                    mine && m.sender === 'system' && 'rounded-br-md bg-paper-sunk text-muted italic')}>
+                    !mine && 'rounded-es-md bg-white',
+                    mine && m.sender === 'agent' && 'rounded-ee-md bg-navy text-white',
+                    mine && m.sender === 'staff' && 'rounded-ee-md bg-gold-wash text-ink ring-1 ring-gold-line',
+                    mine && m.sender === 'system' && 'rounded-ee-md bg-paper-sunk text-muted italic')}>
                     {mine && <p className={cx('mb-0.5 text-[11px] font-semibold uppercase tracking-wide', m.sender === 'agent' ? 'text-gold-bright' : 'text-gold-ink')}>
-                      {m.sender === 'agent' ? 'Agent' : m.sender === 'staff' ? ((m.meta?.via === 'phone') ? 'Team (phone)' : 'Team') : 'Automatic'}
+                      {m.sender === 'agent' ? t('Agent') : m.sender === 'staff' ? ((m.meta?.via === 'phone') ? t('Team (phone)') : t('Team')) : t('Automatic')}
                     </p>}
                     {m.media_url && (m.kind === 'image'
                       ? <img src={m.media_url} alt="" className="mb-1 max-h-64 rounded-lg" />
-                      : <a href={m.media_url} target="_blank" rel="noreferrer" className="underline">Open the file</a>)}
-                    {loc?.maps_url && <a href={loc.maps_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 underline"><MapPin className="size-3.5" /> Location pin</a>}
+                      : <a href={m.media_url} target="_blank" rel="noreferrer" className="underline">{t('Open the file')}</a>)}
+                    {loc?.maps_url && <a href={loc.maps_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 underline"><MapPin className="size-3.5" /> {t('Location pin')}</a>}
                     {m.body && <p className="bubble" dir="auto">{m.body}</p>}
                     <p className={cx('mt-0.5 flex items-center justify-end gap-1 text-[11px]', mine && m.sender === 'agent' ? 'text-on-navy-muted' : 'text-muted')}>
                       {clock(m.created_at, tenant.timezone)}
                       {mine && (m.status === 'queued' || m.status === 'sending' ? <Clock className="size-3" />
-                        : m.status === 'failed' ? <span className="text-critical" title={m.error || ''}>failed</span>
+                        : m.status === 'failed' ? <span className="text-critical" title={m.error || ''}>{t('failed')}</span>
                         : m.status === 'read' ? <CheckCheck className="size-3" /> : <Check className="size-3" />)}
                     </p>
                   </div>
@@ -259,16 +262,16 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
         </div>
 
         <footer className="border-t border-hairline bg-white p-3">
-          {customer?.is_blocked ? <p className="text-center text-sm text-critical">This customer is blocked. Unblock them in the side panel to reply.</p> : (
+          {customer?.is_blocked ? <p className="text-center text-sm text-critical">{t('This customer is blocked. Unblock them in the side panel to reply.')}</p> : (
             <>
-              {!human && <p className="mb-1.5 text-xs text-muted">Sending a message takes this chat over — the agent stays quiet until you hand it back.</p>}
+              {!human && <p className="mb-1.5 text-xs text-muted">{t('Sending a message takes this chat over — the agent stays quiet until you hand it back.')}</p>}
               <div className="flex items-end gap-2">
                 <input ref={file} type="file" accept="image/*,application/pdf" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) attach(f); e.target.value = ''; }} />
-                <Button variant="ghost" onClick={() => file.current?.click()} aria-label="Send a photo"><ImagePlus className="size-5" /></Button>
-                <Textarea rows={1} value={text} onChange={e => setText(e.target.value)} placeholder="Write to the customer…" className="min-h-10 flex-1 resize-none"
+                <Button variant="ghost" onClick={() => file.current?.click()} aria-label={t('Send a photo')}><ImagePlus className="size-5" /></Button>
+                <Textarea rows={1} value={text} onChange={e => setText(e.target.value)} placeholder={t('Write to the customer…')} className="min-h-10 flex-1 resize-none"
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
-                <Button variant="gold" busy={busy} onClick={() => send()} aria-label="Send"><Send className="size-4" /></Button>
+                <Button variant="gold" busy={busy} onClick={() => send()} aria-label={t('Send')}><Send className="size-4" /></Button>
               </div>
             </>
           )}
@@ -276,67 +279,67 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
       </section>
 
       {showSide && (
-        <aside className="hidden w-80 shrink-0 space-y-3 overflow-y-auto border-l border-hairline bg-white p-3 xl:block">
-          <Card title="Customer">
+        <aside className="hidden w-80 shrink-0 space-y-3 overflow-y-auto border-s border-hairline bg-white p-3 xl:block">
+          <Card title={t('Customer')}>
             <div className="space-y-1 text-sm">
               <p className="font-medium" dir="auto">{name}</p>
               <p className="text-muted">{phoneLabel(conv.wa_id, customer?.phone, customer?.phone_hidden)}</p>
-              <p className="text-muted">{customer?.orders_count || 0} orders · {money(customer?.total_spent || 0, sym)} spent</p>
-              {customer?.food_prefs && <p className="text-muted" dir="auto">Avoids: {customer.food_prefs}</p>}
-              <Textarea className="mt-2" rows={2} placeholder="Notes for your team (the customer never sees them)" value={notes}
+              <p className="text-muted">{t('{n} orders · {spent} spent', { n: customer?.orders_count || 0, spent: money(customer?.total_spent || 0, sym) })}</p>
+              {customer?.food_prefs && <p className="text-muted" dir="auto">{t('Avoids: {prefs}', { prefs: customer.food_prefs })}</p>}
+              <Textarea className="mt-2" rows={2} placeholder={t('Notes for your team (the customer never sees them)')} value={notes}
                 onChange={e => setNotes(e.target.value)}
                 onBlur={() => customer && notes !== (customer.staff_notes || '') && run(async () => {
                   const { error } = await sb().from('customers').update({ staff_notes: notes }).eq('id', customer.id);
                   if (error) throw new Error(error.message);
-                }, 'Note saved')} />
+                }, t('Note saved'))} />
               {customer && (
                 <Button size="sm" variant="ghost" className="mt-1 text-critical" onClick={() => run(async () => {
                   const { error } = await sb().from('customers').update({ is_blocked: !customer.is_blocked }).eq('id', customer.id);
                   if (error) throw new Error(error.message);
                   await load();
-                }, customer.is_blocked ? 'Unblocked' : 'Blocked — the agent ignores them now')}>
-                  <Ban className="size-4" /> {customer.is_blocked ? 'Unblock' : 'Block'}
+                }, customer.is_blocked ? t('Unblocked') : t('Blocked — the agent ignores them now'))}>
+                  <Ban className="size-4" /> {customer.is_blocked ? t('Unblock') : t('Block')}
                 </Button>
               )}
             </div>
           </Card>
 
-          <Card title="What the agent knows">
+          <Card title={t('What the agent knows')}>
             <dl className="space-y-1 text-sm">
-              <div className="flex justify-between gap-2"><dt className="text-muted">Branch</dt><dd dir="auto">{conv.state?.branch?.name_ar || '—'}</dd></div>
-              <div className="flex justify-between gap-2"><dt className="text-muted">Delivery area</dt><dd dir="auto">{conv.state?.zone?.name || (conv.state?.location?.in_delivery_area === false ? 'outside the zones' : '—')}</dd></div>
-              <div className="flex justify-between gap-2"><dt className="text-muted">Order type</dt><dd>{details.delivery_method || '—'}</dd></div>
-              {details.full_name && <div className="flex justify-between gap-2"><dt className="text-muted">Name</dt><dd dir="auto">{details.full_name}</dd></div>}
-              {(details.address_area || details.address_street) && <div><dt className="text-muted">Address</dt><dd dir="auto">{[details.address_street, details.address_area, details.address_building && 'عمارة ' + details.address_building, details.address_floor && 'دور ' + details.address_floor, details.address_apartment && 'شقة ' + details.address_apartment].filter(Boolean).join('، ')}</dd></div>}
-              {pending.length > 0 && <div><dt className="text-muted">Waiting on a choice</dt><dd dir="auto">{pending.map(p => p.name).join('، ')}</dd></div>}
-              {(conv.state?.memory_notes || []).length > 0 && <div><dt className="text-muted">Notes</dt><dd className="text-xs">{conv.state?.memory_notes?.slice(-3).join(' · ')}</dd></div>}
+              <div className="flex justify-between gap-2"><dt className="text-muted">{t('Branch')}</dt><dd dir="auto">{conv.state?.branch?.name_ar || '—'}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-muted">{t('Delivery area')}</dt><dd dir="auto">{conv.state?.zone?.name || (conv.state?.location?.in_delivery_area === false ? t('outside the zones') : '—')}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-muted">{t('Order type')}</dt><dd>{details.delivery_method ? t(details.delivery_method) : '—'}</dd></div>
+              {details.full_name && <div className="flex justify-between gap-2"><dt className="text-muted">{t('Name')}</dt><dd dir="auto">{details.full_name}</dd></div>}
+              {(details.address_area || details.address_street) && <div><dt className="text-muted">{t('Address')}</dt><dd dir="auto">{[details.address_street, details.address_area, details.address_building && 'عمارة ' + details.address_building, details.address_floor && 'دور ' + details.address_floor, details.address_apartment && 'شقة ' + details.address_apartment].filter(Boolean).join('، ')}</dd></div>}
+              {pending.length > 0 && <div><dt className="text-muted">{t('Waiting on a choice')}</dt><dd dir="auto">{pending.map(p => p.name).join('، ')}</dd></div>}
+              {(conv.state?.memory_notes || []).length > 0 && <div><dt className="text-muted">{t('Notes')}</dt><dd className="text-xs">{conv.state?.memory_notes?.slice(-3).join(' · ')}</dd></div>}
             </dl>
           </Card>
 
-          <Card title="Current cart">
-            {!draft || !draft.cart.items.length ? <p className="text-sm text-muted">Empty.</p> : (
+          <Card title={t('Current cart')}>
+            {!draft || !draft.cart.items.length ? <p className="text-sm text-muted">{t('Empty.')}</p> : (
               <div className="space-y-1 text-sm">
                 {draft.cart.items.map(i => (
-                  <p key={i.line_id} className="flex justify-between gap-2" dir="auto"><span>{i.display_name || i.item_name} {qty(i.quantity, i.unit)}</span><span>{i.gift ? 'free' : money(i.line_total, sym)}</span></p>
+                  <p key={i.line_id} className="flex justify-between gap-2" dir="auto"><span>{i.display_name || i.item_name} {qty(i.quantity, i.unit)}</span><span>{i.gift ? t('free') : money(i.line_total, sym)}</span></p>
                 ))}
-                <p className="flex justify-between border-t border-hairline pt-1 font-semibold"><span>Total</span><span>{money(draft.total, sym)}</span></p>
+                <p className="flex justify-between border-t border-hairline pt-1 font-semibold"><span>{t('Total')}</span><span>{money(draft.total, sym)}</span></p>
               </div>
             )}
           </Card>
 
-          <Card title="Previous orders">
-            {orders.length === 0 ? <p className="text-sm text-muted">None yet.</p> : (
+          <Card title={t('Previous orders')}>
+            {orders.length === 0 ? <p className="text-sm text-muted">{t('None yet.')}</p> : (
               <ul className="space-y-2 text-sm">
                 {orders.map(o => (
                   <li key={o.id}>
                     <p className="flex justify-between"><strong>{o.order_no}</strong><span>{money(o.total, sym)}</span></p>
-                    <p className="text-xs text-muted">{dateTime(o.placed_at, tenant.timezone)} · {STATUS_LABEL[o.status]}</p>
+                    <p className="text-xs text-muted">{dateTime(o.placed_at, tenant.timezone)} · {statusLabel(o.status)}</p>
                   </li>
                 ))}
               </ul>
             )}
             {addresses.length > 0 && <>
-              <p className="label-caps mb-1 mt-3">Saved addresses</p>
+              <p className="label-caps mb-1 mt-3">{t('Saved addresses')}</p>
               {addresses.map(a => <p key={a.id} className="text-xs text-muted" dir="auto">{a.address_text}</p>)}
             </>}
           </Card>

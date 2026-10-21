@@ -3,6 +3,7 @@ import { Bot, BotOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { sb } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { Button, Checkbox, Field, Modal, Textarea, useAction } from '../ui';
 import { useTenant } from '../tenant';
 
@@ -18,6 +19,7 @@ export function AgentSwitch() {
   const [reason, setReason] = useState('');
   const [notifyBack, setNotifyBack] = useState(true);
   const { busy, run } = useAction();
+  const t = useT();
 
   const load = async () => {
     const { data } = await sb().rpc('pause_status', { p_tenant: tenant.id });
@@ -43,7 +45,7 @@ export function AgentSwitch() {
       if (error) throw new Error(error.message);
       if (on === false) await fetch('/api/outbox/ping', { method: 'POST' }).catch(() => null);
       return data as { notified?: number };
-    }, on ? 'The agent is OFF. Customers get a warm apology and will hear when you are back.' : undefined);
+    }, on ? t('The agent is OFF. Customers get a warm apology and will hear when you are back.') : undefined);
     if (r !== undefined) {
       setOpen(false); setReason('');
       await load();
@@ -56,32 +58,31 @@ export function AgentSwitch() {
         className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
           on ? 'border-positive/30 bg-positive-wash text-positive' : 'border-critical/30 bg-critical-wash text-critical'}`}>
         {on ? <Bot className="size-4" /> : <BotOff className="size-4" />}
-        <span>Agent {on ? 'ON' : 'OFF'}</span>
-        {!on && waiting > 0 && <span className="rounded-full bg-critical px-1.5 text-xs text-white">{waiting} waiting</span>}
+        <span>{on ? t('Agent ON') : t('Agent OFF')}</span>
+        {!on && waiting > 0 && <span className="rounded-full bg-critical px-1.5 text-xs text-white">{t('{n} waiting', { n: waiting })}</span>}
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)}
-        title={on ? 'Switch the agent OFF?' : 'Switch the agent back ON?'}
+        title={on ? t('Switch the agent OFF?') : t('Switch the agent back ON?')}
         footer={<>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant={on ? 'danger' : 'positive'} busy={busy} onClick={apply}>{on ? 'Switch OFF' : 'Switch ON'}</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>{t('Cancel')}</Button>
+          <Button variant={on ? 'danger' : 'positive'} busy={busy} onClick={apply}>{on ? t('Switch OFF') : t('Switch ON')}</Button>
         </>}>
         {on ? (
           <div className="space-y-4 text-sm">
-            <p className="text-muted">Use this when you are too busy to take more WhatsApp orders. While it is off, everyone who writes
-              gets one warm apology (Settings → Messages) and is remembered. Conversations a person already took over are not affected.</p>
-            <Field label="Why (only your team sees this)">
-              <Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Kitchen full, Friday rush…" />
+            <p className="text-muted">{t('Use this when you are too busy to take more WhatsApp orders. While it is off, everyone who writes gets one warm apology (Settings → Messages) and is remembered. Conversations a person already took over are not affected.')}</p>
+            <Field label={t('Why (only your team sees this)')}>
+              <Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder={t('Kitchen full, Friday rush…')} />
             </Field>
           </div>
         ) : (
           <div className="space-y-4 text-sm">
             <p className="text-muted">
-              Off since {timeAgo(status?.pause?.started_at)}{status?.pause?.reason ? ` — ${status.pause.reason}` : ''}.{' '}
-              <strong className="text-ink">{waiting}</strong> {waiting === 1 ? 'person' : 'people'} wrote while it was off.
+              {t('Off since {when}', { when: timeAgo(status?.pause?.started_at) })}{status?.pause?.reason ? ` — ${status.pause.reason}` : ''}.{' '}
+              {waiting === 1 ? t('1 person wrote while it was off.') : t('{n} people wrote while it was off.', { n: waiting })}
             </p>
             <Checkbox checked={notifyBack} onChange={setNotifyBack}
-              label={<>Send them the &quot;we&apos;re back, you can order now&quot; message</>} />
+              label={t('Send them the "we\'re back, you can order now" message')} />
           </div>
         )}
       </Modal>

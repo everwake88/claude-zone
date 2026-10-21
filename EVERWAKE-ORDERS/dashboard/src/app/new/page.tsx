@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Field, Input, Select } from '@/components/ui';
+import { LangSwitch, useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 
 const COUNTRIES = [
@@ -18,6 +19,7 @@ const COUNTRIES = [
 // Signing a restaurant up: one form, then the go-live checklist guides the rest
 export default function NewRestaurant() {
   const router = useRouter();
+  const t = useT();
   const [nameAr, setNameAr] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [country, setCountry] = useState('EG');
@@ -39,24 +41,25 @@ export default function NewRestaurant() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-paper p-4">
+    <main className="relative flex min-h-screen items-center justify-center bg-paper p-4">
+      <LangSwitch className="absolute end-4 top-4" />
       <form onSubmit={create} className="w-full max-w-lg space-y-5 rounded-2xl border border-hairline bg-white p-7 shadow-lg">
         <div>
           <p className="label-caps">Everwake Orders</p>
-          <h1 className="mt-1 text-2xl font-semibold">Sign up your restaurant</h1>
-          <p className="mt-1 text-sm text-muted">Next you add branches, the menu, delivery zones and the WhatsApp number — a checklist walks you through it, and nothing goes live until you say so.</p>
+          <h1 className="mt-1 text-2xl font-semibold">{t('Sign up your restaurant')}</h1>
+          <p className="mt-1 text-sm text-muted">{t('Next you add branches, the menu, delivery zones and the WhatsApp number — a checklist walks you through it, and nothing goes live until you say so.')}</p>
         </div>
-        <Field label="Restaurant name in Arabic"><Input dir="rtl" required value={nameAr} onChange={e => setNameAr(e.target.value)} placeholder="مشويات النيل" /></Field>
-        <Field label="Restaurant name in English" hint="Also used for the restaurant's web address in the dashboard.">
+        <Field label={t('Restaurant name in Arabic')}><Input dir="rtl" required value={nameAr} onChange={e => setNameAr(e.target.value)} placeholder="مشويات النيل" /></Field>
+        <Field label={t('Restaurant name in English')} hint={t("Also used for the restaurant's web address in the dashboard.")}>
           <Input dir="ltr" required value={nameEn} onChange={e => setNameEn(e.target.value)} placeholder="Nile Grill" />
         </Field>
-        <Field label="Country" hint={`Prices in ${c.currency}, times in ${c.tz}. Both can be changed later.`}>
+        <Field label={t('Country')} hint={t('Prices in {currency}, times in {tz}. Both can be changed later.', { currency: c.currency, tz: c.tz })}>
           <Select value={country} onChange={e => setCountry(e.target.value)}>
-            {COUNTRIES.map(x => <option key={x.code} value={x.code}>{x.name}</option>)}
+            {COUNTRIES.map(x => <option key={x.code} value={x.code}>{t(x.name)}</option>)}
           </Select>
         </Field>
         {err && <p className="rounded-lg bg-critical-wash px-3 py-2 text-sm text-critical">{err}</p>}
-        <Button type="submit" variant="gold" className="w-full" busy={busy}>Create the restaurant</Button>
+        <Button type="submit" variant="gold" className="w-full" busy={busy}>{t('Create the restaurant')}</Button>
       </form>
     </main>
   );

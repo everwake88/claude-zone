@@ -5,6 +5,7 @@ import {
   type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes
 } from 'react';
 import { cx } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 
 // ---- Button ------------------------------------------------------------------
 type Variant = 'primary' | 'gold' | 'outline' | 'ghost' | 'danger' | 'positive';
@@ -39,7 +40,7 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea dir="auto" rows={3} {...props} className={cx(field, 'py-2 leading-relaxed', props.className)} />;
 }
 export function Select({ children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cx(field, 'h-10 pr-8', props.className)}>{children}</select>;
+  return <select {...props} className={cx(field, 'h-10 pe-8', props.className)}>{children}</select>;
 }
 export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -58,7 +59,7 @@ export function Switch({ checked, onChange, disabled, label, tone = 'positive' }
       onClick={() => onChange(!checked)}
       className={cx('relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50',
         checked ? (tone === 'gold' ? 'bg-gold' : 'bg-positive') : 'bg-paper-sunk border border-hairline')}>
-      <span className={cx('inline-block size-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-5' : 'translate-x-0.5')} />
+      <span className={cx('inline-block size-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5')} />
     </button>
   );
 }
@@ -118,13 +119,15 @@ export function Empty({ title, children, action }: { title: string; children?: R
   );
 }
 
-export function Spinner({ label = 'Loading…' }: { label?: string }) {
-  return <div className="flex items-center gap-2 p-6 text-sm text-muted"><Loader2 className="size-4 animate-spin" />{label}</div>;
+export function Spinner({ label }: { label?: string }) {
+  const t = useT();
+  return <div className="flex items-center gap-2 p-6 text-sm text-muted"><Loader2 className="size-4 animate-spin" />{label || t('Loading…')}</div>;
 }
 
 // ---- Overlays -------------------------------------------------------------------
 export function Drawer({ open, onClose, title, children, footer, wide }:
   { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+  const t = useT();
   useEffect(() => {
     if (!open) return;
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -138,7 +141,7 @@ export function Drawer({ open, onClose, title, children, footer, wide }:
       <aside className={cx('relative flex h-full w-full flex-col bg-white shadow-2xl', wide ? 'max-w-3xl' : 'max-w-xl')}>
         <header className="flex items-center justify-between border-b border-hairline px-5 py-4">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-paper" aria-label="Close"><X className="size-5" /></button>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-paper" aria-label={t('Close')}><X className="size-5" /></button>
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
         {footer && <footer className="flex justify-end gap-2 border-t border-hairline px-5 py-3">{footer}</footer>}
@@ -149,6 +152,7 @@ export function Drawer({ open, onClose, title, children, footer, wide }:
 
 export function Modal({ open, onClose, title, children, footer }:
   { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode }) {
+  const t = useT();
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -156,7 +160,7 @@ export function Modal({ open, onClose, title, children, footer }:
       <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl">
         <header className="flex items-center justify-between px-5 pt-5">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-paper" aria-label="Close"><X className="size-5" /></button>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-paper" aria-label={t('Close')}><X className="size-5" /></button>
         </header>
         <div className="px-5 py-4">{children}</div>
         {footer && <footer className="flex justify-end gap-2 border-t border-hairline px-5 py-3">{footer}</footer>}
@@ -193,7 +197,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-4 end-4 z-[60] flex flex-col gap-2">
         {list.map(t => (
           <div key={t.id} className={cx('pointer-events-auto max-w-sm rounded-xl px-4 py-3 text-sm shadow-lg',
             t.tone === 'critical' ? 'bg-critical text-white' : t.tone === 'neutral' ? 'bg-navy text-white' : 'bg-positive text-white')}>
@@ -209,6 +213,7 @@ export const useToast = () => useContext(ToastCtx);
 // run an async action with a busy flag and a toast on failure
 export function useAction() {
   const toast = useToast();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const run = useCallback(async <T,>(fn: () => Promise<T>, done?: string): Promise<T | undefined> => {
     setBusy(true);
@@ -217,11 +222,12 @@ export function useAction() {
       if (done) toast(done);
       return r;
     } catch (e) {
-      toast(e instanceof Error ? e.message : String(e), 'critical');
+      // a known message (ours, or the database's) shows in the dashboard's language
+      toast(t(e instanceof Error ? e.message : String(e)), 'critical');
       return undefined;
     } finally {
       setBusy(false);
     }
-  }, [toast]);
+  }, [toast, t]);
   return { busy, run };
 }

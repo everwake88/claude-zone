@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Tenant } from '@/lib/types';
 import { useAction } from '../ui';
@@ -11,6 +12,7 @@ export function useTenantRow() {
   const { tenant } = useTenant();
   const [row, setRow] = useState<Tenant | null>(null);
   const { busy, run } = useAction();
+  const t = useT();
 
   const load = useCallback(async () => {
     const { data } = await sb().from('tenants').select('*').eq('id', tenant.id).single();
@@ -18,12 +20,12 @@ export function useTenantRow() {
   }, [tenant.id]);
   useEffect(() => { load(); }, [load]);
 
-  const save = (patch: Partial<Pick<Tenant, 'name_ar' | 'name_en' | 'timezone' | 'currency' | 'currency_symbol_ar' | 'default_language' | 'order_no_prefix' | 'profile' | 'settings'>>, done = 'Saved — the agent knows on the next message') =>
+  const save = (patch: Partial<Pick<Tenant, 'name_ar' | 'name_en' | 'timezone' | 'currency' | 'currency_symbol_ar' | 'default_language' | 'order_no_prefix' | 'profile' | 'settings'>>, done?: string) =>
     run(async () => {
       const { data, error } = await sb().from('tenants').update(patch).eq('id', tenant.id).select('*').single();
       if (error) throw new Error(error.message);
       setRow(data as Tenant);
-    }, done);
+    }, done ?? t('Saved — the agent knows on the next message'));
 
   return { row, setRow, save, busy, reload: load };
 }
