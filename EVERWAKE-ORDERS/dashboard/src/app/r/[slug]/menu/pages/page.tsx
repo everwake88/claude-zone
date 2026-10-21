@@ -3,6 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, FileText, Trash2, Upload } from 'lucide-
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Card, Input, PageHeader, Select, useAction } from '@/components/ui';
+import { MenuArt } from '@/components/menu/MenuArt';
 import { useTenant } from '@/components/tenant';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
@@ -95,6 +96,7 @@ export default function MenuPages() {
           )}
         </div>
       </Card>
+      {can.edit && <MenuArt scope={scope} existing={pages.length} onSaved={load} />}
     </div>
   );
 }

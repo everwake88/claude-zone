@@ -19,7 +19,11 @@ export interface Profile {
   brand_facts?: string[];
   contacts?: { hotline?: string; complaints?: string; whatsapp?: string; email?: string };
   website?: string; instagram?: string; facebook?: string; tiktok?: string; google_maps_url?: string;
+  brand?: Brand;
 }
+
+// the restaurant's look: its logo and colour, on the dashboard and the menu pictures
+export interface Brand { logo_url?: string; logo_path?: string; color?: string }
 
 export interface Settings {
   payment_methods?: string[];

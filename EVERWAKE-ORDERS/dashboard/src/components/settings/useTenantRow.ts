@@ -25,6 +25,7 @@ export function useTenantRow() {
       const { data, error } = await sb().from('tenants').update(patch).eq('id', tenant.id).select('*').single();
       if (error) throw new Error(error.message);
       setRow(data as Tenant);
+      return true;
     }, done ?? t('Saved — the agent knows on the next message'));
 
   return { row, setRow, save, busy, reload: load };

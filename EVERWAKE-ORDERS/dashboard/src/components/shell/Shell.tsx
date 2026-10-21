@@ -28,7 +28,7 @@ const NAV = [
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { tenant, tenants, base } = useTenant();
+  const { tenant, tenants, base, brand } = useTenant();
   const path = usePathname();
   const router = useRouter();
   const toast = useToast();
@@ -96,9 +96,11 @@ export function Shell({ children }: { children: ReactNode }) {
         mobileNav ? 'translate-x-0' : lang === 'ar' ? 'translate-x-full' : '-translate-x-full')}>
         <div className="relative px-5 pb-4 pt-5">
           <button onClick={() => setSwitcher(s => !s)} className="flex w-full items-center gap-2 text-start">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-gold font-bold text-navy">
-              {(tenant.name_en || tenant.name_ar).slice(0, 1).toUpperCase()}
-            </span>
+            {brand.logo_url
+              ? <img src={brand.logo_url} alt="" className="size-9 shrink-0 rounded-full bg-white object-contain p-0.5" />
+              : <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold font-bold text-navy">
+                  {(tenant.name_en || tenant.name_ar).slice(0, 1).toUpperCase()}
+                </span>}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{tenant.name_en || tenant.name_ar}</span>
               <span className="block truncate text-xs text-on-navy-muted ar" dir="rtl">{tenant.name_ar}</span>
