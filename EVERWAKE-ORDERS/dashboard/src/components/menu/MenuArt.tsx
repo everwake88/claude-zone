@@ -129,6 +129,7 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
 
       {pics.length > 0 && (
         <div className="mt-5 space-y-4">
+          {pics.length > 6 && <p className="rounded-lg bg-paper p-3 text-sm text-critical">{t('That is {n} pictures — the agent sends at most 6 when a customer asks for the menu. Leave out a category or two so it fits.', { n: pics.length })}</p>}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
             {pics.map((p, i) => (
               <figure key={p.url} className="overflow-hidden rounded-xl border border-hairline">

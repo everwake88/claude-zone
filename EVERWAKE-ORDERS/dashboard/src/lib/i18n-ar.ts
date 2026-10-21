@@ -830,4 +830,5 @@ export const AR: Record<string, string> = {
   "This replaces the {n} pictures above with these {m}. Go ahead?": "ده هيستبدل الـ {n} صور اللي فوق بالـ {m} دول. نكمّل؟",
   "Replace them": "استبدلهم",
   "Use these as the menu pictures": "استخدمها كصور المنيو",
+  "That is {n} pictures — the agent sends at most 6 when a customer asks for the menu. Leave out a category or two so it fits.": "دول {n} صور — الإيجنت بيبعت 6 صور بالكتير لما عميل يطلب المنيو. شيل قسم أو اتنين عشان يكفّوا.",
 };
