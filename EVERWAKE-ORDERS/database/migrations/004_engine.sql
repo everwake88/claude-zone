@@ -1129,7 +1129,7 @@ returns jsonb language sql stable as $$
                   select 1 from everwake.menu_media x
                    where x.tenant_id = m.tenant_id and x.is_active and x.branch_id::text = p ->> 'branch_id')))
      order by m.position
-     limit 6
+     limit 10
   ), photos as (
     select distinct on (i.code) i.code, i.name_ar, im.url, im.mime, coalesce(mib.price, i.price) as price, i.unit, x.ord
       from jsonb_array_elements_text(coalesce(p -> 'item_codes', '[]'::jsonb)) with ordinality x(code, ord)

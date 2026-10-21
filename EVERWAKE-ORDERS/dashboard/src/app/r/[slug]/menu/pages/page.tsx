@@ -62,7 +62,7 @@ export default function MenuPages() {
   return (
     <div className="space-y-5">
       <Link href={`${base}/menu`} className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" /> {t('Menu')}</Link>
-      <PageHeader title={t('Menu pictures and PDF')} subtitle={t('What the agent sends when a customer asks to see the menu — at most 6 pages, in this order.')}
+      <PageHeader title={t('Menu pictures and PDF')} subtitle={t('What the agent sends when a customer asks to see the menu — at most 10 pages, in this order.')}
         actions={branches.length > 1 && (
           <Select value={scope} onChange={e => setScope(e.target.value)} className="w-56">
             <option value="all">{t('Every branch')}</option>

@@ -25,7 +25,6 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
   const { busy, run } = useAction();
   const [cats, setCats] = useState<Cat[]>([]);
   const [menu, setMenu] = useState<Section[] | null>(null);
-  const [footer, setFooter] = useState('');
   const [skip, setSkip] = useState<Set<string>>(new Set());
   const [pics, setPics] = useState<{ blob: Blob; url: string }[]>([]);
   const [confirm, setConfirm] = useState(false);
@@ -34,18 +33,15 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
   useEffect(() => {
     (async () => {
       const id = tenant.id;
-      const [c, i, g, o, b, p] = await Promise.all([
+      const [c, i, g, o, b] = await Promise.all([
         sb().from('menu_categories').select('id,name_ar,sort').eq('tenant_id', id).eq('is_active', true).order('sort'),
         sb().from('menu_items').select('id,category_id,name_ar,description_ar,price,sort').eq('tenant_id', id).eq('is_active', true).order('sort'),
         sb().from('menu_option_groups').select('id,item_id,level,label_ar,required,max_select').eq('tenant_id', id),
         sb().from('menu_options').select('group_id,price_delta,is_available').eq('tenant_id', id),
-        scope === 'all' ? Promise.resolve({ data: [] }) : sb().from('menu_item_branches').select('item_id,is_listed,price').eq('branch_id', scope),
-        sb().from('tenants').select('profile').eq('id', id).single()
+        scope === 'all' ? Promise.resolve({ data: [] }) : sb().from('menu_item_branches').select('item_id,is_listed,price').eq('branch_id', scope)
       ]);
       const groups = (g.data || []) as Group[], opts = (o.data || []) as Opt[];
       const branch = new Map(((b.data || []) as { item_id: string; is_listed: boolean; price: number | null }[]).map(r => [r.item_id, r]));
-      const hotline = (p.data?.profile as { contacts?: { hotline?: string } } | null)?.contacts?.hotline;
-      setFooter(hotline ? `اكتب طلبك هنا في الشات  •  الخط الساخن ${hotline}` : 'اكتب طلبك هنا في الشات');
       // a dish with sizes shows each size's price: 155 / 215 / 240
       const priceOf = (it: Item, base: number | null) => {
         if (base == null) return '';
@@ -75,7 +71,7 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
     if (!chosen.length) throw new Error(t('Pick at least one category with dishes.'));
     const pages = drawMenu({
       title: tenant.name_ar || tenant.name_en, subtitle: tenant.name_en && tenant.name_en !== tenant.name_ar ? tenant.name_en : null,
-      logo, color: brand.color || '#0B222E', categories: chosen, footer, font: cairo.style.fontFamily
+      logo, color: brand.color || '#0B222E', categories: chosen, font: cairo.style.fontFamily
     });
     pics.forEach(p => URL.revokeObjectURL(p.url));
     const blobs = await Promise.all(pages.map(toJpeg));
@@ -129,7 +125,7 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
 
       {pics.length > 0 && (
         <div className="mt-5 space-y-4">
-          {pics.length > 6 && <p className="rounded-lg bg-paper p-3 text-sm text-critical">{t('That is {n} pictures — the agent sends at most 6 when a customer asks for the menu. Leave out a category or two so it fits.', { n: pics.length })}</p>}
+          {pics.length > 10 && <p className="rounded-lg bg-paper p-3 text-sm text-critical">{t('That is {n} pictures — the agent sends at most 10 when a customer asks for the menu. Leave out a category or two so it fits.', { n: pics.length })}</p>}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
             {pics.map((p, i) => (
               <figure key={p.url} className="overflow-hidden rounded-xl border border-hairline">

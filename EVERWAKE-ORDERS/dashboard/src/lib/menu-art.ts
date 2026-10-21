@@ -12,7 +12,7 @@ export interface ArtItem { name: string; sub: string | null; price: string }
 export interface ArtCategory { name: string; items: ArtItem[] }
 export interface ArtInput {
   title: string; subtitle: string | null; logo: HTMLImageElement | null; color: string;
-  categories: ArtCategory[]; footer: string; font: string;
+  categories: ArtCategory[]; font: string;
 }
 
 export const W = 1080, H = 1600;           // WhatsApp shows this size without shrinking it
@@ -230,11 +230,9 @@ function drawPage(input: ArtInput, page: Page, index: number, total: number): HT
     }
   });
 
-  // footer
+  // footer: a rule and the page number
   ctx.fillStyle = mix(brand, PAPER, 0.75); ctx.fillRect(M, H - FOOT, W - 2 * M, 2);
-  ctx.font = F(700, 22); ctx.fillStyle = INK; ctx.textAlign = 'right';
-  ctx.fillText(fit(ctx, input.footer, W - 2 * M - 120), W - M, H - FOOT / 2 + 10);
-  if (total > 1) { ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.fillStyle = MUTED; ctx.fillText(`${index + 1} / ${total}`, M, H - FOOT / 2 + 10); }
+  if (total > 1) { ctx.font = F(700, 22); ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.fillStyle = MUTED; ctx.fillText(`${index + 1} / ${total}`, M, H - FOOT / 2 + 10); }
   return c;
 }
 

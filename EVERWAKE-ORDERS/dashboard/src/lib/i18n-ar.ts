@@ -283,7 +283,7 @@ export const AR: Record<string, string> = {
   "Hidden (the agent ignores the whole category)": "مخفي (المساعد يتجاهل القسم كله)",
   "Uploaded — the agent sends these when someone asks for the menu": "اترفعت — المساعد هيبعتها لما حد يطلب المنيو",
   "Menu pictures and PDF": "صور المنيو و PDF",
-  "What the agent sends when a customer asks to see the menu — at most 6 pages, in this order.": "اللي المساعد بيبعته لما عميل يطلب يشوف المنيو — 6 صفحات بالكتير، بالترتيب ده.",
+  "What the agent sends when a customer asks to see the menu — at most 10 pages, in this order.": "اللي المساعد بيبعته لما عميل يطلب يشوف المنيو — 10 صفحات بالكتير، بالترتيب ده.",
   "Every branch": "كل الفروع",
   "{branch} only": "{branch} بس",
   "A branch with its own pages sends those; every other branch sends the \"every branch\" set.": "الفرع اللي ليه صفحات خاصة بيبعتها؛ وباقي الفروع بتبعت صفحات \"كل الفروع\".",
@@ -830,5 +830,5 @@ export const AR: Record<string, string> = {
   "This replaces the {n} pictures above with these {m}. Go ahead?": "ده هيستبدل الـ {n} صور اللي فوق بالـ {m} دول. نكمّل؟",
   "Replace them": "استبدلهم",
   "Use these as the menu pictures": "استخدمها كصور المنيو",
-  "That is {n} pictures — the agent sends at most 6 when a customer asks for the menu. Leave out a category or two so it fits.": "دول {n} صور — الإيجنت بيبعت 6 صور بالكتير لما عميل يطلب المنيو. شيل قسم أو اتنين عشان يكفّوا.",
+  "That is {n} pictures — the agent sends at most 10 when a customer asks for the menu. Leave out a category or two so it fits.": "دول {n} صور — الإيجنت بيبعت 10 صور بالكتير لما عميل يطلب المنيو. شيل قسم أو اتنين عشان يكفّوا.",
 };
