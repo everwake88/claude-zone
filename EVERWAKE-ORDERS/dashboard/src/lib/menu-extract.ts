@@ -92,7 +92,7 @@ const NAMES_INSTRUCTIONS = `You get one category of a restaurant's menu, read ex
   · drinks → "المشروب" / "Drink"; chips or fries kinds → "الشيبسي" or "البطاطس" / "Chips" or "Fries"; rice → "الرز" / "Rice"; sauces → "الصوص" / "Sauce"
   · what the meal comes with, fixed (2 bread, 1 Coleslaw) → "مع الوجبة" / "Comes with"
   · paid extras (cheese jar +70, extra pieces +110) → "إضافات" / "Extras"
-  · 6 pieces → "عدد القطع" / "Pieces"; Spicy, Regular, Half And Half → "حار ولا عادي" / "Spicy or regular"
+  · 6 pieces → "عدد القطع" / "Pieces"; Spicy, Regular, Half And Half → "سبايسي ولا عادي" / "Spicy or regular"
   · sandwiches → "ساندوتش التشيكن", "ساندوتش البرجر", "الراب" / "Chicken sandwich", "Burger", "Wrap"
   Never "سايد", "الوجبة الجانبية" or "جانبي".`;
 
