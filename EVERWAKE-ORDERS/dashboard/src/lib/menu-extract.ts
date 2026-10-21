@@ -71,29 +71,39 @@ async function openai(body: Record<string, unknown>, timeoutMs: number) {
 // a label for each level ("Level 1" → "الساندوتش التشيكن") so the agent can ask
 // for it. A category it cannot name keeps the site's own words.
 const NAMES_SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['name_ar', 'name_en', 'items'],
+  type: 'object', additionalProperties: false, required: ['name_ar', 'name_en', 'items', 'levels'],
   properties: {
     name_ar: { type: 'string' }, name_en: { type: 'string' },
     items: { type: 'array', items: {
-      type: 'object', additionalProperties: false, required: ['name_en', 'aliases', 'tags', 'is_signature', 'levels'],
+      type: 'object', additionalProperties: false, required: ['name_en', 'aliases', 'tags', 'is_signature'],
       properties: {
         name_en: { type: 'string' }, aliases: { type: 'array', items: { type: 'string' } },
-        tags: { type: 'array', items: { type: 'string' } }, is_signature: { type: 'boolean' },
-        levels: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['label_ar', 'label_en'],
-                  properties: { label_ar: { type: 'string' }, label_en: { type: 'string' } } } }
-      } } }
+        tags: { type: 'array', items: { type: 'string' } }, is_signature: { type: 'boolean' }
+      } } },
+    levels: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'label_ar', 'label_en'],
+              properties: { id: { type: 'string' }, label_ar: { type: 'string' }, label_en: { type: 'string' } } } }
   }
 };
 const NAMES_INSTRUCTIONS = `You get one category of a restaurant's menu, read exactly from its ordering site. Never change a dish, a price or a choice. Return:
 - name_ar: the category's Arabic name (an English name becomes the word Egyptian customers use: offers → عروض, Extras → إضافات). name_en: its English name.
 - items: one per dish, in the same order. name_en: the given English name, tidied (no prices, no emojis), or a short translation. aliases: 1–4 ways customers might write the dish (Arabic, Franco-Arabic, short names). tags: 2–5 lowercase English words (chicken, beef, sandwich, combo, drink, dessert, spicy…). is_signature: true only when the name or description says best seller / most popular / الأكثر طلبا / new.
-- levels: one per choice level of the dish, in the same order: a short label for what the customer picks there, from its choices (Chicken BBQ S, Jalapeno Chicken S → label_ar "الساندوتش التشيكن", label_en "Chicken sandwich"; Spicy, Regular → "حار ولا عادي", "Spicy or regular"; drinks with prices → "المشروب", "Drink"). A level named الحجم stays "الحجم" / "Size".`;
+- levels: one for EVERY level id given, with that id: a short label for what the customer picks there, from its choices (Chicken BBQ S, Jalapeno Chicken S → label_ar "ساندوتشات التشيكن", label_en "Chicken sandwich"; Spicy, Regular → "الطعم", "Flavour"; 6 pieces → "عدد القطع", "Pieces"; drinks with prices → "المشروب", "Drink").`;
+
+type Names = { name_ar: string; name_en: string; items: { name_en: string; aliases: string[]; tags: string[]; is_signature: boolean }[];
+               levels: { id: string; label_ar: string; label_en: string }[] };
+const SIZE = 'الحجم';
+const levelKey = (g: ExtractedMenu['categories'][number]['items'][number]['options'][number]) => g.choices.map(x => x.name_ar).join(' | ');
 
 async function nameCategory(c: ExtractedMenu['categories'][number], model: string) {
-  const input = { category: c.name_ar, items: c.items.map(i => ({
-    name: i.name_ar, name_en: i.name_en, description: i.description_ar,
-    levels: i.options.map(g => `${g.label_ar}: ${g.choices.map(x => x.name_ar).join(', ')}`)
-  })) };
+  // each distinct level (the same choices) is named once
+  const ids = new Map<string, string>();
+  for (const i of c.items) for (const g of i.options) if (g.label_ar !== SIZE && !ids.has(levelKey(g))) ids.set(levelKey(g), `L${ids.size + 1}`);
+  const input = {
+    category: c.name_ar,
+    items: c.items.map(i => ({ name: i.name_ar, name_en: i.name_en, description: i.description_ar,
+                               levels: i.options.map(g => ids.get(levelKey(g)) ?? 'Size') })),
+    levels: [...ids].map(([k, id]) => ({ id, choices: k }))
+  };
   const data = await openai({
     model, instructions: NAMES_INSTRUCTIONS,
     input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify(input) }] }],
@@ -102,7 +112,10 @@ async function nameCategory(c: ExtractedMenu['categories'][number], model: strin
   }, 150000);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const text: string = data.output_text || (data.output || []).flatMap((o: any) => o.content || []).filter((x: any) => x.type === 'output_text').map((x: any) => x.text).join('');
-  return { names: JSON.parse(text) as { name_ar: string; name_en: string; items: { name_en: string; aliases: string[]; tags: string[]; is_signature: boolean; levels: { label_ar: string; label_en: string }[] }[] }, usage: data.usage };
+  const names = JSON.parse(text) as Names;
+  const byId = new Map(names.levels.map(l => [l.id, l]));
+  const labels = new Map([...ids].map(([k, id]) => [k, byId.get(id)]));
+  return { names, labels, usage: data.usage };
 }
 
 export async function nameMenu(menu: ExtractedMenu): Promise<{ menu: ExtractedMenu; usage: unknown[]; model: string }> {
@@ -110,23 +123,24 @@ export async function nameMenu(menu: ExtractedMenu): Promise<{ menu: ExtractedMe
   const usage: unknown[] = [];
   let unnamed = 0;
   const categories = await Promise.all(menu.categories.map(async c => {
-    try {
-      const { names, usage: u } = await nameCategory(c, model);
-      usage.push(u);
-      if (names.items.length !== c.items.length) throw new Error('count');
-      return {
-        name_ar: names.name_ar.trim() || c.name_ar, name_en: names.name_en.trim() || c.name_en,
-        items: c.items.map((i, k) => {
-          const n = names.items[k];
-          return { ...i, name_en: i.name_en || n.name_en.trim() || null, aliases: n.aliases, tags: n.tags, is_signature: n.is_signature,
-                   options: n.levels.length === i.options.length
-                     ? i.options.map((g, j) => ({ ...g, label_ar: n.levels[j].label_ar.trim() || g.label_ar, label_en: n.levels[j].label_en.trim() || g.label_en }))
-                     : i.options };
-        })
-      };
-    } catch { unnamed++; return c; }
+    let named: Awaited<ReturnType<typeof nameCategory>> | null = null;
+    try { named = await nameCategory(c, model); usage.push(named.usage); } catch { /* keep the site's words */ }
+    const items = named && named.names.items.length === c.items.length ? named.names.items : null;
+    return {
+      name_ar: named?.names.name_ar.trim() || c.name_ar, name_en: named?.names.name_en.trim() || c.name_en,
+      items: c.items.map((i, k) => {
+        const n = items?.[k];
+        return { ...i, ...(n ? { name_en: i.name_en || n.name_en.trim() || null, aliases: n.aliases, tags: n.tags, is_signature: n.is_signature } : {}),
+                 options: i.options.map(g => {
+                   if (g.label_ar === SIZE) return g;
+                   const l = named?.labels.get(levelKey(g));
+                   if (!l?.label_ar.trim()) { unnamed++; return g; }
+                   return { ...g, label_ar: l.label_ar.trim(), label_en: l.label_en.trim() || g.label_en };
+                 }) };
+      })
+    };
   }));
-  const notes = [menu.notes, unnamed ? `${unnamed} categories kept the site's own level names (Level 1, Level 2…) — rename them if you like.` : null]
+  const notes = [menu.notes, unnamed ? `${unnamed} levels kept the site's own names (Level 1, Level 2…) — rename them if you like.` : null]
     .filter(Boolean).join(' ') || null;
   return { menu: tidy({ categories, notes }), usage, model };
 }
