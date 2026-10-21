@@ -135,7 +135,7 @@ export interface ConversationState {
 
 export interface Message {
   id: number; tenant_id: string; conversation_id: number | null; wa_id: string; direction: 'inbound' | 'outbound';
-  sender: 'customer' | 'agent' | 'staff' | 'system'; staff_user_id: string | null; kind: string; body: string | null;
+  sender: 'customer' | 'agent' | 'staff' | 'system' | 'driver'; staff_user_id: string | null; kind: string; body: string | null;
   media_url: string | null; media_mime: string | null; status: string; error: string | null; created_at: string;
   meta: Record<string, unknown>;
 }
@@ -159,6 +159,14 @@ export interface Order {
   notes: string | null; eta_text: string | null; reject_reason: string | null;
   placed_at: string | null; accepted_at: string | null; ready_at: string | null; out_for_delivery_at: string | null;
   completed_at: string | null; cancelled_at: string | null; created_at: string; updated_at: string;
+  driver_id: string | null; driver_assigned_at: string | null;
+  delivery_km_left: number | null; delivery_eta_min: number | null; delivery_track_at: string | null;
+}
+// one of the restaurant's own drivers (طيار)
+export interface Driver {
+  id: string; tenant_id: string; name: string; phone: string; branch_ids: string[]; is_active: boolean;
+  login_code_sent_at: string | null; last_lat: number | null; last_lng: number | null; last_loc_at: string | null;
+  last_seen_at: string | null; created_at: string;
 }
 export interface OrderEvent { id: number; order_id: number; status: string; note: string | null; by_role: string; notified: boolean; created_at: string }
 

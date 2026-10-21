@@ -49,6 +49,7 @@ You need:
 | `MENU_AI_MODEL` | Optional; defaults to `gpt-5.6-luna`, the model the agent uses. It must read PDFs and photos |
 | `N8N_BASE_URL` | Your n8n's public address, e.g. `https://n8n.example.com` |
 | `N8N_OUTBOX_SECRET` | A long random string; the same value goes into n8n (step 3) |
+| `NEXT_PUBLIC_SITE_URL` | Optional: the dashboard's public address for the links sent to drivers (sign-in, "your orders"). Without it, the address the page was opened on is used |
 
 ### Hosting: Vercel
 
@@ -134,6 +135,37 @@ installs) and a dated file in `database/patches/` (for databases that are
 already running). After pulling an update, run each new patch once, oldest
 first, in Supabase → SQL Editor. `everwake_supabase_setup.sql` already
 contains every patch, so a fresh install needs none of them.
+
+## Drivers
+
+The restaurant's own drivers are added under **Drivers** by any team member
+(owner, manager or staff) with a name and a WhatsApp number. A one-time
+sign-in link goes to that number from the restaurant's WhatsApp; opening it
+signs the phone in for six months — there is no password and no Supabase
+account. A driver who lost the link opens `<dashboard>/driver/login` and types
+their number to get a new one (at most one a minute).
+
+On the order board, a delivery order gets a driver from the list on its card.
+The driver's page (`/driver`) shows the order, the branch and the customer on
+a map, a **Directions** button that opens Google Maps, the customer's number,
+a chat through the restaurant's number, and the cash to collect. When the
+driver presses **start delivery**, the customer gets the driver's name, number
+and an arrival estimate; when the phone's position puts the driver about 5
+minutes away, the customer is told once more. The agent sees the driver and
+the distance if the customer asks where the order is.
+
+Things to know:
+- The position comes from the browser while `/driver` is open (the screen is
+  kept on while delivering). A phone browser stops sending it when the page is
+  in the background — e.g. while Google Maps is open — so drivers should come
+  back to the page. Reliable background tracking needs a small Android app;
+  that is the next step if restaurants need it.
+- Estimates use the straight-line distance × 1.35 at 22 km/h. A restaurant can
+  set `driver_speed_kmh` and `driver_near_minutes` (default 5) in its settings.
+- The maps use OpenStreetMap's public tiles, which are fine for testing; a busy
+  platform should switch to a paid tile service (MapTiler, Stadia, Carto).
+- On the official WhatsApp Cloud API, messages to a driver who has not written
+  to the restaurant in 24 hours need an approved template.
 
 ## The dashboard's languages
 

@@ -127,7 +127,9 @@ dashboard each restaurant runs. Everything is in `EVERWAKE-ORDERS/`.
 | Take over a chat, reply from the dashboard, hand back; the agent sees what was said | `engine/`, `dashboard/` |
 | Dashboard: live order board, inbox, menu with stock switches, AI menu import (PDF, photos, link, text, spreadsheet), offers, branches, zones on a map, customers, analytics, settings, team | `dashboard/` |
 | Moving Seagull-style clients over with their menu, customers and order history | `database/tools/import_legacy.sql` |
-| Tests: 6 SQL test files, 9 whole-conversation engine tests | `database/tests/`, `engine/test/` |
+| Restaurant drivers: added with a WhatsApp number, sign-in link instead of a password, a driver page with the map, directions, the customer's number and a chat; the customer hears who is coming and when they are ~5 minutes away; cash per driver | `database/migrations/008_drivers.sql`, `dashboard/` |
+| Logo and brand colour; designed menu pictures drawn from the live menu | `dashboard/` |
+| Tests: 7 SQL test files, 9 whole-conversation engine tests | `database/tests/`, `engine/test/` |
 
 ### Next
 
@@ -135,6 +137,8 @@ dashboard each restaurant runs. Everything is in `EVERWAKE-ORDERS/`.
 - **Move Seagull, Bazooka and 5 Roosters** over with the importer
 - **Official WhatsApp Cloud API** for paying restaurants: Meta's embedded signup, a second webhook, an approved template for "we're back" after 24 hours
 - **Plans and billing** per restaurant
+- **Driver app for Android:** background location while Google Maps is open
+- **Delivery companies** (Mrsool, Roadrunner…) for restaurants without drivers, through one connection point
 - **Growth kit:** QR codes and `wa.me` links per restaurant from the dashboard
 
 ---

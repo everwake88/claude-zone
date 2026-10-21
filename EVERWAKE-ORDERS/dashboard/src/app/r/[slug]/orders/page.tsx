@@ -7,7 +7,7 @@ import { useTenant } from '@/components/tenant';
 import { clock, cx, dateTime, displayName, money, qty, statusLabel, timeAgo } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
-import type { Branch, Order, OrderEvent, OrderStatus } from '@/lib/types';
+import type { Branch, Driver, Order, OrderEvent, OrderStatus } from '@/lib/types';
 
 const COLUMNS: { key: string; title: string; statuses: OrderStatus[] }[] = [
   { key: 'new', title: 'New', statuses: ['placed'] },
@@ -34,6 +34,7 @@ export default function OrdersBoard() {
   const { tenant, base } = useTenant();
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [branch, setBranch] = useState('');
   const [open, setOpen] = useState<Order | null>(null);
   const [accepting, setAccepting] = useState<Order | null>(null);
@@ -56,6 +57,8 @@ export default function OrdersBoard() {
   useEffect(() => {
     load();
     sb().from('branches').select('*').eq('tenant_id', tenant.id).order('sort').then(({ data }) => setBranches((data || []) as Branch[]));
+    sb().from('drivers').select('id,tenant_id,name,phone,branch_ids,is_active').eq('tenant_id', tenant.id).eq('is_active', true).order('name')
+      .then(({ data }) => setDrivers((data || []) as Driver[]));
     const ch = sb().channel('board-' + tenant.id)
       .on('postgres_changes', { event: '*', schema: 'everwake', table: 'orders', filter: `tenant_id=eq.${tenant.id}` }, () => load())
       .subscribe();
@@ -71,6 +74,14 @@ export default function OrdersBoard() {
       await load();
     }, t('{no}: {status} — the customer was told on WhatsApp', { no: o.order_no, status: statusLabel(status) }));
   };
+
+  // give the order to one of the restaurant's drivers; they get it on WhatsApp and in their app
+  const assign = (o: Order, driverId: string) => run(async () => {
+    const { error } = await sb().rpc('assign_driver', { p_order: o.id, p_driver: driverId || null, p_base: window.location.origin });
+    if (error) throw new Error(error.message);
+    await fetch('/api/outbox/ping', { method: 'POST' }).catch(() => null);
+    await load();
+  }, driverId ? t('{no}: given to {name}', { no: o.order_no, name: drivers.find(d => d.id === driverId)?.name || '' }) : undefined);
 
   const branchName = useMemo(() => Object.fromEntries(branches.map(b => [b.id, b.name_en || b.name_ar])), [branches]);
   const shown = (orders || []).filter(o => !branch || o.branch_id === branch);
@@ -119,6 +130,18 @@ export default function OrdersBoard() {
                         : col.key === 'done' ? <Badge tone="positive">{statusLabel(o.status)}</Badge>
                         : col.key !== 'new' ? <Badge>{statusLabel(o.status)}</Badge> : null}
                     </div>
+                    {o.delivery_method !== 'pickup' && drivers.length > 0 && ['placed', 'accepted', 'preparing', 'ready', 'out_for_delivery'].includes(o.status) && (
+                      <div className="mt-2 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <Bike className="size-4 shrink-0 text-muted" />
+                        <Select value={o.driver_id || ''} disabled={busy} onChange={e => assign(o, e.target.value)} className="h-8 py-0 text-xs">
+                          <option value="">{t('No driver yet')}</option>
+                          {drivers.filter(d => !d.branch_ids.length || !o.branch_id || d.branch_ids.includes(o.branch_id)).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </Select>
+                      </div>
+                    )}
+                    {o.status === 'out_for_delivery' && o.delivery_eta_min != null && o.delivery_track_at && Date.now() - new Date(o.delivery_track_at).getTime() < 10 * 60000 && (
+                      <p className="mt-1 text-xs font-medium text-positive">{t('{km} km · about {min} min', { km: o.delivery_km_left ?? '—', min: o.delivery_eta_min })}</p>
+                    )}
                     <div className="mt-2 flex flex-wrap gap-1.5" onClick={e => e.stopPropagation()}>
                       {nextSteps(o).map(s => (
                         <Button key={s.status} size="sm" variant={s.variant} disabled={busy}

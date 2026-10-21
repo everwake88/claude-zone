@@ -9,7 +9,11 @@ const quiet = (text, extra = {}) => ({
   reply_messages: [text], send_menu_images: false, send_item_photos: [], showed_order_summary: false,
   handoff: { needed: false, reason: '' }, language: 'ar', memory_note: '', ...extra });
 
-before(async () => { freshDatabase(); db = await connect(); });
+before(async () => {
+  freshDatabase(); db = await connect();
+  // the conversations order food: the demo branches are open whatever the hour the tests run
+  await db.query(`update everwake.branches set hours = '{"default":[{"open":"00:00","close":"23:59"}]}'`);
+});
 after(async () => { if (db) await db.end(); });
 
 test('a new customer: pin → zone → cart with offers → details → summary → placed', async () => {

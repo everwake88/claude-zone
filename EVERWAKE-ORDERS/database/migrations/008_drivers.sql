@@ -460,6 +460,11 @@ begin
     '🛵 ' || d.name || ': ' || left(btrim(p_text), 1000), p_sender => 'driver');
 end $$;
 
+create or replace function everwake.driver_logout(p_token text)
+returns void language sql as $$
+  delete from everwake.driver_sessions where token_hash = everwake.token_hash(p_token)
+$$;
+
 -- ---------------------------------------------------------------------
 -- Who can see and call what
 -- ---------------------------------------------------------------------
@@ -479,7 +484,7 @@ revoke execute on function
   everwake.queue_driver_message(uuid, text), everwake.driver_request_login(text, text),
   everwake.driver_redeem(uuid, text, text), everwake.driver_from_token(text), everwake.driver_home(text),
   everwake.driver_action(text, bigint, text), everwake.driver_ping(text, double precision, double precision, real),
-  everwake.driver_chat(text, bigint), everwake.driver_send(text, bigint, text)
+  everwake.driver_chat(text, bigint), everwake.driver_send(text, bigint, text), everwake.driver_logout(text)
   from authenticated;
 grant execute on all functions in schema everwake to service_role;
 grant execute on function

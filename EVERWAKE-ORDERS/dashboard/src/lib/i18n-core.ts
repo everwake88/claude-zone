@@ -6,7 +6,7 @@ import { AR } from './i18n-ar';
 // cookie, so the server renders the right language and direction first time.
 export type Lang = 'en' | 'ar';
 export type Vars = Record<string, string | number | null | undefined>;
-export const LANG_COOKIE = 'ew_lang';
+export { LANG_COOKIE } from './lang-cookie';
 
 export function translate(lang: Lang, key: string, vars?: Vars): string {
   let s = lang === 'ar' ? (AR[key] ?? key) : key;

@@ -238,9 +238,10 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
                     !mine && 'rounded-es-md bg-white',
                     mine && m.sender === 'agent' && 'rounded-ee-md bg-navy text-white',
                     mine && m.sender === 'staff' && 'rounded-ee-md bg-gold-wash text-ink ring-1 ring-gold-line',
+                    mine && m.sender === 'driver' && 'rounded-ee-md bg-positive-wash text-ink ring-1 ring-positive/30',
                     mine && m.sender === 'system' && 'rounded-ee-md bg-paper-sunk text-muted italic')}>
                     {mine && <p className={cx('mb-0.5 text-[11px] font-semibold uppercase tracking-wide', m.sender === 'agent' ? 'text-gold-bright' : 'text-gold-ink')}>
-                      {m.sender === 'agent' ? t('Agent') : m.sender === 'staff' ? ((m.meta?.via === 'phone') ? t('Team (phone)') : t('Team')) : t('Automatic')}
+                      {m.sender === 'agent' ? t('Agent') : m.sender === 'staff' ? ((m.meta?.via === 'phone') ? t('Team (phone)') : t('Team')) : m.sender === 'driver' ? t('Driver') : t('Automatic')}
                     </p>}
                     {m.media_url && (m.kind === 'image'
                       ? <img src={m.media_url} alt="" className="mb-1 max-h-64 rounded-lg" />
