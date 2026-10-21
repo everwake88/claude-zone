@@ -44,6 +44,7 @@ Rules:
 - Dishes priced by weight ("الكيلو", "per kg") have unit "kg" and the price per kilo; "per person" → "person"; counted pieces sold individually → "piece"; everything else "portion".
 - Add-ons or sauces listed for a section become an optional choice group (required false, min 0, max = how many can be picked, or null for any) on the dishes they apply to, with their prices as price_delta. Add-ons that stand alone become dishes in their own category.
 - Combos and meals: one dish, with what is inside in description_ar.
+- An offers / deals section ("عروض", "Offers", "Deals", "Boxes") that sells bundles at a fixed price stays its own category, each bundle one dish at that price; where the customer picks what goes inside (which sandwich, which drink) that is a required choice group. Discounts that are not a dish (percent off, free delivery, promo codes) and any dates or hours an offer runs are not dishes: put them in notes.
 - is_signature: true only when the menu marks it (chef's special, ★, best seller, new, the house dish).
 - aliases: 1–4 other ways customers might write the dish (common spellings, Franco-Arabic, short names). tags: 2–5 lowercase English words (main ingredient, type: chicken, beef, seafood, vegetarian, spicy, sandwich, pizza, drink, dessert, side…).
 - description_ar: the printed description, or null. Keep it short.
