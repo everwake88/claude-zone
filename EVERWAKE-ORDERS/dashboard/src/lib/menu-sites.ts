@@ -159,7 +159,7 @@ export async function popupSiteMenu(url: string, html: string, get: Get): Promis
     options.push(...(p?.groups || []));
     const en = english.get(m.id);
     let desc = m.desc;
-    if (m.old != null && price != null && m.old > price) desc = `${desc ? desc + ' — ' : ''}بدل ${m.old} جنيه`;
+    if (m.old != null && price != null && m.old > price) desc = `${desc ? desc + ' — ' : ''}بدل\u00a0${m.old}\u00a0جنيه`;
     cats.get(m.section)!.items.push({
       name_ar: m.name, name_en: en?.name && en.name !== m.name ? en.name : (LATIN.test(m.name) ? m.name : null),
       description_ar: desc, price, unit: 'portion', is_signature: false, aliases: [], tags: [], options

@@ -11,7 +11,7 @@ it alone, or you do it with them on a call. Until they press **Go live**:
 |---|---|---|
 | The menu — PDF, photos of the pages, a website link, or a spreadsheet | Dishes, prices, sizes, add-ons | Menu → **Import a menu with AI** (review, then publish) |
 | A photo of each popular dish (optional, recommended) | Sent when a customer asks what a dish looks like | Menu → dish → Photos |
-| The menu pages or PDF as they want customers to see them — or none: **Design menu pictures** draws two or three from the live menu with their logo | Sent when a customer asks for the menu | Menu → **Menu pictures / PDF** |
+| The menu pages or PDF as they want customers to see them — or none: **Design menu pictures** draws them from the live menu with their logo, on as few pictures as it takes | Sent when a customer asks for the menu | Menu → **Menu pictures / PDF** |
 | Their logo (a square PNG is best) | On the dashboard and on top of the designed menu pictures, in the brand colour | Settings → **Logo and colour** |
 | Every branch: address, Google Maps link, phone, opening hours (split shifts allowed), delivery fee, minimum order, VAT, usual delivery time | Prices, "are you open?", the nearest branch | **Branches** |
 | Where each branch delivers | The zone decides the fee, the minimum and the branch | **Delivery zones** — draw them on the map; list the area names customers type |

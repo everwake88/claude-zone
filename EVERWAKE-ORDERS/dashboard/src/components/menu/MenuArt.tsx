@@ -10,14 +10,14 @@ import { drawMenu, loadImage, toJpeg, type ArtCategory } from '@/lib/menu-art';
 import { sb } from '@/lib/supabase/client';
 
 interface Cat { id: string; name_ar: string; sort: number }
-interface Item { id: string; category_id: string | null; name_ar: string; name_en: string | null; description_ar: string | null; price: number | null; sort: number }
+interface Item { id: string; category_id: string | null; name_ar: string; description_ar: string | null; price: number | null; sort: number }
 interface Group { id: string; item_id: string; level: number; label_ar: string; required: boolean; max_select: number | null }
 interface Opt { group_id: string; price_delta: number; is_available: boolean }
 
 type Section = ArtCategory & { id: string };
 const num = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
-// "Design menu pictures": the live menu as two or three designed pictures
+// "Design menu pictures": the live menu as designed pictures, as few as it takes,
 // with the logo, ready to be the pictures the agent sends.
 export function MenuArt({ scope, existing, onSaved }: { scope: string; existing: number; onSaved: () => void }) {
   const { tenant, brand, base, can } = useTenant();
@@ -28,7 +28,6 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
   const [footer, setFooter] = useState('');
   const [skip, setSkip] = useState<Set<string>>(new Set());
   const [pics, setPics] = useState<{ blob: Blob; url: string }[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
 
   // the menu as customers see it: active dishes, branch prices for one branch
@@ -37,7 +36,7 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
       const id = tenant.id;
       const [c, i, g, o, b, p] = await Promise.all([
         sb().from('menu_categories').select('id,name_ar,sort').eq('tenant_id', id).eq('is_active', true).order('sort'),
-        sb().from('menu_items').select('id,category_id,name_ar,name_en,description_ar,price,sort').eq('tenant_id', id).eq('is_active', true).order('sort'),
+        sb().from('menu_items').select('id,category_id,name_ar,description_ar,price,sort').eq('tenant_id', id).eq('is_active', true).order('sort'),
         sb().from('menu_option_groups').select('id,item_id,level,label_ar,required,max_select').eq('tenant_id', id),
         sb().from('menu_options').select('group_id,price_delta,is_available').eq('tenant_id', id),
         scope === 'all' ? Promise.resolve({ data: [] }) : sb().from('menu_item_branches').select('item_id,is_listed,price').eq('branch_id', scope),
@@ -62,13 +61,13 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
         id: cat.id, name: cat.name_ar,
         items: items.filter(it => it.category_id === cat.id).map(it => {
           const price = branch.get(it.id)?.price ?? it.price;
-          return { name: it.name_ar, sub: it.description_ar || it.name_en, price: priceOf(it, price == null ? null : Number(price)) };
+          return { name: it.name_ar, sub: it.description_ar?.replace(/بدل (\S+) جنيه/g, 'بدل\u00a0$1\u00a0جنيه') ?? null, price: priceOf(it, price == null ? null : Number(price)) };
         })
       })));
     })();
   }, [tenant.id, tenant.currency_symbol, scope]);
   const design = () => run(async () => {
-    setError(null); setConfirm(false);
+    setConfirm(false);
     if (!menu) return;
     await Promise.all(['400', '700', '800'].map(w => document.fonts.load(`${w} 30px ${cairo.style.fontFamily}`, 'منيو Menu 123')));
     const logo = brand.logo_url ? await loadImage(brand.logo_url).catch(() => null) : null;
@@ -76,10 +75,9 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
     if (!chosen.length) throw new Error(t('Pick at least one category with dishes.'));
     const pages = drawMenu({
       title: tenant.name_ar || tenant.name_en, subtitle: tenant.name_en && tenant.name_en !== tenant.name_ar ? tenant.name_en : null,
-      logo, color: brand.color || '#0B222E', categories: chosen, footer, font: cairo.style.fontFamily, maxPages: 3
+      logo, color: brand.color || '#0B222E', categories: chosen, footer, font: cairo.style.fontFamily
     });
     pics.forEach(p => URL.revokeObjectURL(p.url));
-    if (!pages) { setPics([]); setError(t('The menu does not fit in three pictures. Leave out a category or two (drinks, extras) and try again.')); return; }
     const blobs = await Promise.all(pages.map(toJpeg));
     setPics(blobs.map(blob => ({ blob, url: URL.createObjectURL(blob) })));
   });
@@ -113,7 +111,7 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
   return (
     <Card className={cairo.className} title={<span className="flex items-center gap-2"><Sparkles className="size-4 text-gold-ink" /> {t('Design menu pictures')}</span>}>
       <p className="mb-3 text-sm text-muted">
-        {t('Two or three pictures of your live menu, with your logo and colour — ready to send when a customer asks for the menu.')}{' '}
+        {t('Your live menu as pictures, with your logo and colour, every dish written out in full — on as few pictures as it takes. Ready to send when a customer asks for the menu.')}{' '}
         {!brand.logo_url && <Link href={`${base}/settings/brand`} className="text-gold-ink underline">{t('Add your logo first')}</Link>}
       </p>
       {cats.length > 0 && (
@@ -128,7 +126,6 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
         </div>
       )}
       <Button variant="gold" busy={busy && !pics.length} disabled={!menu} onClick={design}><Sparkles className="size-4" /> {pics.length ? t('Design again') : t('Design the pictures')}</Button>
-      {error && <p className="mt-3 text-sm text-critical">{error}</p>}
 
       {pics.length > 0 && (
         <div className="mt-5 space-y-4">

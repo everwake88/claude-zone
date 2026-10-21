@@ -1,8 +1,9 @@
 'use client';
 
 // Designed menu pictures, drawn in the browser: the restaurant's logo and
-// colour on top, the menu in two columns, at most three pages. They become
-// the pictures the agent sends when a customer asks for the menu.
+// colour on top, the menu in two columns, every name and what comes in each
+// dish written out in full, on as few pages as that takes. They become the
+// pictures the agent sends when a customer asks for the menu.
 //
 // Drawn on a canvas rather than rendered on the server: the browser shapes
 // Arabic properly, and nothing leaves the dashboard until the owner saves.
@@ -11,7 +12,7 @@ export interface ArtItem { name: string; sub: string | null; price: string }
 export interface ArtCategory { name: string; items: ArtItem[] }
 export interface ArtInput {
   title: string; subtitle: string | null; logo: HTMLImageElement | null; color: string;
-  categories: ArtCategory[]; footer: string; font: string; maxPages: number;
+  categories: ArtCategory[]; footer: string; font: string;
 }
 
 export const W = 1080, H = 1600;           // WhatsApp shows this size without shrinking it
@@ -66,38 +67,61 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
 }
 
 // ---- layout -----------------------------------------------------------------------
-interface Tier { sub: boolean; s: number }
-const TIERS: Tier[] = [{ sub: true, s: 1 }, { sub: false, s: 1 }, { sub: false, s: 0.92 }, { sub: false, s: 0.85 }, { sub: false, s: 0.78 }];
-const sizes = (t: Tier) => ({ name: 27 * t.s, price: 26 * t.s, sub: 19 * t.s, cat: 27 * t.s,
-                              row: (t.sub ? 70 : 47) * t.s, catH: 74 * t.s });
+const Z = { name: 27, price: 26, sub: 19, cat: 27, nameLine: 35, subLine: 26, pad: 12, catH: 68 };
 const headH = (page: number, logo: boolean) => (page === 0 ? (logo ? 350 : 270) : 150);
 
-type Block = { kind: 'cat'; name: string; more: boolean; y: number } | { kind: 'item'; item: ArtItem; y: number };
+// a dish, measured: its name and description broken into lines that fit
+interface Lines { item: ArtItem; name: string[]; sub: string[]; h: number }
+type Block = { kind: 'cat'; name: string; more: boolean; y: number } | { kind: 'item'; dish: Lines; y: number };
 type Page = Block[][];                                 // [right column, left column]
 
-function layout(input: ArtInput, t: Tier, maxPages: number): Page[] | null {
-  const z = sizes(t);
+function wrap(ctx: CanvasRenderingContext2D, text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  // breaks at plain spaces only: a no-break space keeps "بدل 480 جنيه" on one line
+  for (const word of text.split(/[ \t\r\n]+/).filter(Boolean)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(next).width > width) { lines.push(line); line = word; } else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function measure(input: ArtInput, it: ArtItem): Lines {
+  const ctx = document.createElement('canvas').getContext('2d')!;
+  const F = (w: number, px: number) => `${w} ${px}px ${input.font}`;
+  ctx.direction = 'rtl';
+  ctx.font = F(800, Z.price);
+  const pw = it.price ? ctx.measureText(it.price).width : 0;
+  ctx.font = F(700, Z.name);
+  const name = wrap(ctx, it.name, COL - pw - 40);
+  ctx.font = F(400, Z.sub);
+  const sub = it.sub ? wrap(ctx, it.sub, COL - 10) : [];
+  return { item: it, name, sub, h: name.length * Z.nameLine + sub.length * Z.subLine + Z.pad };
+}
+
+function layout(input: ArtInput): Page[] {
   const pages: Page[] = [];
-  let p = -1, col = 1, y = 0, bottom = 0;
+  let p = -1, col = 1, y = 0;
+  const bottom = H - FOOT - 16;
   const next = () => {
     if (col === 0) { col = 1; } else { p++; col = 0; pages.push([[], []]); }
     y = headH(p, !!input.logo) + 30;
-    bottom = H - FOOT - 16;
-    return p < maxPages;
   };
-  if (!next()) return null;
+  next();
   for (const c of input.categories) {
     if (!c.items.length) continue;
-    if (y + z.catH + z.row > bottom && !next()) return null;
-    pages[p][col].push({ kind: 'cat', name: c.name, more: false, y }); y += z.catH;
-    for (const it of c.items) {
-      if (y + z.row > bottom) {
-        if (!next()) return null;
-        pages[p][col].push({ kind: 'cat', name: c.name, more: true, y }); y += z.catH;
+    const dishes = c.items.map(it => measure(input, it));
+    if (y + Z.catH + dishes[0].h > bottom) next();
+    pages[p][col].push({ kind: 'cat', name: c.name, more: false, y }); y += Z.catH;
+    for (const dish of dishes) {
+      if (y + dish.h > bottom) {
+        next();
+        pages[p][col].push({ kind: 'cat', name: c.name, more: true, y }); y += Z.catH;
       }
-      pages[p][col].push({ kind: 'item', item: it, y }); y += z.row;
+      pages[p][col].push({ kind: 'item', dish, y }); y += dish.h;
     }
-    y += 14 * t.s;
+    y += 14;
   }
   return pages;
 }
@@ -113,13 +137,13 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
 }
 
-function drawPage(input: ArtInput, page: Page, index: number, total: number, t: Tier): HTMLCanvasElement {
+function drawPage(input: ArtInput, page: Page, index: number, total: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const ctx = c.getContext('2d')!;
   const F = (w: number, px: number) => `${w} ${px}px ${input.font}`;
   const brand = input.color, on = onColor(brand), ink = inkOf(brand);
-  const z = sizes(t);
+  const z = Z;
   ctx.direction = 'rtl';
   ctx.textBaseline = 'alphabetic';
 
@@ -189,22 +213,20 @@ function drawPage(input: ArtInput, page: Page, index: number, total: number, t: 
         ctx.fillStyle = mix(brand, PAPER, 0.6); ctx.fillRect(left, b.y + z.catH / 2, Math.max(0, COL - w - 14), 2);
         continue;
       }
-      const it = b.item, base = b.y + z.name * 1.2;
+      const { item: it, name, sub } = b.dish, base = b.y + z.name * 1.2;
       ctx.font = F(800, z.price);
       const pw = it.price ? ctx.measureText(it.price).width : 0;
       ctx.fillStyle = ink; ctx.textAlign = 'left';
       if (it.price) ctx.fillText(it.price, left, base);
       ctx.font = F(700, z.name); ctx.fillStyle = INK; ctx.textAlign = 'right';
-      const name = fit(ctx, it.name, COL - pw - 40);
-      const nw = ctx.measureText(name).width;
-      ctx.fillText(name, right, base);
-      // dotted leader between the name and the price
+      name.forEach((l, i) => ctx.fillText(l, right, base + i * z.nameLine));
+      // dotted leader between the name's first line and the price
+      const nw = ctx.measureText(name[0] || '').width;
       ctx.fillStyle = DOTS;
       for (let x = right - nw - 14; x > left + pw + 12; x -= 9) { ctx.beginPath(); ctx.arc(x, base - 6, 1.6, 0, Math.PI * 2); ctx.fill(); }
-      if (t.sub && it.sub) {
-        ctx.font = F(400, z.sub); ctx.fillStyle = MUTED; ctx.textAlign = 'right';
-        ctx.fillText(fit(ctx, it.sub, COL - 10), right, base + z.sub * 1.45);
-      }
+      ctx.font = F(400, z.sub); ctx.fillStyle = MUTED; ctx.textAlign = 'right';
+      const top = base + (name.length - 1) * z.nameLine;
+      sub.forEach((l, i) => ctx.fillText(l, right, top + z.subLine * (i + 1) - 2));
     }
   });
 
@@ -216,14 +238,10 @@ function drawPage(input: ArtInput, page: Page, index: number, total: number, t: 
   return c;
 }
 
-// the menu as up to maxPages pictures, roomiest design that fits; null when
-// even the tightest one needs more pages
-export function drawMenu(input: ArtInput): HTMLCanvasElement[] | null {
-  for (const t of TIERS) {
-    const pages = layout(input, t, input.maxPages);
-    if (pages) return pages.map((p, i) => drawPage(input, p, i, pages.length, t));
-  }
-  return null;
+// the whole menu, on as few pictures as it takes
+export function drawMenu(input: ArtInput): HTMLCanvasElement[] {
+  const pages = layout(input);
+  return pages.map((p, i) => drawPage(input, p, i, pages.length));
 }
 
 export const toJpeg = (c: HTMLCanvasElement) =>
