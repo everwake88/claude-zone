@@ -87,7 +87,14 @@ const NAMES_SCHEMA = {
 const NAMES_INSTRUCTIONS = `You get one category of a restaurant's menu, read exactly from its ordering site. Never change a dish, a price or a choice. Return:
 - name_ar: the category's Arabic name (an English name becomes the word Egyptian customers use: offers → عروض, Extras → إضافات). name_en: its English name.
 - items: one per dish, in the same order. name_en: the given English name, tidied (no prices, no emojis), or a short translation. aliases: 1–4 ways customers might write the dish (Arabic, Franco-Arabic, short names). tags: 2–5 lowercase English words (chicken, beef, sandwich, combo, drink, dessert, spicy…). is_signature: true only when the name or description says best seller / most popular / الأكثر طلبا / new.
-- levels: one for EVERY level id given, with that id: a short label for what the customer picks there, from its choices (Chicken BBQ S, Jalapeno Chicken S → label_ar "ساندوتشات التشيكن", label_en "Chicken sandwich"; Spicy, Regular → "الطعم", "Flavour"; 6 pieces → "عدد القطع", "Pieces"; drinks with prices → "المشروب", "Drink").`;
+- levels: one for EVERY level id given, with that id: a short label for what the customer picks there, in the everyday Egyptian Arabic a cashier would use, from its choices. Use these words:
+  · upgrades that pair fries / coleslaw / rice with a drink, usually with a Plain choice (Fries + Vcola +55, Coleslaw + Juice +50, Plain) → "الكومبو" / "Combo"
+  · drinks → "المشروب" / "Drink"; chips or fries kinds → "الشيبسي" or "البطاطس" / "Chips" or "Fries"; rice → "الرز" / "Rice"; sauces → "الصوص" / "Sauce"
+  · what the meal comes with, fixed (2 bread, 1 Coleslaw) → "مع الوجبة" / "Comes with"
+  · paid extras (cheese jar +70, extra pieces +110) → "إضافات" / "Extras"
+  · 6 pieces → "عدد القطع" / "Pieces"; Spicy, Regular, Half And Half → "حار ولا عادي" / "Spicy or regular"
+  · sandwiches → "ساندوتش التشيكن", "ساندوتش البرجر", "الراب" / "Chicken sandwich", "Burger", "Wrap"
+  Never "سايد", "الوجبة الجانبية" or "جانبي".`;
 
 type Names = { name_ar: string; name_en: string; items: { name_en: string; aliases: string[]; tags: string[]; is_signature: boolean }[];
                levels: { id: string; label_ar: string; label_en: string }[] };
