@@ -1,0 +1,22 @@
+﻿category_ar,category_en,name_ar,name_en,price,unit,description_ar,signature,choices
+سمك بالكيلو,Fish by the kilo,بوري,Mullet,420,kg,بوري طازة من الميناء,yes,"طريقة الطهي*: مشوي=0 | مقلي=0 | سنجاري=20 ; إضافات: رز صيادية=30 | سلطة خضرا=25 | طحينة=15"
+سمك بالكيلو,Fish by the kilo,دنيس,Sea Bream,520,kg,دنيس طازة,no,"طريقة الطهي*: مشوي=0 | مقلي=0 | سنجاري=20"
+سمك بالكيلو,Fish by the kilo,قاروص,Sea Bass,580,kg,قاروص طازة,no,"طريقة الطهي*: مشوي=0 | مقلي=0 | سنجاري=20"
+سمك بالكيلو,Fish by the kilo,جمبري,Shrimp,750,kg,جمبري وسط,yes,"طريقة الطهي*: مشوي=0 | مقلي=0 | بالردة=30"
+سمك بالكيلو,Fish by the kilo,كابوريا,Crab,300,kg,كابوريا بالصلصة,no,
+أطباق,Plates,طاجن سي فود,Seafood Tagine,220,portion,جمبري وكاليماري وسمك في صلصة طماطم,yes,"الحجم*: صغير=0 | كبير=80"
+أطباق,Plates,صينية كاليماري,Calamari Tray,190,portion,حلقات كاليماري مقلية,no,"الحجم*: صغير=0 | كبير=70"
+أطباق,Plates,فيليه سمك مقلي,Fried Fish Fillet,160,portion,فيليه بلطي مقلي مع بطاطس,no,
+أطباق,Plates,وجبة البحر للفرد,Bahr Meal (1 person),260,person,ربع كيلو جمبري وقطعة سمك ورز وسلطة,yes,"نوع السمك*: بوري=0 | دنيس=30"
+شوربة,Soups,شوربة سي فود,Seafood Soup,150,portion,شوربة كريمي بالجمبري والكاليماري,no,
+شوربة,Soups,شوربة لسان عصفور بالجمبري,Orzo Shrimp Soup,110,portion,,no,
+جانبي,Sides,رز صيادية,Sayadeya Rice,45,portion,,no,
+جانبي,Sides,سلطة خضرا,Green Salad,35,portion,,no,
+جانبي,Sides,طحينة,Tahini,25,portion,,no,
+جانبي,Sides,بابا غنوج,Baba Ghanoush,35,portion,,no,
+جانبي,Sides,بطاطس محمرة,French Fries,40,portion,,no,
+حلو,Desserts,أم علي,Om Ali,70,portion,,no,
+حلو,Desserts,بسبوسة,Basbousa,45,piece,,no,
+مشروبات,Drinks,بيبسي,Pepsi,25,piece,,no,
+مشروبات,Drinks,مياه معدنية,Water,15,piece,,no,
+مشروبات,Drinks,عصير ليمون نعناع,Lemon Mint,50,portion,,no,
