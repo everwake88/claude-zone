@@ -1,6 +1,6 @@
 'use client';
 import {
-  BarChart3, Bike, BookOpen, ChefHat, ChevronDown, LayoutDashboard, LogOut, Map, MessageCircle, Percent, Settings,
+  BarChart3, Bike, BookOpen, ChefHat, ChevronDown, LayoutDashboard, LogOut, Map, Megaphone, MessageCircle, Percent, Settings,
   ShoppingBag, Store, Users, Menu as MenuIcon
 } from 'lucide-react';
 import Link from 'next/link';
@@ -20,6 +20,7 @@ const NAV = [
   { href: '/inbox', label: 'Inbox', icon: MessageCircle, badge: 'inbox' as const },
   { href: '/menu', label: 'Menu', icon: ChefHat },
   { href: '/offers', label: 'Offers', icon: Percent },
+  { href: '/growth', label: 'Get customers', icon: Megaphone },
   { href: '/branches', label: 'Branches', icon: Store },
   { href: '/zones', label: 'Delivery zones', icon: Map },
   { href: '/drivers', label: 'Drivers', icon: Bike },

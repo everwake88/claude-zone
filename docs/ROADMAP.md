@@ -129,7 +129,8 @@ dashboard each restaurant runs. Everything is in `EVERWAKE-ORDERS/`.
 | Moving Seagull-style clients over with their menu, customers and order history | `database/tools/import_legacy.sql` |
 | Restaurant drivers: added with a WhatsApp number, sign-in link instead of a password, a driver page with the map, directions, the customer's number and a chat; the customer hears who is coming and when they are ~5 minutes away; cash per driver | `database/migrations/008_drivers.sql`, `dashboard/` |
 | Logo and brand colour; designed menu pictures drawn from the live menu | `dashboard/` |
-| Tests: 7 SQL test files, 9 whole-conversation engine tests | `database/tests/`, `engine/test/` |
+| Growth: saved commission on the Overview; a WhatsApp link, QR code and printable card per branch and place, with chats / orders / sales per place; missed sales (unfinished carts, outside the zones on a map, written while closed, refused orders); the owner's daily report on WhatsApp | `database/migrations/009_growth.sql`, `dashboard/` |
+| Tests: 8 SQL test files, 9 whole-conversation engine tests | `database/tests/`, `engine/test/` |
 
 ### Next
 

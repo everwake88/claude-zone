@@ -2,6 +2,7 @@
 import { CheckCircle2, Circle, Rocket } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { SavingsHero } from '@/components/growth/SavingsHero';
 import { Badge, Button, Card, PageHeader, Spinner, useAction } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { money, timeAgo, displayName } from '@/lib/format';
@@ -26,7 +27,7 @@ function detailText(t: (k: string, v?: Record<string, string>) => string, key: s
   return t(d);
 }
 
-interface Stats { orders: number; revenue: number; average_order: number; conversations: number; conversion_percent: number; commission_saved: number }
+interface Stats { orders: number; revenue: number; average_order: number; conversations: number; conversion_percent: number }
 
 export default function Overview() {
   const { tenant, base, can } = useTenant();
@@ -68,6 +69,7 @@ export default function Overview() {
   return (
     <div className="space-y-6">
       <PageHeader title={t('Good to see you')} subtitle={`${tenant.name_en || tenant.name_ar} · ${tenant.status === 'live' ? t('live on WhatsApp') : t('getting ready to go live')}`} />
+      <SavingsHero />
 
       {tenant.status !== 'live' && (
         <Card title={<span className="flex items-center gap-2"><Rocket className="size-4 text-gold" /> {t('Go-live checklist — {done} of {total} required steps done', { done, total: required.length })}</span>}
@@ -89,13 +91,12 @@ export default function Overview() {
       )}
 
       {stats && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
             ['Orders today', String(stats.orders)],
             ['Revenue today', money(stats.revenue, tenant.currency_symbol)],
             ['Average order', money(stats.average_order, tenant.currency_symbol)],
-            ['Chats → orders', `${stats.conversion_percent}%`],
-            ['Commission saved today', money(stats.commission_saved, tenant.currency_symbol)]
+            ['Chats → orders', `${stats.conversion_percent}%`]
           ].map(([k, v]) => (
             <div key={k} className="rounded-xl border border-hairline bg-white p-4">
               <p className="label-caps">{t(k)}</p>
@@ -111,7 +112,7 @@ export default function Overview() {
             <ul className="divide-y divide-hairline">
               {waiting.map(o => (
                 <li key={o.id} className="flex items-center justify-between py-2 text-sm">
-                  <span><strong>{o.order_no}</strong> · {displayName(o.customer as never)} · {timeAgo(o.placed_at)}</span>
+                  <span><strong>{o.order_no}</strong> · <bdi>{displayName(o.customer as never)}</bdi> · {timeAgo(o.placed_at)}</span>
                   <span className="font-medium">{money(o.total, tenant.currency_symbol)}</span>
                 </li>
               ))}
@@ -124,7 +125,7 @@ export default function Overview() {
               {attention.map(c => (
                 <li key={c.id} className="py-2 text-sm">
                   <Link href={`${base}/inbox?c=${c.id}`} className="flex items-center justify-between gap-2 hover:text-gold-ink">
-                    <span className="truncate"><strong>{displayName(c.customers)}</strong> — <span dir="auto">{c.attention_reason || c.last_message_preview}</span></span>
+                    <span className="truncate"><strong><bdi>{displayName(c.customers)}</bdi></strong> — <span dir="auto">{c.attention_reason || c.last_message_preview}</span></span>
                     <Badge tone="critical">{t('needs you')}</Badge>
                   </Link>
                 </li>

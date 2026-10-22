@@ -26,11 +26,11 @@ const rgb = (hex: string): [number, number, number] => {
   return [0, 2, 4].map(i => parseInt(v.slice(i, i + 2), 16) || 0) as [number, number, number];
 };
 const hex = (c: number[]) => '#' + c.map(x => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('');
-const mix = (a: string, b: string, t: number) => { const x = rgb(a), y = rgb(b); return hex(x.map((v, i) => v + (y[i] - v) * t)); };
+export const mix = (a: string, b: string, t: number) => { const x = rgb(a), y = rgb(b); return hex(x.map((v, i) => v + (y[i] - v) * t)); };
 const lum = (c: string) => { const [r, g, b] = rgb(c).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 export const onColor = (c: string) => (lum(c) > 0.45 ? INK : '#FFFFFF');
 // the brand colour, dark enough to read on paper
-const inkOf = (c: string) => { let x = c; for (let i = 0; i < 6 && lum(x) > 0.18; i++) x = mix(x, '#000000', 0.2); return x; };
+export const inkOf = (c: string) => { let x = c; for (let i = 0; i < 6 && lum(x) > 0.18; i++) x = mix(x, '#000000', 0.2); return x; };
 
 // the logo's main colours, most vivid first — offered as the brand colour
 export function logoColors(img: HTMLImageElement): string[] {

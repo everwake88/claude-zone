@@ -38,6 +38,10 @@ export interface Settings {
   ops_whatsapp?: string;
   test_numbers?: string[];
   aggregator_commission_percent?: number;
+  // the owner's summary on WhatsApp once a day (009)
+  daily_report?: { enabled?: boolean; numbers?: string[]; time?: string };
+  // extra "where did you find us" sources for the QR links, beyond the built-in ones
+  growth_sources?: string[];
   allowed_links?: string[];
   templates?: Record<string, string>;
 }

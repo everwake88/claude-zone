@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarList, ChartCard, ColumnChart, Stat, type Point } from '@/components/charts/Charts';
+import { MissedSales } from '@/components/growth/MissedSales';
 import { Input, PageHeader, Spinner, Tabs } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { money } from '@/lib/format';
@@ -24,6 +25,7 @@ const day = (d: Date) => d.toISOString().slice(0, 10);
 
 export default function Analytics() {
   const { tenant, can } = useTenant();
+  const [view, setView] = useState<'sales' | 'missed'>('sales');
   const [range, setRange] = useState<Range>('30');
   const [from, setFrom] = useState(day(new Date(Date.now() - 29 * 864e5)));
   const [to, setTo] = useState(day(new Date()));
@@ -72,11 +74,12 @@ export default function Analytics() {
     <div className={loading && data ? 'opacity-60 transition-opacity' : ''}>
       <PageHeader title={t('Analytics')} subtitle={t('What WhatsApp ordering brings in — and what it saves you compared with the delivery apps.')} />
       <div className="mb-5 flex flex-wrap items-center gap-3">
+        <Tabs value={view} onChange={setView} tabs={[{ value: 'sales', label: t('Sales') }, { value: 'missed', label: t('Missed sales') }]} />
         <Tabs value={range} onChange={setRange} tabs={[{ value: 'today', label: t('Today') }, { value: '7', label: t('{n} days', { n: 7 }) }, { value: '30', label: t('{n} days', { n: 30 }) }, { value: '90', label: t('{n} days', { n: 90 }) }, { value: 'custom', label: t('Custom') }]} />
         {range === 'custom' && <><Input type="date" className="w-40" value={from} onChange={e => setFrom(e.target.value)} /><Input type="date" className="w-40" value={to} onChange={e => setTo(e.target.value)} /></>}
       </div>
 
-      {!data ? <Spinner /> : (
+      {view === 'missed' ? <MissedSales from={span.from} to={span.to} /> : !data ? <Spinner /> : (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <Stat label={t('Orders')} value={data.orders.toLocaleString('en-US')} hint={data.cancelled ? t('{n} rejected or cancelled', { n: data.cancelled }) : undefined} />

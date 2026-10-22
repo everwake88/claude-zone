@@ -65,7 +65,8 @@ export function MenuArt({ scope, existing, onSaved }: { scope: string; existing:
   const design = () => run(async () => {
     setConfirm(false);
     if (!menu) return;
-    await Promise.all(['400', '700', '800'].map(w => document.fonts.load(`${w} 30px ${cairo.style.fontFamily}`, 'منيو Menu 123')));
+    // the typeface, if it can load; the pictures still draw with the fallback if not
+    await Promise.all(['400', '700', '800'].map(w => document.fonts.load(`${w} 30px ${cairo.style.fontFamily}`, 'منيو Menu 123').catch(() => null)));
     const logo = brand.logo_url ? await loadImage(brand.logo_url).catch(() => null) : null;
     const chosen = menu.filter(c => !skip.has(c.id) && c.items.length);
     if (!chosen.length) throw new Error(t('Pick at least one category with dishes.'));

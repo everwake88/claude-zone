@@ -167,6 +167,26 @@ Things to know:
 - On the official WhatsApp Cloud API, messages to a driver who has not written
   to the restaurant in 24 hours need an approved template.
 
+## Growth and reports
+
+- **Saved commission:** the Overview and **Get customers** show what the month's
+  WhatsApp orders would have paid a delivery app, at the percentage set in
+  Settings → Ordering (25% by default).
+- **Get customers:** a `wa.me` link and QR code per branch and per place
+  (the card in delivery-app bags, the shop, Instagram…), and a printable A6
+  card with the logo. The link pre-fills "… عرفتكم من <place>", which the
+  agent reads as a normal first message and the page counts: chats, customers
+  who ordered, sales and commission saved per place.
+- **Missed sales** (Analytics → Missed sales): carts never finished (with a link
+  to the chat to follow up), customers outside every delivery zone on a map,
+  people who wrote while every branch was closed, rejected / cancelled orders
+  and why, chats with no order.
+- **Daily report** (Settings → Daily report): a summary of the last 24 hours on
+  up to five WhatsApp numbers at the hour chosen. The outbox workflow's
+  every-minute housekeeping sends it — nothing to set up in n8n. On the official
+  Cloud API it is a message outside a conversation, so it needs an approved
+  template there.
+
 ## The dashboard's languages
 
 The dashboard has an English / العربية switch in the top bar and on the
