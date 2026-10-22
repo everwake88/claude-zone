@@ -26,6 +26,7 @@ export function psqlFile(path) {
 
 export function freshDatabase() {
   execFileSync('psql', ['-X', '-q', '-d', 'postgres', '-c', `drop database if exists ${DB_NAME}`, '-c', `create database ${DB_NAME}`], { env: pgEnv() });
+  psqlFile(join('tests', 'fixtures', 'vault_stub.sql'));      // Supabase Vault's stand-in (local only)
   const files = readdirSync(join(DB_DIR, 'migrations')).filter(f => /^0[0-8]\d_.*\.sql$/.test(f)).sort();
   for (const f of files) psqlFile(join('migrations', f));
   psqlFile(join('seed', 'demo_restaurant.sql'));

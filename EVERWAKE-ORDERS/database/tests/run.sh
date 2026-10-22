@@ -12,6 +12,7 @@ export PGHOST="${PGHOST:-localhost}" PGUSER="${PGUSER:-tester}"
 PSQL=(psql -X -q -v ON_ERROR_STOP=1 -d "$DB")
 
 psql -X -q -d postgres -c "drop database if exists $DB" -c "create database $DB"
+"${PSQL[@]}" -f tests/fixtures/vault_stub.sql      # Supabase Vault's stand-in (local only)
 for f in migrations/0*.sql; do
   [[ "$(basename "$f")" == 090_* ]] && continue      # Supabase-only
   "${PSQL[@]}" -f "$f"

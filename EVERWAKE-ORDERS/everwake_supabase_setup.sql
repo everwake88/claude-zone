@@ -5204,7 +5204,19 @@ grant execute on function everwake.set_reservation_status(bigint, text, text, bo
 --
 -- Payment links are made by the dashboard (it holds the Paymob calls and
 -- checks Paymob's signature); this file keeps the rules and the records.
+--
+-- The secret key and the HMAC secret are kept in Supabase Vault: encrypted,
+-- so a database backup or export shows only scrambled text. Only the
+-- dashboard's server (service role) gets them back, through two functions.
 -- =====================================================================
+
+-- Supabase Vault (on by default in Supabase; local tests load a stand-in)
+do $$
+begin
+  if to_regnamespace('vault') is null and exists (select 1 from pg_available_extensions where name = 'supabase_vault') then
+    create extension supabase_vault;
+  end if;
+end $$;
 
 alter table everwake.orders
   add column payment_status text not null default 'none'
@@ -5212,15 +5224,15 @@ alter table everwake.orders
   add column paid_at        timestamptz,
   add column paid_amount    numeric(12, 2);
 
--- one Paymob account per restaurant; the keys never leave the database
--- except to the dashboard's server (service role)
+-- one Paymob account per restaurant; the two secrets are only Vault ids here
 create table everwake.payment_accounts (
   tenant_id             uuid primary key references everwake.tenants(id) on delete cascade,
   provider              text not null default 'paymob' check (provider in ('paymob')),
   enabled               boolean not null default false,
   public_key            text,
-  secret_key            text,
-  hmac_secret           text,
+  secret_key_id         uuid,             -- the secret key, encrypted in Supabase Vault
+  hmac_secret_id        uuid,             -- the HMAC secret, encrypted in Supabase Vault
+  secret_hint           text,             -- the secret key's last 4 characters, to recognise it
   card_integration_id   bigint,
   wallet_integration_id bigint,
   other_integration_ids bigint[] not null default '{}',
@@ -5228,7 +5240,7 @@ create table everwake.payment_accounts (
   reminder_minutes      int not null default 15 check (reminder_minutes between 0 and 1440),   -- 0 = no reminder
   billing_email         text,             -- Paymob asks for an e-mail; customers on WhatsApp rarely give one
   dashboard_url         text,             -- where links are made and Paymob reports payments (set by the settings page)
-  is_live               boolean generated always as (position('_live_' in coalesce(secret_key, '')) > 0) stored,
+  is_live               boolean not null default false,
   last_callback_at      timestamptz,
   last_error            text,
   created_at            timestamptz not null default now(),
@@ -5271,6 +5283,44 @@ create index payments_provider_idx on everwake.payments (tenant_id, provider_ord
 -- ---------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------
+
+-- a secret into Vault (new, or replacing the one at p_id); returns its id
+create or replace function everwake.vault_put(p_id uuid, p_value text, p_name text)
+returns uuid language plpgsql security definer set search_path = everwake, pg_temp as $$
+declare v_id uuid;
+begin
+  if to_regnamespace('vault') is null then
+    raise exception 'Supabase Vault is off: Supabase → Database → Extensions → turn on supabase_vault';
+  end if;
+  v_id := coalesce(p_id, (select s.id from vault.secrets s where s.name = p_name));
+  if v_id is not null and exists (select 1 from vault.secrets s where s.id = v_id) then
+    perform vault.update_secret(v_id, p_value);
+    return v_id;
+  end if;
+  return vault.create_secret(p_value, p_name, 'Everwake Orders — a restaurant''s payment secret');
+end $$;
+
+-- a secret back from Vault (the dashboard's server only)
+create or replace function everwake.vault_get(p_id uuid)
+returns text language plpgsql stable security definer set search_path = everwake, pg_temp as $$
+begin
+  if p_id is null or to_regnamespace('vault') is null then return null; end if;
+  -- only the secrets of a restaurant's payment account, nothing else kept in Vault
+  if not exists (select 1 from everwake.payment_accounts a where p_id in (a.secret_key_id, a.hmac_secret_id)) then return null; end if;
+  return (select s.decrypted_secret from vault.decrypted_secrets s where s.id = p_id);
+end $$;
+
+-- a restaurant removed: its secrets go too
+create or replace function everwake.payment_account_forget()
+returns trigger language plpgsql security definer set search_path = everwake, pg_temp as $$
+begin
+  if to_regnamespace('vault') is not null then
+    delete from vault.secrets where id in (old.secret_key_id, old.hmac_secret_id);
+  end if;
+  return old;
+end $$;
+create trigger payment_accounts_forget after delete on everwake.payment_accounts
+  for each row execute function everwake.payment_account_forget();
 
 -- 590 → "590ج", 12.5 → "12.5ج"
 create or replace function everwake.money_text(n numeric, sym text)
@@ -5343,8 +5393,8 @@ begin
   if not found then return jsonb_build_object('connected', false); end if;
   return jsonb_build_object(
     'connected', a.enabled, 'provider', a.provider, 'public_key', a.public_key,
-    'has_secret_key', a.secret_key is not null, 'secret_hint', case when a.secret_key is not null then '…' || right(a.secret_key, 4) end,
-    'has_hmac_secret', a.hmac_secret is not null,
+    'has_secret_key', a.secret_key_id is not null, 'secret_hint', case when a.secret_key_id is not null then '…' || a.secret_hint end,
+    'has_hmac_secret', a.hmac_secret_id is not null,
     'card_integration_id', a.card_integration_id, 'wallet_integration_id', a.wallet_integration_id,
     'other_integration_ids', to_jsonb(a.other_integration_ids), 'link_minutes', a.link_minutes,
     'reminder_minutes', a.reminder_minutes, 'billing_email', a.billing_email, 'dashboard_url', a.dashboard_url,
@@ -5365,9 +5415,16 @@ begin
   select * into a from everwake.payment_accounts where tenant_id = p_tenant for update;
 
   if p ? 'public_key' then a.public_key := nullif(btrim(p ->> 'public_key'), ''); end if;
-  -- secrets are only replaced, never shown back; an empty field keeps the saved one
-  if nullif(btrim(coalesce(p ->> 'secret_key', '')), '') is not null then a.secret_key := btrim(p ->> 'secret_key'); end if;
-  if nullif(btrim(coalesce(p ->> 'hmac_secret', '')), '') is not null then a.hmac_secret := btrim(p ->> 'hmac_secret'); end if;
+  -- secrets go straight into Vault and are never shown back; an empty field keeps the saved one
+  if nullif(btrim(coalesce(p ->> 'secret_key', '')), '') is not null then
+    v_txt := btrim(p ->> 'secret_key');
+    a.secret_key_id := everwake.vault_put(a.secret_key_id, v_txt, 'everwake_paymob_secret_key_' || p_tenant);
+    a.secret_hint := right(v_txt, 4);
+    a.is_live := position('_live_' in v_txt) > 0;
+  end if;
+  if nullif(btrim(coalesce(p ->> 'hmac_secret', '')), '') is not null then
+    a.hmac_secret_id := everwake.vault_put(a.hmac_secret_id, btrim(p ->> 'hmac_secret'), 'everwake_paymob_hmac_' || p_tenant);
+  end if;
   if p ? 'card_integration_id' then a.card_integration_id := nullif(everwake.digits(p ->> 'card_integration_id'), '')::bigint; end if;
   if p ? 'wallet_integration_id' then a.wallet_integration_id := nullif(everwake.digits(p ->> 'wallet_integration_id'), '')::bigint; end if;
   if p ? 'other_integration_ids' then
@@ -5387,18 +5444,19 @@ begin
   if a.enabled then
     v_txt := case
       when a.public_key is null then 'the public key'
-      when a.secret_key is null then 'the secret key'
-      when a.hmac_secret is null then 'the HMAC secret'
+      when a.secret_key_id is null then 'the secret key'
+      when a.hmac_secret_id is null then 'the HMAC secret'
       when cardinality(v_ids) = 0 then 'at least one integration ID'
       when a.dashboard_url is null then 'the dashboard address' end;
     if v_txt is not null then raise exception 'Paymob needs % before it can be switched on', v_txt; end if;
-    if (a.public_key like '%\_test\_%') <> (a.secret_key like '%\_test\_%') then
+    if (a.public_key like '%\_live\_%') <> a.is_live then
       raise exception 'The public key and the secret key must both be test keys or both be live keys';
     end if;
   end if;
 
   update everwake.payment_accounts
-     set public_key = a.public_key, secret_key = a.secret_key, hmac_secret = a.hmac_secret,
+     set public_key = a.public_key, secret_key_id = a.secret_key_id, hmac_secret_id = a.hmac_secret_id,
+         secret_hint = a.secret_hint, is_live = a.is_live,
          card_integration_id = a.card_integration_id, wallet_integration_id = a.wallet_integration_id,
          other_integration_ids = a.other_integration_ids, link_minutes = a.link_minutes,
          reminder_minutes = a.reminder_minutes, billing_email = a.billing_email, dashboard_url = a.dashboard_url,
@@ -5471,7 +5529,7 @@ declare
 begin
   select * into a from everwake.payment_accounts where tenant_id = p_tenant;
   v_ids := array_remove(array[a.card_integration_id, a.wallet_integration_id], null) || coalesce(a.other_integration_ids, '{}');
-  if a.tenant_id is null or not a.enabled or a.secret_key is null or a.public_key is null or cardinality(v_ids) = 0 then
+  if a.tenant_id is null or not a.enabled or a.secret_key_id is null or a.public_key is null or cardinality(v_ids) = 0 then
     return jsonb_build_object('ok', false, 'error', 'NOT_CONNECTED', 'fact', 'paying online is not set up for this restaurant');
   end if;
   select * into t from everwake.tenants where id = p_tenant;
@@ -5480,7 +5538,7 @@ begin
     v_ref := 'test-' || substr(everwake.random_token(), 1, 10);
     v_cents := round(coalesce(p_amount, 10) * 100)::bigint;
     return jsonb_build_object('ok', true, 'test', true, 'ref', v_ref, 'amount', coalesce(p_amount, 10), 'amount_cents', v_cents,
-      'currency', t.currency, 'secret_key', a.secret_key, 'public_key', a.public_key, 'integration_ids', to_jsonb(v_ids),
+      'currency', t.currency, 'secret_key', everwake.vault_get(a.secret_key_id), 'public_key', a.public_key, 'integration_ids', to_jsonb(v_ids),
       'expiration', 900,
       'billing', jsonb_build_object('first_name', 'Everwake', 'last_name', 'Test', 'phone_number', '+201000000000',
                                     'email', coalesce(a.billing_email, 'customer@everwake.tech'), 'street', 'NA', 'building', 'NA',
@@ -5532,7 +5590,7 @@ begin
   v_phone := coalesce(nullif(everwake.digits(c ->> 'phone'), ''), nullif(everwake.digits(o.wa_id), ''), '201000000000');
   return jsonb_build_object('ok', true, 'payment_id', v_id, 'ref', v_ref, 'order_no', o.order_no, 'amount', v_amt,
     'amount_cents', v_cents, 'currency', o.currency, 'currency_symbol', t.currency_symbol_ar,
-    'secret_key', a.secret_key, 'public_key', a.public_key, 'integration_ids', to_jsonb(v_ids),
+    'secret_key', everwake.vault_get(a.secret_key_id), 'public_key', a.public_key, 'integration_ids', to_jsonb(v_ids),
     'expiration', a.link_minutes * 60,
     'billing', jsonb_build_object(
       'first_name', left(split_part(v_name, ' ', 1), 50),
@@ -5699,7 +5757,7 @@ end $$;
 
 create or replace function everwake.payment_hmac_secret(p_tenant uuid)
 returns text language sql stable as $$
-  select hmac_secret from everwake.payment_accounts where tenant_id = p_tenant
+  select everwake.vault_get(hmac_secret_id) from everwake.payment_accounts where tenant_id = p_tenant
 $$;
 
 -- the short link's page: where to send the customer, or what to tell them

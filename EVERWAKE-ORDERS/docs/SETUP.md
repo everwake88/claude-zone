@@ -242,6 +242,20 @@ How it works:
 - `npm run paymob:check` (dashboard) checks the signature code against
   Paymob's documented example.
 
+Keeping the keys safe:
+- The secret key and the HMAC secret are stored in **Supabase Vault**,
+  encrypted: the `payment_accounts` table holds only their Vault ids, so a
+  database backup or export shows no key. Vault is on by default in Supabase
+  (Database → Extensions → `supabase_vault`).
+- After saving, a secret never comes back to any browser — the page shows
+  "Saved …1234". No dashboard user, owner included, can read them; only the
+  dashboard's server (the service-role key, on Vercel) gets them back, through
+  `vault_get`, to call Paymob or check a notice.
+- So protect what can reach them: two-factor sign-in on Supabase, Vercel and
+  GitHub; `SUPABASE_SERVICE_ROLE_KEY` marked *Sensitive* in Vercel; few people
+  on those teams. If a key may have leaked, make a new one in Paymob's dashboard
+  and paste it in Settings → Payments — the old one stops working.
+
 ## Growth and reports
 
 - **Saved commission:** the Overview and **Get customers** show what the month's

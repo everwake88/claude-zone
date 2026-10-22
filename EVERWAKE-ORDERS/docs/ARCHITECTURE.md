@@ -137,6 +137,6 @@ Sensitive actions go through `SECURITY DEFINER` functions that check the role fi
 | Talk | `conversations` (the engine's state, takeover, attention), `messages`, `outbox`, `inbound_buffer`, `conversation_locks` |
 | Orders | `orders` (one draft per customer, then placed), `order_items`, `order_events` |
 | Bookings | `reservations` (one draft per customer, then requested → confirmed / declined → arrived / did not come) |
-| Paying | `payment_accounts` (each restaurant's Paymob keys, readable only by the server), `payments` (each link: pending → paid / expired / replaced / refunded); `orders.payment_status` |
+| Paying | `payment_accounts` (each restaurant's Paymob keys; the two secrets encrypted in Supabase Vault, only their ids here), `payments` (each link: pending → paid / expired / replaced / refunded); `orders.payment_status` |
 | Switch | `agent_pauses`, `pause_contacts` |
 | Engine | `menu_snapshot`, `agent_events`, `audit_log` |

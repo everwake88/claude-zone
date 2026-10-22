@@ -21,6 +21,7 @@ begin
   assert (v ->> 'connected')::boolean and v ->> 'secret_hint' = '…1234' and not (v ->> 'is_live')::boolean, v::text;
   assert v ->> 'dashboard_url' = 'https://dash.example', 'no trailing slash';
   assert not v ? 'secret_key' and not v ? 'hmac_secret', 'secrets never come back';
+  assert (v ->> 'has_secret_key')::boolean and (v ->> 'has_hmac_secret')::boolean;
   assert (select settings -> 'payment_methods' from everwake.tenants where id = t) ? 'online', 'customers are offered "online"';
   -- saving again with empty secrets keeps them
   v := everwake.save_payment_account(t, '{"secret_key": "", "hmac_secret": ""}');
@@ -44,6 +45,31 @@ end $$;
 
 reset role;
 select set_config('request.jwt.claims', '', false);
+
+-- the secrets live in Vault: the account row holds only their ids
+insert into vault.secrets (name, secret) values ('someone_elses_secret', 'not for us');
+do $$
+declare t uuid := (select id from everwake.tenants where slug = 'nile_grill'); a everwake.payment_accounts%rowtype;
+begin
+  select * into a from everwake.payment_accounts where tenant_id = t;
+  assert to_jsonb(a)::text not like '%egy_sk_test_secret1234%' and to_jsonb(a)::text not like '%HMACSECRET%', 'no secret in the table';
+  assert a.secret_key_id is not null and a.hmac_secret_id is not null and a.secret_hint = '1234';
+  assert everwake.vault_get(a.secret_key_id) = 'egy_sk_test_secret1234' and everwake.payment_hmac_secret(t) = 'HMACSECRET',
+         'the server gets them back';
+  assert everwake.vault_get((select id from vault.secrets where id not in (a.secret_key_id, a.hmac_secret_id) limit 1)) is null,
+         'nothing else in Vault can be read through it';
+  -- a new secret replaces the old one in place
+  perform everwake.save_payment_account(t, '{"secret_key": "egy_sk_test_secret5678"}');
+  assert (select secret_key_id from everwake.payment_accounts where tenant_id = t) = a.secret_key_id;
+  assert everwake.vault_get(a.secret_key_id) = 'egy_sk_test_secret5678';
+  perform everwake.save_payment_account(t, '{"secret_key": "egy_sk_test_secret1234"}');
+  -- live and test keys are never mixed
+  begin
+    perform everwake.save_payment_account(t, '{"public_key": "egy_pk_live_abc"}');
+    assert false, 'a live public key with a test secret key';
+  exception when raise_exception then null;
+  end;
+end $$;
 
 -- a helper for these tests: a placed order the way the agent places it
 create function pg_temp.place(p_wa text, p_method text, p_delivery text, p_fee numeric, p_ext text) returns text language plpgsql as $$
