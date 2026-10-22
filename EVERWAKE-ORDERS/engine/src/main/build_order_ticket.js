@@ -17,7 +17,8 @@ const c = obj(o.customer);
 const SYM = str(o.currency_symbol) || 'ج';
 const m = (n) => `${fmt(n)}${SYM}`;
 const UNIT = { kg: 'كيلو', piece: 'قطعة', person: 'فرد' };
-const PAY = { cash: 'كاش', card: 'فيزا/كارت', wallet: 'محفظة', instapay: 'إنستاباي' };
+const PAY = { cash: 'كاش', card: 'فيزا/كارت', wallet: 'محفظة', instapay: 'إنستاباي',
+              online: 'أونلاين (لينك دفع) — هيوصلكم إشعار لما يدفع' };
 
 const lines = arr(obj(o.cart).items).map(i => {
   const ch = arr(i.choices).map(x => arr(x.selected).map(s => (s.name || s) + (s.extra_charge ? ' (+رسوم تسوية)' : '')).join(' + ')).filter(Boolean).join('، ');

@@ -416,6 +416,68 @@ test('a table booking: asked in two natural steps, a summary, sent to the branch
   await db.query(`update everwake.branches set reservations = 'off', reservation_note_ar = null where tenant_id = $1`, [tenant]);
 });
 
+test('paying online: the link goes out with the order, "paid" only after Paymob says so', async () => {
+  const phone = '201066667777';
+  const tenant = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  await sql(db, `select everwake.save_payment_account($1, $2) as r`, [tenant, { public_key: 'egy_pk_test_x', secret_key: 'egy_sk_test_y',
+    hmac_secret: 'H', card_integration_id: '4097558', dashboard_url: 'https://dash.example', enabled: true }]);
+
+  // they choose to pay online; the summary is shown
+  let t = await turn(db, evolutionPayload({ phone, pushName: 'Karim', text: 'عايز فرخة كاملة حارة استلام من الزمالك، باسم كريم، والدفع أونلاين بالفيزا' }), async (brief) => {
+    assert.match(brief.facts_text, /PAYMENT METHODS YOU MAY PROMISE: .*online \(payment_method "online": a secure payment link/);
+    return {
+      plan: { stage: 'reviewing', show_summary: true },
+      tools: [
+        { tool: 'save_customer_details', details: { full_name: 'كريم', phone_confirmed: 'yes', delivery_method: 'استلام', payment_method: 'أونلاين بالفيزا' } },
+        { tool: 'manage_cart', action: 'set_branch', branch: 'zamalek' },
+        { tool: 'manage_cart', action: 'add', items: [{ menu_id: 'M003', quantity: 1, choices: [{ selected: ['فرخة كاملة', 'حار'] }] }] }
+      ],
+      reply: (steps) => quiet(`ملخص طلبك:\n*فرخة مشوية* كاملة حار — 480ج\n*الإجمالي ${steps[2].result.total}ج*\nاستلام من الزمالك · الدفع أونلاين (لينك بعد التأكيد)\nأأكد؟`,
+                              { showed_order_summary: true })
+    };
+  });
+  assert.deepEqual(t.steps[0].result.rejected || [], []);
+  assert.equal((await sql(db, `select state -> 'customer' ->> 'payment_method' as r from everwake.conversations where wa_id = $1`, [phone])).r, 'online');
+  assert.deepEqual(t.checked.violations, []);
+
+  // yes: placed, and the payment link rides with the confirmation even when the host forgets it
+  t = await turn(db, evolutionPayload({ phone, text: 'تمام أكد' }), async () => ({
+    plan: { stage: 'placed', place_order: true },
+    tools: [{ tool: 'manage_cart', action: 'place_order' }],
+    reply: (steps) => quiet(`تمام يا كريم، طلبك ${steps[0].result.order_no} اتسجل 👌`)
+  }));
+  const placed = t.steps[0].result;
+  assert.equal(placed.status, 'PLACED', JSON.stringify(placed.reasons));
+  assert.equal(placed.payment.status, 'LINK_READY', JSON.stringify(placed.payment));
+  assert.match(placed.payment.link, /^https:\/\/dash\.example\/p\/[0-9a-f]{12}$/);
+  assert.deepEqual(t.checked.violations, []);
+  assert.ok(t.checked.decision.reply_messages.at(-1).endsWith(`لينك الدفع: ${placed.payment.link}`), t.checked.decision.reply_messages.join('|'));
+  assert.match(t.ticket[0].text, /أونلاين \(لينك دفع\)/);
+
+  // "I paid" before Paymob's notice: the host may not say it arrived
+  t = await turn(db, evolutionPayload({ phone, text: 'دفعت خلاص' }), async (brief) => {
+    assert.match(brief.facts_text, new RegExp(`payment: NOT PAID YET — link ${placed.payment.link.replace(/[.]/g, '\\.')}`));
+    return { plan: { stage: 'support' }, reply: quiet('تمام اتدفع ✅ شكراً!'),
+             rewrite: [`لسه الدفع موصلش عندنا — أول ما يوصل هيجيلك تأكيد هنا على طول. لو محتاج اللينك تاني: ${placed.payment.link}`] };
+  });
+  assert.equal(t.checked.repair_used, true);
+  assert.match(t.nodes['Check Reply'].violations[0], /payment arrived/);
+  assert.match(t.checked.decision.reply_messages[0], /^لسه الدفع موصلش/);
+
+  // Paymob's notice (the dashboard checked its signature): paid, the customer and the branch hear it
+  const ref = placed.payment.link.split('/').pop();
+  const cents = Math.round(placed.total * 100);
+  const r = (await sql(db, `select everwake.payment_callback($1, $2) as r`, [tenant, { merchant_order_id: ref, success: true, pending: false, amount_cents: cents }])).r;
+  assert.equal(r.status, 'paid');
+  assert.ok((await sql(db, `select count(*)::int as r from everwake.outbox where wa_id = $1 and body like 'تم استلام الدفع ✅%'`, [phone])).r === 1);
+  t = await turn(db, evolutionPayload({ phone, text: 'وصل؟' }), async (brief) => {
+    assert.match(brief.facts_text, /payment: PAID online/);
+    return { plan: { stage: 'support' }, reply: quiet('أيوه، الدفع وصل ✅ وطلبك بيتجهز.') };
+  });
+  assert.deepEqual(t.checked.violations, []);
+  await sql(db, `select everwake.save_payment_account($1, $2) as r`, [tenant, { enabled: false }]);
+});
+
 test('normalize: groups, reactions, voice notes and the restaurant\'s own phone', async () => {
   const group = evolutionPayload({ phone: '201000', text: 'hi' });
   group.body.data.key.remoteJid = '1203630@g.us';

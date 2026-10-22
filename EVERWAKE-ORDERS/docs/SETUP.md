@@ -27,6 +27,7 @@ You need:
    database/migrations/008_drivers.sql
    database/migrations/009_growth.sql
    database/migrations/010_reservations.sql
+   database/migrations/011_payments.sql
    database/migrations/090_supabase.sql      ← storage buckets + live updates (Supabase only)
    ```
    Or paste `everwake_supabase_setup.sql` (all of them in one file) and run it once.
@@ -52,8 +53,8 @@ You need:
 | `OPENAI_API_KEY` | For the AI menu import |
 | `MENU_AI_MODEL` | Optional; defaults to `gpt-5.6-luna`, the model the agent uses. It must read PDFs and photos |
 | `N8N_BASE_URL` | Your n8n's public address, e.g. `https://n8n.example.com` |
-| `N8N_OUTBOX_SECRET` | A long random string; the same value goes into n8n (step 3) |
-| `NEXT_PUBLIC_SITE_URL` | Optional: the dashboard's public address for the links sent to drivers (sign-in, "your orders"). Without it, the address the page was opened on is used |
+| `N8N_OUTBOX_SECRET` | A long random string; the same value goes into n8n (step 3). n8n also sends it when it asks the dashboard for a payment link |
+| `NEXT_PUBLIC_SITE_URL` | Optional: the dashboard's public address for the links sent to drivers (sign-in, "your orders") and customers (payment links). Without it, the address the page was opened on is used |
 
 ### Hosting: Vercel
 
@@ -99,6 +100,7 @@ You now see every restaurant in the switcher.
    - Open the **manage_cart**, **save_customer_details** and **manage_reservation** tool nodes, which show `SET_AFTER_IMPORT`, and pick the three tool workflows you just imported.
    - Pick the **Everwake DB** credential on every Postgres node, and your OpenAI credential on Brain Model, Agent Model and Rewrite Model. n8n lists the nodes missing a credential.
 4. **In "Everwake — Outbox + Housekeeping":** pick **Everwake DB** on the Postgres nodes and **Everwake Outbox Secret** on *Ping From Dashboard*.
+   **In "Everwake — Tool: manage_cart":** pick **Everwake Outbox Secret** on *Create Payment Link* too (it asks the dashboard for Paymob links).
 5. **Activate** Main and Outbox. The three tools are called by Main and need no activation.
    Each tool workflow has one Postgres node: pick **Everwake DB** on it too.
 6. *(Busy platform)* Run n8n in **queue mode** with a couple of workers once you pass a handful of restaurants. The debounce and conversation locks already make concurrent runs safe.
@@ -200,6 +202,45 @@ mark **Arrived** or **Did not come**. A customer can cancel on WhatsApp, and the
 branch is told. **Booking rules** on that page sets the largest group, how far
 ahead, and the occasions the agent may mention. The daily report counts the
 requests and how many still wait for the team.
+
+## Paying online (Paymob)
+
+Each restaurant connects **its own** Paymob account in **Settings → Payments**,
+so the money goes straight to its bank; Everwake never holds it. Paymob needs a
+commercial register, a tax card and a bank account; it charges no monthly fee,
+only a fee on each payment.
+
+1. In Paymob's dashboard: **Developers → API keys** (public and secret key),
+   **Settings → Account info** (HMAC secret), **Developers → Payment
+   integrations** (the card integration ID, and the wallet one). Start with the
+   test keys and test integration IDs.
+2. Paste them in Settings → Payments, switch on **Customers can pay online**,
+   and press **Make a 10 EGP test link**. Pay it with a Paymob test card: the
+   page then shows "Paymob last reached us …", which proves the notices arrive.
+3. Switch to the live keys when Paymob activates the account.
+
+How it works:
+- The agent offers "online by card or wallet" (payment method `online`). When
+  it places such an order, the cart tool asks the dashboard
+  (`POST /api/pay/link`) for a link; the dashboard creates a Paymob *intention*
+  and answers with a short link on its own address (`/p/<ref>`), which opens
+  Paymob's checkout. The agent sends it in the same reply.
+- Paymob reports every payment to `/api/pay/paymob/<restaurant id>` (sent with
+  each link — nothing to paste into Paymob). The dashboard checks Paymob's
+  HMAC signature, and the database marks the order **Paid**, tells the customer
+  and the branch on WhatsApp, and the agent knows from then on. A forged or
+  altered notice is refused.
+- A link works for 60 minutes (settable). Unpaid after 15 minutes: one reminder.
+  Expired: the branch gets a WhatsApp ("call the customer — a new link or
+  cash") and the chat is flagged in the inbox.
+- On the order board, a card shows *Waiting for payment* / *Paid online* /
+  *Not paid*. The order's drawer can send a new link (with a different amount
+  if the total changed), switch the order to cash, or mark it paid.
+- A total that may still change (a delivery fee the branch confirms, fees the
+  branch adds) gets no automatic link: the team confirms the amount and sends it
+  from the order board.
+- `npm run paymob:check` (dashboard) checks the signature code against
+  Paymob's documented example.
 
 ## Growth and reports
 

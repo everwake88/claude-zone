@@ -1,13 +1,23 @@
 'use client';
-import { Bike, Check, ChefHat, Clock, MapPin, MessageCircle, Package, Phone, Store, X } from 'lucide-react';
+import { Banknote, Bike, Check, ChefHat, Clock, Copy, CreditCard, MapPin, MessageCircle, Package, Phone, Send, Store, X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Drawer, Field, Input, Modal, PageHeader, Select, Spinner, Textarea, useAction } from '@/components/ui';
+import { Badge, Button, Drawer, Field, Input, Modal, PageHeader, Select, Spinner, Textarea, useAction, useToast } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { clock, cx, dateTime, displayName, money, qty, statusLabel, timeAgo } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
-import type { Branch, Driver, Order, OrderEvent, OrderStatus } from '@/lib/types';
+import type { Branch, Driver, Order, OrderEvent, OrderStatus, Payment, PaymentStatus } from '@/lib/types';
+
+// paying online: what the card on the board says
+const PAY_BADGE: Record<PaymentStatus, { label: string; tone: 'positive' | 'caution' | 'critical' | 'neutral' } | null> = {
+  none: null, pending: { label: 'Waiting for payment', tone: 'caution' }, paid: { label: 'Paid online', tone: 'positive' },
+  expired: { label: 'Not paid', tone: 'critical' }, refunded: { label: 'Refunded', tone: 'neutral' }
+};
+const PAY_EVENT: Record<string, string> = {
+  payment_link: 'Payment link sent', payment_paid: 'Paid', payment_expired: 'Payment link expired unpaid',
+  payment_refunded: 'Refunded', payment_cash: 'Switched to cash'
+};
 
 const COLUMNS: { key: string; title: string; statuses: OrderStatus[] }[] = [
   { key: 'new', title: 'New', statuses: ['placed'] },
@@ -124,8 +134,9 @@ export default function OrdersBoard() {
                       {o.cart.items.slice(0, 4).map(i => <li key={i.line_id}>{i.display_name || i.item_name} {qty(i.quantity, i.unit)}{i.gift ? ' 🎁' : ''}</li>)}
                       {o.cart.items.length > 4 && <li>{t('+{n} more', { n: o.cart.items.length - 4 })}</li>}
                     </ul>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="font-semibold">{money(o.total, tenant.currency_symbol)}</span>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 font-semibold">{money(o.total, tenant.currency_symbol)}
+                        {PAY_BADGE[o.payment_status] && <Badge tone={PAY_BADGE[o.payment_status]!.tone}><CreditCard className="size-3" /> {t(PAY_BADGE[o.payment_status]!.label)}</Badge>}</span>
                       {o.status === 'rejected' || o.status === 'cancelled' ? <Badge tone="critical">{statusLabel(o.status)}</Badge>
                         : col.key === 'done' ? <Badge tone="positive">{statusLabel(o.status)}</Badge>
                         : col.key !== 'new' ? <Badge>{statusLabel(o.status)}</Badge> : null}
@@ -157,8 +168,8 @@ export default function OrdersBoard() {
         })}
       </div>
 
-      <OrderDrawer order={open} onClose={() => setOpen(null)} base={base} branchName={branchName}
-        onCancel={(o) => { setReason(''); setRejecting({ order: o, status: 'cancelled' }); }} />
+      <OrderDrawer order={open ? orders.find(o => o.id === open.id) || open : null} onClose={() => setOpen(null)} base={base} branchName={branchName}
+        onCancel={(o) => { setReason(''); setRejecting({ order: o, status: 'cancelled' }); }} onChanged={load} />
 
       <Modal open={!!accepting} onClose={() => setAccepting(null)} title={t('Accept {no}', { no: accepting?.order_no })}
         footer={<><Button variant="outline" onClick={() => setAccepting(null)}>{t('Back')}</Button>
@@ -181,15 +192,47 @@ export default function OrdersBoard() {
   );
 }
 
-function OrderDrawer({ order, onClose, base, branchName, onCancel }:
-  { order: Order | null; onClose: () => void; base: string; branchName: Record<string, string>; onCancel: (o: Order) => void }) {
+function OrderDrawer({ order, onClose, base, branchName, onCancel, onChanged }:
+  { order: Order | null; onClose: () => void; base: string; branchName: Record<string, string>; onCancel: (o: Order) => void; onChanged: () => Promise<void> }) {
   const { tenant } = useTenant();
   const t = useT();
+  const toast = useToast();
+  const { busy, run } = useAction();
   const [events, setEvents] = useState<OrderEvent[]>([]);
-  useEffect(() => {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [linkFor, setLinkFor] = useState<string | null>(null);     // the amount for a new link, while the box is open
+  const loadMore = useCallback(async (id: number) => {
+    const [e, p] = await Promise.all([
+      sb().from('order_events').select('*').eq('order_id', id).order('created_at'),
+      sb().from('payments').select('id,tenant_id,order_id,provider,ref,amount,currency,status,link_url,method,card_brand,card_last4,attempts,last_error,expires_at,reminded_at,paid_at,created_by,is_live,created_at')
+        .eq('order_id', id).order('created_at', { ascending: false })
+    ]);
+    setEvents((e.data || []) as OrderEvent[]);
+    setPayments((p.data || []) as Payment[]);
+  }, []);
+  useEffect(() => { if (order) { loadMore(order.id); setLinkFor(null); } }, [order?.id, order?.payment_status, loadMore]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // a new payment link from the team, sent to the customer on WhatsApp
+  const sendLink = () => run(async () => {
     if (!order) return;
-    sb().from('order_events').select('*').eq('order_id', order.id).order('created_at').then(({ data }) => setEvents((data || []) as OrderEvent[]));
-  }, [order]);
+    const res = await fetch('/api/pay/link', { method: 'POST', headers: { 'content-type': 'application/json' },
+                                                body: JSON.stringify({ order_id: order.id, amount: linkFor || null }) });
+    const r = await res.json() as { ok: boolean; status?: string; reason?: string; error?: string; fact?: string };
+    if (!r.ok) {
+      if (r.status === 'NOT_CONNECTED') throw new Error(t('Paymob is not connected — Settings → Payments.'));
+      if (r.status === 'TOTAL_NOT_FINAL') throw new Error(t('The total is not final ({reason}). Type the amount to charge.', { reason: r.reason || '' }));
+      throw new Error(r.error || r.fact || r.status || 'error');
+    }
+    setLinkFor(null);
+    await onChanged(); await loadMore(order.id);
+  }, t('Payment link sent to the customer on WhatsApp'));
+  const setPayment = (action: 'cash' | 'mark_paid') => run(async () => {
+    if (!order) return;
+    const { error } = await sb().rpc('set_order_payment', { p_order: order.id, p_action: action, p_notify: true });
+    if (error) throw new Error(error.message);
+    if (action === 'cash') await fetch('/api/outbox/ping', { method: 'POST' }).catch(() => null);
+    await onChanged(); await loadMore(order.id);
+  }, action === 'cash' ? t('Switched to cash — the customer was told') : t('Marked as paid'));
   if (!order) return null;
   const c = (order.customer || {}) as Record<string, string>;
   const sym = tenant.currency_symbol;
@@ -218,6 +261,41 @@ function OrderDrawer({ order, onClose, base, branchName, onCancel }:
           )}
           {order.location?.maps_url && <a href={order.location.maps_url} target="_blank" rel="noreferrer" className="text-gold-ink underline">{t('Open the map pin')}</a>}
           <p className="mt-1 text-muted">{t('Payment: {method}', { method: order.payment_method ? t(order.payment_method) : '—' })}</p>
+          {(order.payment_method === 'online' || order.payment_status !== 'none' || payments.length > 0) && (
+            <div className="mt-2 space-y-2 rounded-lg border border-hairline p-3">
+              <p className="flex flex-wrap items-center gap-2">
+                <CreditCard className="size-4 text-gold-ink" />
+                {PAY_BADGE[order.payment_status] ? <Badge tone={PAY_BADGE[order.payment_status]!.tone}>{t(PAY_BADGE[order.payment_status]!.label)}</Badge> : <Badge>{t('No payment link yet')}</Badge>}
+                {order.payment_status === 'paid' && order.paid_amount != null && <span className="font-medium">{money(order.paid_amount, sym)}</span>}
+              </p>
+              {payments.slice(0, 3).map(p => (
+                <div key={p.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                  <span>{money(p.amount, sym)} · {t(p.status)} · {timeAgo(p.created_at)}</span>
+                  {p.card_last4 && <span dir="ltr">{p.card_brand} •••• {p.card_last4}</span>}
+                  {p.status === 'pending' && p.attempts > 0 && <span className="text-critical">{t('{n} declined tries', { n: p.attempts })}{p.last_error ? ` — ${p.last_error}` : ''}</span>}
+                  {!p.is_live && <Badge>{t('Test mode')}</Badge>}
+                  {p.status === 'pending' && p.link_url && (
+                    <button className="inline-flex items-center gap-1 text-gold-ink hover:underline"
+                      onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/p/${p.ref}`); toast(t('Copied')); }}>
+                      <Copy className="size-3" /> {t('Copy the link')}</button>
+                  )}
+                </div>
+              ))}
+              {active && order.payment_status !== 'paid' && (linkFor === null
+                ? <div className="flex flex-wrap gap-1.5">
+                    <Button size="sm" variant="gold" disabled={busy} onClick={() => setLinkFor('')}><Send className="size-3.5 rtl:rotate-180" /> {payments.length ? t('Send a new payment link') : t('Send a payment link')}</Button>
+                    {order.payment_method !== 'cash' && <Button size="sm" variant="outline" disabled={busy} onClick={() => setPayment('cash')}><Banknote className="size-3.5" /> {t('Switch to cash')}</Button>}
+                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => setPayment('mark_paid')}>{t('Mark as paid')}</Button>
+                  </div>
+                : <div className="flex flex-wrap items-end gap-2">
+                    <Field label={t('Amount ({currency})', { currency: tenant.currency })} hint={t('Empty = the order total.')}>
+                      <Input type="number" min={1} value={linkFor} onChange={e => setLinkFor(e.target.value)} placeholder={String(order.total)} className="w-32" />
+                    </Field>
+                    <Button size="sm" variant="gold" busy={busy} onClick={sendLink}>{t('Send')}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setLinkFor(null)}>{t('Cancel')}</Button>
+                  </div>)}
+            </div>
+          )}
           {order.notes && <p className="mt-1 rounded-lg bg-gold-wash p-2" dir="auto">{t('Note: {note}', { note: order.notes })}</p>}
         </section>
 
@@ -251,8 +329,9 @@ function OrderDrawer({ order, onClose, base, branchName, onCancel }:
           <ol className="space-y-1.5">
             {events.map(e => (
               <li key={e.id} className="flex items-center gap-2">
-                {e.status === 'placed' ? <Package className="size-4 text-gold" /> : e.status === 'rejected' || e.status === 'cancelled' ? <X className="size-4 text-critical" /> : e.status === 'accepted' || e.status === 'preparing' ? <ChefHat className="size-4" /> : <Check className="size-4 text-positive" />}
-                <span>{statusLabel(e.status as OrderStatus)}</span>
+                {PAY_EVENT[e.status] ? <CreditCard className={cx('size-4', e.status === 'payment_expired' ? 'text-critical' : 'text-gold-ink')} />
+                  : e.status === 'placed' ? <Package className="size-4 text-gold" /> : e.status === 'rejected' || e.status === 'cancelled' ? <X className="size-4 text-critical" /> : e.status === 'accepted' || e.status === 'preparing' ? <ChefHat className="size-4" /> : <Check className="size-4 text-positive" />}
+                <span>{PAY_EVENT[e.status] ? t(PAY_EVENT[e.status]) : statusLabel(e.status as OrderStatus)}</span>
                 <span className="text-muted">{clock(e.created_at, tenant.timezone)} · {e.by_role === 'agent' ? t('by the agent') : t(e.by_role)}{e.notified ? ' · ' + t('customer told') : ''}</span>
                 {e.note && <span className="text-muted" dir="auto">— {e.note}</span>}
               </li>

@@ -68,6 +68,8 @@ the message changes. This also keeps the model's prompt caching effective.
 | `apply_code` | Applies a promo code |
 | `place_order` | Refuses unless the cart, the details, the branch (open and taking orders), the delivery area, and a confirmed summary that still matches all check out |
 
+When the customer pays online, a placed order also gets its Paymob payment link in the same call: the tool asks the database whether the order needs one (`payment_after_place`) and, if so, the dashboard (`/api/pay/link`), which makes it with the restaurant's own Paymob keys. The agent puts the link in its reply; Check Reply adds it if forgotten and refuses "paid" until Paymob's signed notice has marked the order paid.
+
 Offers are computed in code (`src/shared/offers.js`): percent or amount off, a special price, free delivery or a free item. They can depend on dishes or categories, a minimum order, days and hours, branches, the customer's first order, or a promo code. Offers that stack all apply; of the rest, the customer gets the one worth the most.
 
 **manage_reservation** takes table bookings at branches set to book on WhatsApp. `update` saves any of branch, day, time, guests, name, phone, occasion and special requests, checking each value (in the future, not too far ahead, the branch open then, not more guests than it seats); `summary` writes the text the customer confirms; `submit` refuses unless that summary was shown and nothing changed since, then gives the booking its reference and puts the ticket on the branch's WhatsApp; `cancel` drops a booking in progress or cancels one already sent. The team confirms on the dashboard, which tells the customer.
@@ -135,5 +137,6 @@ Sensitive actions go through `SECURITY DEFINER` functions that check the role fi
 | Talk | `conversations` (the engine's state, takeover, attention), `messages`, `outbox`, `inbound_buffer`, `conversation_locks` |
 | Orders | `orders` (one draft per customer, then placed), `order_items`, `order_events` |
 | Bookings | `reservations` (one draft per customer, then requested → confirmed / declined → arrived / did not come) |
+| Paying | `payment_accounts` (each restaurant's Paymob keys, readable only by the server), `payments` (each link: pending → paid / expired / replaced / refunded); `orders.payment_status` |
 | Switch | `agent_pauses`, `pause_contacts` |
 | Engine | `menu_snapshot`, `agent_events`, `audit_log` |

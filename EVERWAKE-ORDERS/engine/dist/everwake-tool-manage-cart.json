@@ -10,7 +10,7 @@
         0
       ],
       "parameters": {
-        "content": "## Everwake · manage_cart\nCalled BY THE AGENT. Owns the cart, the branch, the offers and placing the order — for every restaurant.\n**actions** add · update · remove · replace · clear · **set_branch** · **reorder_last** · **apply_code** · **place_order** (refuses unless the cart, the details, the branch — open and taking orders — the delivery area and the confirmed summary all check out).\nEvery call first re-checks the cart against the live menu, so a dish switched off in the dashboard is never sold.",
+        "content": "## Everwake · manage_cart\nCalled BY THE AGENT. Owns the cart, the branch, the offers and placing the order — for every restaurant.\n**actions** add · update · remove · replace · clear · **set_branch** · **reorder_last** · **apply_code** · **place_order** (refuses unless the cart, the details, the branch — open and taking orders — the delivery area and the confirmed summary all check out).\nA placed order the customer pays **online** gets its Paymob payment link from the dashboard (**Create Payment Link**, header auth *Everwake Outbox Secret*), so the agent sends it in the same reply.\nEvery call first re-checks the cart against the live menu, so a dish switched off in the dashboard is never sold.",
         "width": 1200,
         "height": 220,
         "color": 5
@@ -214,15 +214,110 @@
       "id": "e117dff7-8474-54eb-a7f9-43c67b881674"
     },
     {
+      "name": "Payment Needed?",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1540,
+        140
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.payment_after_place($1::uuid, $2::text) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $('Read Args').first().json.tenant_id, ($json.r && $json.r.order_no) || '' ] }}"
+        }
+      },
+      "alwaysOutputData": true,
+      "id": "d46e3df2-6eb3-52f5-abbe-d67a1e026b09"
+    },
+    {
+      "name": "Route: Payment Link?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1760,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dd5e5a70-2eac-57a6-a918-2b61d32ec7c9",
+              "leftValue": "={{ !!$json.r && $json.r.needed === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "5cfb0d79-ffa8-5dc1-a028-f61cc9867e85"
+    },
+    {
+      "name": "Create Payment Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1980,
+        40
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.r.endpoint }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tenant_id: $json.r.tenant_id, order_no: $json.r.order_no }) }}",
+        "options": {
+          "timeout": 25000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EVERWAKE_OUTBOX",
+          "name": "Everwake Outbox Secret"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "ae5fb9c5-054d-5094-a8d9-77ddbcbfa29d"
+    },
+    {
       "name": "Format Tool Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1540,
+        2200,
         240
       ],
       "parameters": {
-        "jsCode": "// =====================================================================\n// EVERWAKE — Tool: manage_cart · NODE: Format Tool Response\n//\n// FACTS ONLY. No prose to repeat — the agent phrases everything itself.\n// Each status says plainly what is now true, so the agent never has to\n// guess whether the call worked.\n// =====================================================================\nconst r = $('Apply + Recalculate').first().json;\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nlet placed = null;\ntry { placed = $('Place Order').first().json; placed = placed && placed.r ? placed.r : placed; } catch (e) { placed = null; }\n\nconst totals = {\n  subtotal: r.subtotal,\n  discount_total: r.discount_total,                 // offers, already taken off the total\n  offers_applied: arr(r.offers_applied),\n  offers_almost: arr(r.offers_almost),              // \"add short_by more and this offer applies\"\n  vat_percent: r.vat_percent,                       // null = the branch confirms its fees\n  vat: r.vat,\n  delivery_fee: r.delivery_fee,                     // null = the branch confirms the fee\n  delivery_fee_known: r.delivery_fee_known,\n  delivery_zone: r.delivery_zone,\n  total: r.total,\n  currency_symbol: r.currency_symbol,\n  branch_price_note: r.price_note,\n  special_preparation_charge_pending_for: arr(r.extra_charge_items)\n};\nconst problems = arr(r.cart_errors);\nconst changes = r.menu_changed ? r.menu_changes : undefined;\nconst out = (facts) => [{ json: { response: JSON.stringify(facts) } }];\nconst waiting = arr(r.pending_after).map(p => ({ pending_id: p.pid, name: p.name, levels_left: p.levels_left }));\n\n// ---- place_order --------------------------------------------------------------\nif (r.action === 'place_order') {\n  if (r.is_place && placed && placed.ok && placed.order_no) {\n    return out({\n      status: 'PLACED',\n      order_no: placed.order_no,\n      branch: r.branch_name,\n      cart: r.cart_lines,\n      ...totals,\n      fact: 'The order is placed and recorded for the branch. The cart is now empty; anything new starts a fresh order.'\n    });\n  }\n  return out({\n    status: 'NOT_PLACED',\n    reasons: arr((r.place || {}).reasons),\n    cart: r.cart_lines,\n    ...totals,\n    menu_changes: changes,\n    items_waiting_on_choices: waiting,\n    missing_details: arr(r.missing_details),\n    fact: 'Nothing was placed. SUMMARY_NOT_SHOWN / SUMMARY_OUTDATED / MENU_CHANGED / TOTALS_CHANGED mean the customer must see and confirm an up-to-date summary first. BRANCH_CLOSED / BRANCH_BUSY: say when it can be ordered. OUT_OF_DELIVERY_AREA / ADDRESS_SERVED_BY_OTHER_BRANCH / DELIVERY_AREA_UNKNOWN: sort out the address or the branch, or offer pickup.'\n  });\n}\n\n// ---- branch set / reorder ------------------------------------------------------------\nif (r.action === 'set_branch' || r.action === 'reorder_last') {\n  const pending = arr(r.pending_choices);\n  return out({\n    status: r.action === 'set_branch' ? 'BRANCH_SET' : 'REORDERED',\n    branch: r.branch_name,\n    branch_changed: r.branch_changed,\n    menu_changes: changes,\n    cart: r.cart_lines,\n    ...totals,\n    items_waiting_on_choices: waiting,\n    next_question: pending[0] ? { pending_id: pending[0].pending_id, name: pending[0].item_name, ask_about: pending[0].ask_now } : null,\n    problems,\n    missing_details_for_order: arr(r.missing_details),\n    fact: r.action === 'set_branch'\n      ? 'Every price and the menu now come from this branch.'\n      : 'Their last order is back in the cart, priced from today\\'s menu. Anything in problems or menu_changes did not come back as before — tell them.'\n  });\n}\n\n// ---- a promo code ------------------------------------------------------------------------\nif (r.action === 'apply_code') {\n  const c = r.code_result || {};\n  return out({\n    status: c.status || 'CODE_NOT_VALID',\n    code: c.code, offer: c.offer || null, min_subtotal: c.min_subtotal || null,\n    cart: r.cart_lines,\n    ...totals,\n    fact: c.status === 'CODE_APPLIED'\n      ? 'The code is saved for this order; discount_total shows what it takes off now (0 until its conditions are met).'\n      : 'The code was not applied.'\n  });\n}\n\n// ---- an item is waiting on a required choice ---------------------------------------------\nconst pending = arr(r.pending_choices);\nif (pending.length) {\n  const p = pending[0];\n  return out({\n    status: 'NEEDS_CHOICES',\n    cart_saved: true,\n    item_waiting: {\n      pending_id: p.pending_id, menu_id: p.menu_id, name: p.item_name,\n      quantity: p.quantity, unit: p.unit, price: p.base_price,\n      already_answered: p.answered_so_far,\n      auto_included: p.auto_filled || []\n    },\n    ask_about: { level: p.ask_now.level, label: p.ask_now.label_ar, pick_min: p.ask_now.min, pick_max: p.ask_now.max,\n                 options: p.ask_now.options },\n    still_to_ask_after_this: (p.remaining_preview || []).slice(1),\n    other_items_waiting: pending.slice(1).map(x => ({ pending_id: x.pending_id, name: x.item_name, ask_about: x.ask_now })),\n    menu_changes: changes,\n    cart: r.cart_lines,\n    ...totals,\n    problems,\n    fact: 'This item is not in the cart until its required choices are answered. Send pending_id back with the answer and earlier answers are kept.'\n  });\n}\n\n// ---- done ----------------------------------------------------------------------------------\nconst optionalOpen = [];\nfor (const line of arr((r.cart || {}).items)) {\n  for (const L of arr(line.optional_levels_open)) {\n    optionalOpen.push({ line_id: line.line_id, item: line.display_name, level: L.level, label: L.label_ar, options: L.options });\n  }\n}\nreturn out({\n  status: 'DONE',\n  cart_saved: true,\n  branch: r.branch_name,\n  menu_changes: changes,\n  cart: r.cart_lines,\n  ...totals,\n  items_waiting_on_choices: waiting,\n  optional_choices_available: optionalOpen,\n  problems,\n  missing_details_for_order: arr(r.missing_details),\n  fact: problems.some(x => x.code !== 'MATCHED_AS')\n    ? 'The cart is saved as listed. Items in problems (other than MATCHED_AS) were NOT added; WHICH_ONE means ask the customer which of the candidates they mean.'\n    : 'The cart is saved exactly as listed.'\n});\n"
+        "jsCode": "// =====================================================================\n// EVERWAKE — Tool: manage_cart · NODE: Format Tool Response\n//\n// FACTS ONLY. No prose to repeat — the agent phrases everything itself.\n// Each status says plainly what is now true, so the agent never has to\n// guess whether the call worked.\n// =====================================================================\nconst r = $('Apply + Recalculate').first().json;\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nlet placed = null;\ntry { placed = $('Place Order').first().json; placed = placed && placed.r ? placed.r : placed; } catch (e) { placed = null; }\n// paying online: the link the dashboard made with Paymob (only when the order needs one)\nlet payNeeded = false, pay = null;\ntry { const n = $('Payment Needed?').first().json; payNeeded = !!(n && n.r && n.r.needed); } catch (e) { payNeeded = false; }\nif (payNeeded) { try { pay = $('Create Payment Link').first().json; } catch (e) { pay = null; } }\nconst payment = !payNeeded ? undefined\n  : (pay && pay.ok && pay.link)\n    ? { status: 'LINK_READY', link: pay.link, amount: pay.amount, works_until: pay.valid_until,\n        fact: 'They pay online: put this payment link in your reply exactly as it is, with the amount and until when it works. The order is NOT paid until FACTS shows PAID — never say it is paid.' }\n    : { status: (pay && pay.status) || 'LINK_FAILED', reason: pay && pay.reason,\n        fact: (pay && pay.fact) || 'The payment link could not be made right now. The order is placed; the team sends the link (or they can pay cash). Never invent a link.' };\n\nconst totals = {\n  subtotal: r.subtotal,\n  discount_total: r.discount_total,                 // offers, already taken off the total\n  offers_applied: arr(r.offers_applied),\n  offers_almost: arr(r.offers_almost),              // \"add short_by more and this offer applies\"\n  vat_percent: r.vat_percent,                       // null = the branch confirms its fees\n  vat: r.vat,\n  delivery_fee: r.delivery_fee,                     // null = the branch confirms the fee\n  delivery_fee_known: r.delivery_fee_known,\n  delivery_zone: r.delivery_zone,\n  total: r.total,\n  currency_symbol: r.currency_symbol,\n  branch_price_note: r.price_note,\n  special_preparation_charge_pending_for: arr(r.extra_charge_items)\n};\nconst problems = arr(r.cart_errors);\nconst changes = r.menu_changed ? r.menu_changes : undefined;\nconst out = (facts) => [{ json: { response: JSON.stringify(facts) } }];\nconst waiting = arr(r.pending_after).map(p => ({ pending_id: p.pid, name: p.name, levels_left: p.levels_left }));\n\n// ---- place_order --------------------------------------------------------------\nif (r.action === 'place_order') {\n  if (r.is_place && placed && placed.ok && placed.order_no) {\n    return out({\n      status: 'PLACED',\n      order_no: placed.order_no,\n      branch: r.branch_name,\n      cart: r.cart_lines,\n      ...totals,\n      payment,\n      fact: 'The order is placed and recorded for the branch. The cart is now empty; anything new starts a fresh order.'\n    });\n  }\n  return out({\n    status: 'NOT_PLACED',\n    reasons: arr((r.place || {}).reasons),\n    cart: r.cart_lines,\n    ...totals,\n    menu_changes: changes,\n    items_waiting_on_choices: waiting,\n    missing_details: arr(r.missing_details),\n    fact: 'Nothing was placed. SUMMARY_NOT_SHOWN / SUMMARY_OUTDATED / MENU_CHANGED / TOTALS_CHANGED mean the customer must see and confirm an up-to-date summary first. BRANCH_CLOSED / BRANCH_BUSY: say when it can be ordered. OUT_OF_DELIVERY_AREA / ADDRESS_SERVED_BY_OTHER_BRANCH / DELIVERY_AREA_UNKNOWN: sort out the address or the branch, or offer pickup.'\n  });\n}\n\n// ---- branch set / reorder ------------------------------------------------------------\nif (r.action === 'set_branch' || r.action === 'reorder_last') {\n  const pending = arr(r.pending_choices);\n  return out({\n    status: r.action === 'set_branch' ? 'BRANCH_SET' : 'REORDERED',\n    branch: r.branch_name,\n    branch_changed: r.branch_changed,\n    menu_changes: changes,\n    cart: r.cart_lines,\n    ...totals,\n    items_waiting_on_choices: waiting,\n    next_question: pending[0] ? { pending_id: pending[0].pending_id, name: pending[0].item_name, ask_about: pending[0].ask_now } : null,\n    problems,\n    missing_details_for_order: arr(r.missing_details),\n    fact: r.action === 'set_branch'\n      ? 'Every price and the menu now come from this branch.'\n      : 'Their last order is back in the cart, priced from today\\'s menu. Anything in problems or menu_changes did not come back as before — tell them.'\n  });\n}\n\n// ---- a promo code ------------------------------------------------------------------------\nif (r.action === 'apply_code') {\n  const c = r.code_result || {};\n  return out({\n    status: c.status || 'CODE_NOT_VALID',\n    code: c.code, offer: c.offer || null, min_subtotal: c.min_subtotal || null,\n    cart: r.cart_lines,\n    ...totals,\n    fact: c.status === 'CODE_APPLIED'\n      ? 'The code is saved for this order; discount_total shows what it takes off now (0 until its conditions are met).'\n      : 'The code was not applied.'\n  });\n}\n\n// ---- an item is waiting on a required choice ---------------------------------------------\nconst pending = arr(r.pending_choices);\nif (pending.length) {\n  const p = pending[0];\n  return out({\n    status: 'NEEDS_CHOICES',\n    cart_saved: true,\n    item_waiting: {\n      pending_id: p.pending_id, menu_id: p.menu_id, name: p.item_name,\n      quantity: p.quantity, unit: p.unit, price: p.base_price,\n      already_answered: p.answered_so_far,\n      auto_included: p.auto_filled || []\n    },\n    ask_about: { level: p.ask_now.level, label: p.ask_now.label_ar, pick_min: p.ask_now.min, pick_max: p.ask_now.max,\n                 options: p.ask_now.options },\n    still_to_ask_after_this: (p.remaining_preview || []).slice(1),\n    other_items_waiting: pending.slice(1).map(x => ({ pending_id: x.pending_id, name: x.item_name, ask_about: x.ask_now })),\n    menu_changes: changes,\n    cart: r.cart_lines,\n    ...totals,\n    problems,\n    fact: 'This item is not in the cart until its required choices are answered. Send pending_id back with the answer and earlier answers are kept.'\n  });\n}\n\n// ---- done ----------------------------------------------------------------------------------\nconst optionalOpen = [];\nfor (const line of arr((r.cart || {}).items)) {\n  for (const L of arr(line.optional_levels_open)) {\n    optionalOpen.push({ line_id: line.line_id, item: line.display_name, level: L.level, label: L.label_ar, options: L.options });\n  }\n}\nreturn out({\n  status: 'DONE',\n  cart_saved: true,\n  branch: r.branch_name,\n  menu_changes: changes,\n  cart: r.cart_lines,\n  ...totals,\n  items_waiting_on_choices: waiting,\n  optional_choices_available: optionalOpen,\n  problems,\n  missing_details_for_order: arr(r.missing_details),\n  fact: problems.some(x => x.code !== 'MATCHED_AS')\n    ? 'The cart is saved as listed. Items in problems (other than MATCHED_AS) were NOT added; WHICH_ONE means ask the customer which of the candidates they mean.'\n    : 'The cart is saved exactly as listed.'\n});\n"
       },
       "id": "1e31ebb9-7c78-511d-a86d-3fccd51f75da"
     },
@@ -323,6 +418,46 @@
       ]
     },
     "Place Order": {
+      "main": [
+        [
+          {
+            "node": "Payment Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment Needed?": {
+      "main": [
+        [
+          {
+            "node": "Route: Payment Link?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Payment Link?": {
+      "main": [
+        [
+          {
+            "node": "Create Payment Link",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Tool Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Payment Link": {
       "main": [
         [
           {

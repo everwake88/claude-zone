@@ -519,7 +519,7 @@ end $$;
 create or replace function everwake.housekeeping()
 returns jsonb language plpgsql as $$
 declare
-  n_release int; n_locks int; n_stuck int; n_buf int; n_snap int := 0; n_busy int; n_rep int;
+  n_release int; n_locks int; n_stuck int; n_buf int; n_snap int := 0; n_busy int; n_rep int; n_pay int;
   r record;
 begin
   -- a takeover nobody touched for a while goes back to the agent
@@ -562,7 +562,10 @@ begin
   -- each restaurant's daily report on the owner's WhatsApp, at its hour (009)
   n_rep := everwake.send_due_reports();
 
+  -- online payments: one reminder, then the link expires and the branch is told (011)
+  n_pay := everwake.payment_due();
+
   return jsonb_build_object('takeovers_released', n_release, 'locks_cleared', n_locks, 'outbox_requeued', n_stuck,
                             'buffer_cleared', n_buf, 'busy_cleared', n_busy, 'snapshots_rebuilt', n_snap,
-                            'reports_queued', n_rep);
+                            'reports_queued', n_rep, 'payments_due', n_pay);
 end $$;

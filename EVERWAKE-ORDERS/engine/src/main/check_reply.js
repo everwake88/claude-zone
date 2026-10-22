@@ -7,12 +7,14 @@
 //   · a number that is not a real price / total / fee / detail on file
 //   · saying the order is placed when place_order did not return PLACED
 //   · saying a table booking is confirmed (only the branch team confirms)
+//   · saying an online payment arrived before Paymob confirmed it
 //   · internal codes, ids or tool names leaking to the customer
 //   · a link that is not the restaurant's or the customer's own
 //   · menu pictures or a dish photo promised when none is being sent
 //   · far too long for WhatsApp
 // Facts it may ADD without asking: the order number after a placement,
-// or the booking's reference after it was sent, when the host forgot it.
+// the booking's reference after it was sent, or the payment link of an
+// order just placed, when the host forgot it.
 // =====================================================================
 // @include shared/basics.js
 // @include shared/arabic.js
@@ -43,6 +45,7 @@ const toolNumbers = [];
 const toolProblems = [];
 const bookingTexts = [];
 let bookingRef = null;
+let payLink = null;
 for (const st of steps) {
   const tool = str(obj(obj(st).action).tool);
   if (tool) toolsUsed.push(tool);
@@ -59,6 +62,10 @@ for (const st of steps) {
     continue;
   }
   if (str(o.status) === 'PLACED' && o.order_no) { placedNo = str(o.order_no); placedTotal = o.total; }
+  if (o.payment && typeof o.payment === 'object') {
+    bookingTexts.push(JSON.stringify(o.payment));
+    if (str(o.payment.status) === 'LINK_READY' && o.payment.link) payLink = str(o.payment.link);
+  }
   for (const k of ['subtotal', 'discount_total', 'vat', 'vat_percent', 'delivery_fee', 'total', 'minimum', 'short_by'])
     if (o[k] != null) toolNumbers.push(num(o[k]));
   for (const l of arr(o.cart)) if (l && l.line_total != null) toolNumbers.push(num(l.line_total));
@@ -141,8 +148,9 @@ for (const m of textPool.match(/\d+(?:\.\d+)?/g) || []) add(Number(m));
 
 // ---- links the host may send ------------------------------------------------------------------
 const domainOf = (u) => str(u).toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
+const payLinks = [payLink].concat(arr(ctx.last_orders).map(o => obj(obj(o).payment).link)).filter(Boolean);
 const allowedLinks = [location.maps_url, profile.website, profile.instagram, profile.facebook, profile.tiktok, profile.google_maps_url]
-  .concat(arr(allLookup.branches).map(b => b.maps_url)).concat(arr(settings.allowed_links))
+  .concat(arr(allLookup.branches).map(b => b.maps_url)).concat(arr(settings.allowed_links)).concat(payLinks)
   .map(domainOf).filter(Boolean);
 const mapsHosts = ['google.com/maps', 'maps.google.com', 'goo.gl/maps', 'maps.app.goo.gl'];
 
@@ -163,7 +171,7 @@ if (!placedNo && CLAIM.test(orderText)) {
 
 // a table booking is confirmed by the branch team, never by the host
 const BOOKED = /(تم|اتم|اتعمل)\s*(تأكيد\s*)?(الحجز|حجزك|حجز حضرتك|حجزكم)|(الحجز|حجزك|حجز حضرتك|حجزكم|الترابيزة|ترابيزتك)\s*(اتأكد|اتأكدت|اتثبت|مؤكد|متأكد|تمام ومتأكد)|اتحجز(ت|تلك|تلكم)?(?![\u0600-\u06FF])|حجزت(لك|لكم|لكو)|حجزنا(لك|لكم|لكو)|(booking|reservation|table)\s+(is|has been|was)\s+(confirmed|booked|reserved)|(you'?re|you are)\s+(all\s+)?booked/i;
-const NOT_YET = /(?<!\p{L})(مش|مو|لسه|لسا|لما|عشان|علشان|بعد ما|أول ما|اول ما|not|once|until|will|pending)(?!\p{L})|(?<!\p{L})(هيت|هيأ|هيك|هير|هنت|هنأ|هنك|يأكد|يتأكد|بيأكد|للتأكيد)|n't/iu;
+const NOT_YET = /(?<!\p{L})(مش|مو|لسه|لسا|لما|لو|عشان|علشان|بعد ما|أول ما|اول ما|not|once|until|will|pending|if|when)(?!\p{L})|(?<!\p{L})(هيت|هيأ|هيك|هير|هنت|هنأ|هنك|يأكد|يتأكد|بيأكد|للتأكيد)|n't/iu;
 const confirmedBooking = arr(ctx.reservations_upcoming).some(x => str(obj(x).status) === 'confirmed');
 if (!confirmedBooking) {
   const said = joined.split(/(?<=[.؟?!\n])/).find(x => BOOKED.test(x) && !NOT_YET.test(x));
@@ -172,6 +180,15 @@ if (!confirmedBooking) {
       ? 'it was just SENT to the branch team, who will contact the customer to confirm it. Say that, with the reference number.'
       : 'only the branch team confirms a booking after it is sent. Say what is actually next.'));
   }
+}
+
+// an online payment is paid when Paymob says so (FACTS shows PAID), never before
+const PAID = /(تم|اتم)\s*(استلام\s*)?الدفع|الدفع\s*(وصل|اتم|نجح|اتسجل|اتأكد)|استلمنا\s*(الدفع|المبلغ|فلوس)|(?<![\u0600-\u06FF])(اتدفع|اندفع)(?![\u0600-\u06FF])|payment\s+(received|confirmed|went through|was successful|is complete)|(has been|is|was)\s+paid\b/i;
+const latest = obj(arr(ctx.last_orders)[0]);
+const paidNow = !placedNo && latest.payment_status === 'paid';
+if (!paidNow) {
+  const said = joined.split(/(?<=[.؟?!\n])/).find(x => PAID.test(x) && !NOT_YET.test(x));
+  if (said) violations.push('The reply says the payment arrived — it has not: FACTS does not show it PAID yet. Say the order is confirmed the moment the payment goes through (they get a message), and give the link again if they need it.');
 }
 
 // internal leakage
@@ -232,6 +249,12 @@ if (placedNo && !joined.includes(placedNo) && messages.length) {
   messages[messages.length - 1] += (en ? `\nOrder number: ${placedNo}` : `\nرقم الأوردر: ${placedNo}`);
 }
 
+// an order just placed to pay online always carries its payment link
+if (payLink && !joined.includes(payLink) && messages.length) {
+  const en = /^[\x00-\x7F\s\p{P}\p{Emoji}]*$/u.test(messages[messages.length - 1]);
+  messages[messages.length - 1] += (en ? `\nPayment link: ${payLink}` : `\nلينك الدفع: ${payLink}`);
+}
+
 // a booking sent to the branch always carries its reference
 if (bookingRef && !joined.includes(bookingRef) && messages.length) {
   const en = /^[\x00-\x7F\s\p{P}\p{Emoji}]*$/u.test(messages[messages.length - 1]);
@@ -256,6 +279,8 @@ return [{
     order_placed_no: placedNo,
     booking_requested_ref: bookingRef,
     booking_confirmed: confirmedBooking,
+    pay_link: payLink,
+    paid_now: paidNow,
     cart_items_after: items.length,
     pending_after: pending.length,
     branch_after: branchId || null,

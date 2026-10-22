@@ -73,6 +73,17 @@ export function evolutionPayload({ text, phone, lid, pushName = 'Test', id, from
 }
 
 // ---- the tool sub-workflows, wired exactly like n8n -----------------------
+// stands in for the dashboard's /api/pay/link (which calls Paymob): the same
+// database steps, with a made-up checkout address. Tests may swap it.
+export const payLinks = {
+  async make(db, tenant, orderNo) {
+    const p = (await sql(db, 'select everwake.payment_prepare($1::uuid, $2::text) as r', [tenant, orderNo])).r;
+    if (!p.ok) return { ok: false, status: p.error, reason: p.reason, fact: p.fact };
+    return (await sql(db, 'select everwake.payment_link_saved($1::bigint, $2::text, $3::text, $4::bigint, false) as r',
+                      [p.payment_id, `https://eg.checkout.paymob.com/?publicKey=pk&clientSecret=cs_${p.ref}`, `pi_${p.ref}`, 900000 + p.payment_id])).r;
+  }
+};
+
 export async function manageCart(db, intake, action, items = [], branch = '') {
   const args = (await runCode('cart/read_args.js', { input: { tenant_id: intake.tenant_id, wa_id: intake.wa_id, action,
     items_json: typeof items === 'string' ? items : JSON.stringify(items), branch_id: branch } }))[0];
@@ -80,8 +91,12 @@ export async function manageCart(db, intake, action, items = [], branch = '') {
   const applied = (await runCode('cart/apply_recalculate.js', { input: ctx, nodes: { 'Read Args': args } }))[0];
   const nodes = { 'Read Args': args, 'Apply + Recalculate': applied };
   if (!applied.ok) return JSON.parse((await runCode('cart/format_tool_error.js', { input: applied }))[0].response);
-  if (applied.is_place) nodes['Place Order'] = await callB64(db, 'place_order', applied.b64_place);
-  else await callB64(db, 'persist_cart', applied.b64_cart);
+  if (applied.is_place) {
+    nodes['Place Order'] = await callB64(db, 'place_order', applied.b64_place);
+    const no = (nodes['Place Order'].r || {}).order_no || '';
+    nodes['Payment Needed?'] = await sql(db, 'select everwake.payment_after_place($1::uuid, $2::text) as r', [args.tenant_id, no]);
+    if (nodes['Payment Needed?'].r && nodes['Payment Needed?'].r.needed) nodes['Create Payment Link'] = await payLinks.make(db, args.tenant_id, no);
+  } else await callB64(db, 'persist_cart', applied.b64_cart);
   return JSON.parse((await runCode('cart/format_tool_response.js', { input: {}, nodes }))[0].response);
 }
 

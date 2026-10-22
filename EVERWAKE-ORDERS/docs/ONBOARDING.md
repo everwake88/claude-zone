@@ -20,6 +20,7 @@ it alone, or you do it with them on a call. Until they press **Go live**:
 | Dine-in: which branches take table bookings on WhatsApp, which only by phone, the largest group, and anything to tell customers (e.g. "the sea-view tables are limited") | The agent books a table in conversation and sends the request to the branch; or gives the number | **Branches** → a branch → *Table bookings*; rules on **Table bookings** |
 | Their own drivers: name and WhatsApp number, and which branches each drives for | Orders go to a driver; the customer hears who is coming and when they are close | **Drivers** — each gets a sign-in link on WhatsApp |
 | Payment methods they accept | The agent never promises anything else | Settings → **Ordering** |
+| Paying online (optional): their own Paymob account — public key, secret key, HMAC secret, card (and wallet) integration IDs | Customers pay by card or wallet from a link; the order shows Paid | Settings → **Payments** (then a 10 EGP test link) |
 | The kitchen's WhatsApp for order tickets (per branch or one for all) | New orders as a WhatsApp message too | Branches / Settings → Ordering |
 | What the restaurant is, its tone, key facts, contacts | How the agent introduces and describes it | Settings → **Agent** |
 | Answers to the usual questions: parking, catering, allergens, kids' menu… | So the agent answers instead of guessing | Settings → **Answers** |

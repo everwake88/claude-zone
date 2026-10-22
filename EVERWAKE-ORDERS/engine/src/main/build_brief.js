@@ -172,6 +172,23 @@ else if (zoneElsewhere) areaLine = `their location is in the zone "${zoneElsewhe
 else if (hasPin && location.in_delivery_area === false) areaLine = 'their pin is OUTSIDE every delivery zone — delivery is not possible there; pickup is (say which branch is nearest)';
 else areaLine = 'unknown yet — a location pin (or the area name) decides the zone, the fee and the branch';
 
+// ---- paying ------------------------------------------------------------------------------
+const PAY_FACT = {
+  cash: 'cash', card: 'card on delivery', wallet: 'mobile wallet on delivery', instapay: 'InstaPay',
+  online: 'online (payment_method "online": a secure payment link by card or mobile wallet, sent right after the order is placed)'
+};
+const payLine = (o) => {
+  if (o.payment_method !== 'online' && (!o.payment_status || o.payment_status === 'none')) return '';
+  const p = obj(o.payment);
+  const st = o.payment_status;
+  if (st === 'paid') return `\n    payment: PAID online ${money$(o.paid_amount != null ? o.paid_amount : o.total)}`;
+  if (st === 'refunded') return '\n    payment: paid online, then REFUNDED';
+  if (st === 'pending' && p.link) return `\n    payment: NOT PAID YET — link ${p.link} (works until ${localTime(p.expires_at, tz)})`
+    + (num(p.declined_attempts) ? ` · ${num(p.declined_attempts)} declined attempt(s)${p.last_error ? ': ' + p.last_error : ''}` : '');
+  if (st === 'expired') return '\n    payment: NOT PAID — the payment link expired; the branch was asked to call them (a new link or cash)';
+  return '\n    payment: online, NO LINK YET — the team sends it (or switches to cash)';
+};
+
 // ---- returning customer ------------------------------------------------------------------
 const UNIT_EN = { kg: 'kg', piece: 'pcs', person: 'ppl' };
 const orderLine = (o) => {
@@ -182,6 +199,7 @@ const orderLine = (o) => {
     + (o.last_update_at ? ` (last update ${String(o.last_update_at).slice(0, 16).replace('T', ' ')} UTC)` : '')
     + (driver.name ? `\n    driver: ${driver.name} (${driver.phone || 'no number'})`
        + (track.eta_min != null ? ` · about ${track.km_left} km / ${track.eta_min} min from the customer (position from ${num(track.minutes_ago)} min ago)` : '') : '')
+    + payLine(o)
     + `\n    items: ${items || '—'}`;
 };
 const historyFacts = [];
@@ -342,7 +360,7 @@ const facts = [
   `MENU PICTURES: ${menuPics}`,
   `DISH PHOTOS: ${photoCodes.length ? `dishes marked 📷 in the MENU have a photo you can send (send_item_photos)${photosSent.length ? '; already sent: ' + photosSent.join(', ') : ''}` : 'none uploaded'}`,
   `RULED OUT BY THE CUSTOMER (food_prefs): ${str(details.food_prefs) || 'nothing — everything is open'}`,
-  `PAYMENT METHODS YOU MAY PROMISE: ${arr(settings.payment_methods).join(', ') || 'cash'} (anything else: the branch confirms)`,
+  `PAYMENT METHODS YOU MAY PROMISE: ${arr(settings.payment_methods).map(m => PAY_FACT[m] || m).join(', ') || 'cash'} (anything else: the branch confirms)`,
   '',
   ...bookingLines,
   memory.length ? 'NOTES FROM EARLIER IN THIS CONVERSATION:\n' + memory.map(m => '- ' + m).join('\n') : ''

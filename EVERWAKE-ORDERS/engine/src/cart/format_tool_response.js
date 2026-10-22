@@ -9,6 +9,16 @@ const r = $('Apply + Recalculate').first().json;
 const arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);
 let placed = null;
 try { placed = $('Place Order').first().json; placed = placed && placed.r ? placed.r : placed; } catch (e) { placed = null; }
+// paying online: the link the dashboard made with Paymob (only when the order needs one)
+let payNeeded = false, pay = null;
+try { const n = $('Payment Needed?').first().json; payNeeded = !!(n && n.r && n.r.needed); } catch (e) { payNeeded = false; }
+if (payNeeded) { try { pay = $('Create Payment Link').first().json; } catch (e) { pay = null; } }
+const payment = !payNeeded ? undefined
+  : (pay && pay.ok && pay.link)
+    ? { status: 'LINK_READY', link: pay.link, amount: pay.amount, works_until: pay.valid_until,
+        fact: 'They pay online: put this payment link in your reply exactly as it is, with the amount and until when it works. The order is NOT paid until FACTS shows PAID — never say it is paid.' }
+    : { status: (pay && pay.status) || 'LINK_FAILED', reason: pay && pay.reason,
+        fact: (pay && pay.fact) || 'The payment link could not be made right now. The order is placed; the team sends the link (or they can pay cash). Never invent a link.' };
 
 const totals = {
   subtotal: r.subtotal,
@@ -39,6 +49,7 @@ if (r.action === 'place_order') {
       branch: r.branch_name,
       cart: r.cart_lines,
       ...totals,
+      payment,
       fact: 'The order is placed and recorded for the branch. The cart is now empty; anything new starts a fresh order.'
     });
   }

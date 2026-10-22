@@ -138,7 +138,8 @@ function buildMain() {
     '1. Pick the **Everwake DB** Postgres credential on every Postgres node (Supabase: Settings → Database → connection string, port 5432).',
     '2. Pick your OpenAI credential on Brain Model, Agent Model and Rewrite Model.',
     '3. Import the three tool workflows, then set them on **manage_cart**, **save_customer_details** and **manage_reservation** (they show SET_AFTER_IMPORT).',
-    '4. Activate. Nothing here is per restaurant: a new restaurant is a row in the database.'
+    '4. In **Everwake — Tool: manage_cart**, pick the *Everwake Outbox Secret* credential on **Create Payment Link** (it asks the dashboard for Paymob payment links).',
+    '5. Activate. Nothing here is per restaurant: a new restaurant is a row in the database.'
   ].join('\n'), [-2400, 1000], 1100, 260, 3));
 
   w.add({ name: 'WA — Evolution Webhook', type: 'n8n-nodes-base.webhook', typeVersion: 2.1, position: [-2300, 600],
@@ -317,6 +318,7 @@ function buildCart() {
     '## Everwake · manage_cart',
     'Called BY THE AGENT. Owns the cart, the branch, the offers and placing the order — for every restaurant.',
     '**actions** add · update · remove · replace · clear · **set_branch** · **reorder_last** · **apply_code** · **place_order** (refuses unless the cart, the details, the branch — open and taking orders — the delivery area and the confirmed summary all check out).',
+    'A placed order the customer pays **online** gets its Paymob payment link from the dashboard (**Create Payment Link**, header auth *Everwake Outbox Secret*), so the agent sends it in the same reply.',
     'Every call first re-checks the cart against the live menu, so a dish switched off in the dashboard is never sold.'
   ].join('\n'), [0, 0], 1200, 220, 5));
   w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'action', 'items_json', 'branch_id'], [0, 320]));
@@ -328,12 +330,24 @@ function buildCart() {
   w.add(iff('Route: Place Order?', '$json.is_place', [1100, 240]));
   w.add(pg('Place Order', b64sql('place_order'), '={{ [ $json.b64_place ] }}', [1320, 140]));
   w.add(pg('Persist Cart', b64sql('persist_cart'), '={{ [ $json.b64_cart ] }}', [1320, 340]));
-  w.add(code('Format Tool Response', 'cart/format_tool_response.js', [1540, 240]));
+  w.add(pg('Payment Needed?', 'select everwake.payment_after_place($1::uuid, $2::text) as r;',
+           "={{ [ $('Read Args').first().json.tenant_id, ($json.r && $json.r.order_no) || '' ] }}", [1540, 140], { alwaysOutputData: true }));
+  w.add(iff('Route: Payment Link?', '!!$json.r && $json.r.needed === true', [1760, 140]));
+  w.add({ name: 'Create Payment Link', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: [1980, 40],
+          parameters: { method: 'POST', url: '={{ $json.r.endpoint }}', authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
+                        sendBody: true, specifyBody: 'json',
+                        jsonBody: '={{ JSON.stringify({ tenant_id: $json.r.tenant_id, order_no: $json.r.order_no }) }}',
+                        options: { timeout: 25000, response: { response: { neverError: true, responseFormat: 'json' } } } },
+          credentials: { httpHeaderAuth: { id: 'EVERWAKE_OUTBOX', name: 'Everwake Outbox Secret' } },
+          onError: 'continueRegularOutput', alwaysOutputData: true });
+  w.add(code('Format Tool Response', 'cart/format_tool_response.js', [2200, 240]));
   w.add(code('Format Tool Error', 'cart/format_tool_error.js', [1100, 460]));
   w.chain('Tool Called By Agent', 'Read Args', 'Load Cart + Menu', 'Apply + Recalculate', 'Applied OK?');
   w.link('Applied OK?', 'Route: Place Order?', 0); w.link('Applied OK?', 'Format Tool Error', 1);
   w.link('Route: Place Order?', 'Place Order', 0); w.link('Route: Place Order?', 'Persist Cart', 1);
-  w.link('Place Order', 'Format Tool Response'); w.link('Persist Cart', 'Format Tool Response');
+  w.chain('Place Order', 'Payment Needed?', 'Route: Payment Link?');
+  w.link('Route: Payment Link?', 'Create Payment Link', 0); w.link('Route: Payment Link?', 'Format Tool Response', 1);
+  w.link('Create Payment Link', 'Format Tool Response'); w.link('Persist Cart', 'Format Tool Response');
   return w;
 }
 

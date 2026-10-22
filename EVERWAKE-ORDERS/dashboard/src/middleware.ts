@@ -33,7 +33,9 @@ export async function middleware(request: NextRequest) {
   });
   const { data: { user } } = await supabase.auth.getUser();
 
-  const open = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/api/health');
+  // customers' payment pages and Paymob's notices need no sign-in (the link route checks its own callers)
+  const open = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/api/health')
+    || path.startsWith('/p/') || path.startsWith('/api/pay/');
   if (!user && !open) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';

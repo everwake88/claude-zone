@@ -5,7 +5,7 @@ actions:
 - set_branch — branch_id = the branch code or name. Required before the first dish (unless the restaurant has one branch). Changing it re-checks and re-prices the whole cart.
 - reorder_last — the customer's latest order back in the cart, priced from today's menu (items_json = []).
 - apply_code — a promo code the customer gave: items_json = [{"promo_code":"CODE"}].
-- place_order — only after the customer confirmed the order summary you showed. Returns PLACED with order_no, or NOT_PLACED with reasons.
+- place_order — only after the customer confirmed the order summary you showed. Returns PLACED with order_no, or NOT_PLACED with reasons. When they pay online, PLACED carries payment: LINK_READY with the link to send (or why there is no link yet).
 
 items_json shape (a JSON array as a string):
 [{"menu_id":"M003","quantity":1,"choices":[{"level":1,"selected":["فرخة كاملة"]}],"notes":"من غير بصل"}]

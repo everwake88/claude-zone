@@ -29,7 +29,7 @@ rows in the database, not a copy of the workflows.
 
 ## What a restaurant gets
 
-- **The agent** answers in Egyptian Arabic or English. It knows every dish, every choice, every branch's prices and hours. It finds the delivery zone from a location pin (or the area name), applies the offers, and never invents a price. It remembers each customer's last order and addresses, whether they come back by number or by the private ID WhatsApp sometimes shows instead. It sends a dish's photo when someone wants to see it, and the menu when asked. At restaurants with dine-in it books a table in conversation and sends the request to the branch to confirm.
+- **The agent** answers in Egyptian Arabic or English. It knows every dish, every choice, every branch's prices and hours. It finds the delivery zone from a location pin (or the area name), applies the offers, and never invents a price. It remembers each customer's last order and addresses, whether they come back by number or by the private ID WhatsApp sometimes shows instead. It sends a dish's photo when someone wants to see it, and the menu when asked. At restaurants with dine-in it books a table in conversation and sends the request to the branch to confirm. Customers can pay online: a Paymob link by card or wallet right after the order, confirmed on WhatsApp the moment it is paid.
 - **The dashboard**
   - Live order board that rings for new orders. Every step (accepted, out for delivery…) is sent to the customer on WhatsApp.
   - Inbox of every conversation. Take over a chat, reply, hand it back; the agent reads what you wrote and carries on.

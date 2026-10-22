@@ -8,7 +8,7 @@ import { cx } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 
 const TABS = [
-  ['agent', 'Agent'], ['knowledge', 'Answers'], ['ordering', 'Ordering'], ['messages', 'Messages'], ['whatsapp', 'WhatsApp'], ['brand', 'Logo and colour'], ['report', 'Daily report'], ['team', 'Team']
+  ['agent', 'Agent'], ['knowledge', 'Answers'], ['ordering', 'Ordering'], ['payments', 'Payments'], ['messages', 'Messages'], ['whatsapp', 'WhatsApp'], ['brand', 'Logo and colour'], ['report', 'Daily report'], ['team', 'Team']
 ];
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {

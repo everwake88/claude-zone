@@ -180,6 +180,21 @@ export interface Order {
   completed_at: string | null; cancelled_at: string | null; created_at: string; updated_at: string;
   driver_id: string | null; driver_assigned_at: string | null;
   delivery_km_left: number | null; delivery_eta_min: number | null; delivery_track_at: string | null;
+  payment_status: PaymentStatus; paid_at: string | null; paid_amount: number | null;
+}
+// paying online (Paymob): the order's state, and each link made for it
+export type PaymentStatus = 'none' | 'pending' | 'paid' | 'expired' | 'refunded';
+export interface Payment {
+  id: number; tenant_id: string; order_id: number; provider: string; ref: string; amount: number; currency: string;
+  status: 'creating' | 'pending' | 'paid' | 'expired' | 'replaced' | 'cancelled' | 'refunded'; link_url: string | null;
+  method: string | null; card_brand: string | null; card_last4: string | null; attempts: number; last_error: string | null;
+  expires_at: string; reminded_at: string | null; paid_at: string | null; created_by: 'agent' | 'staff'; is_live: boolean; created_at: string;
+}
+export interface PaymentAccountView {
+  connected: boolean; provider?: string; public_key?: string | null; has_secret_key?: boolean; secret_hint?: string | null;
+  has_hmac_secret?: boolean; card_integration_id?: number | null; wallet_integration_id?: number | null; other_integration_ids?: number[];
+  link_minutes?: number; reminder_minutes?: number; billing_email?: string | null; dashboard_url?: string | null; is_live?: boolean;
+  last_callback_at?: string | null; last_error?: string | null; updated_at?: string;
 }
 // one of the restaurant's own drivers (طيار)
 export interface Driver {

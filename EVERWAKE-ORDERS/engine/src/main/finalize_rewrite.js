@@ -30,12 +30,14 @@ const allowedLinks = (d.allowed_links || []).map(String);
 // the same booking rails as Check Reply: a booking sentence is not an order claim, and is never "confirmed" by the host
 const BOOKING_WORDS = /(حجز|ترابيز|طاول|booking|reservation|\btable\b)/i;
 const BOOKED = /(تم|اتم|اتعمل)\s*(تأكيد\s*)?(الحجز|حجزك|حجز حضرتك|حجزكم)|(الحجز|حجزك|حجز حضرتك|حجزكم|الترابيزة|ترابيزتك)\s*(اتأكد|اتأكدت|اتثبت|مؤكد|متأكد|تمام ومتأكد)|اتحجز(ت|تلك|تلكم)?(?![\u0600-\u06FF])|حجزت(لك|لكم|لكو)|حجزنا(لك|لكم|لكو)|(booking|reservation|table)\s+(is|has been|was)\s+(confirmed|booked|reserved)|(you'?re|you are)\s+(all\s+)?booked/i;
-const NOT_YET = /(?<!\p{L})(مش|مو|لسه|لسا|لما|عشان|علشان|بعد ما|أول ما|اول ما|not|once|until|will|pending)(?!\p{L})|(?<!\p{L})(هيت|هيأ|هيك|هير|هنت|هنأ|هنك|يأكد|يتأكد|بيأكد|للتأكيد)|n't/iu;
+const NOT_YET = /(?<!\p{L})(مش|مو|لسه|لسا|لما|لو|عشان|علشان|بعد ما|أول ما|اول ما|not|once|until|will|pending|if|when)(?!\p{L})|(?<!\p{L})(هيت|هيأ|هيك|هير|هنت|هنأ|هنك|يأكد|يتأكد|بيأكد|للتأكيد)|n't/iu;
+const PAID = /(تم|اتم)\s*(استلام\s*)?الدفع|الدفع\s*(وصل|اتم|نجح|اتسجل|اتأكد)|استلمنا\s*(الدفع|المبلغ|فلوس)|(?<![\u0600-\u06FF])(اتدفع|اندفع)(?![\u0600-\u06FF])|payment\s+(received|confirmed|went through|was successful|is complete)|(has been|is|was)\s+paid\b/i;
 
 function badLine(s) {
   if (LEAK.test(s)) return true;
   if (!d.order_placed_no && !BOOKING_WORDS.test(s) && CLAIM.test(s)) return true;
   if (!d.booking_confirmed && BOOKED.test(s) && !NOT_YET.test(s)) return true;
+  if (!d.paid_now && PAID.test(s) && !NOT_YET.test(s)) return true;
   for (const l of s.match(/https?:\/\/[^\s)]+/gi) || []) {
     const dom = l.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
     if (!allowedLinks.some(a => a && (dom.startsWith(a) || a.startsWith(dom)))) return true;
@@ -57,6 +59,10 @@ if (!messages.length) {
   const en = /English/.test(d.language_hint || '');
   messages = [en ? 'One moment please, let me check that for you 🙏' : 'ثانية واحدة أتأكدلك من الحتة دي 🙏'];
   source = 'fallback';
+}
+if (d.pay_link && !messages.join('\n').includes(d.pay_link)) {
+  const en = /English/.test(d.language_hint || '');
+  messages[messages.length - 1] += en ? `\nPayment link: ${d.pay_link}` : `\nلينك الدفع: ${d.pay_link}`;
 }
 if (ref && !messages.join('\n').includes(ref)) {
   const en = /English/.test(d.language_hint || '');

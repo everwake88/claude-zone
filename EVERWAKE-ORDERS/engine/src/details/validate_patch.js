@@ -120,10 +120,13 @@ for (const [k, v] of Object.entries(incoming)) {
   if (k === 'payment_method') {
     let pm = val.toLowerCase();
     if (/كاش|cash|نقد/.test(pm)) pm = 'cash';
-    else if (/فيزا|كارت|card|visa|ماستر|master/.test(pm)) pm = 'card';
+    else if (/أونلاين|اونلاين|أون لاين|اون لاين|online|لينك|link|paymob|باي ?موب/.test(pm)) pm = 'online';
+    else if (/فيزا|كارت|card|visa|ماستر|master|ميزة|meeza/.test(pm)) pm = 'card';
     else if (/محفظ|wallet|فودافون|vodafone|اتصالات|etisalat|اورنج|orange/.test(pm)) pm = 'wallet';
     else if (/انستا|إنستا|instapay/.test(pm)) pm = 'instapay';
-    if (!['cash', 'card', 'wallet', 'instapay'].includes(pm)) { rejected.push({ field: k, reason: 'MUST_BE cash|card|wallet|instapay' }); continue; }
+    // card or wallet at a restaurant that takes them only online (a payment link), not at the door
+    if ((pm === 'card' || pm === 'wallet') && PAY_OK.includes('online') && !PAY_OK.includes(pm)) pm = 'online';
+    if (!['cash', 'card', 'wallet', 'instapay', 'online'].includes(pm)) { rejected.push({ field: k, reason: 'MUST_BE cash|card|wallet|instapay|online' }); continue; }
     if (PAY_OK.length && !PAY_OK.includes(pm)) {
       rejected.push({ field: k, reason: 'NOT_ACCEPTED_BY_THE_RESTAURANT', accepted: PAY_OK }); continue;
     }

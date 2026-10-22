@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { Fragment, useEffect, useState } from 'react';
 import { useTenantRow } from '@/components/settings/useTenantRow';
 import { Button, Card, Checkbox, Field, Input, Spinner } from '@/components/ui';
@@ -15,7 +16,7 @@ const FIELDS: [string, string][] = [
 ];
 
 export default function OrderingSettings() {
-  const { can } = useTenant();
+  const { can, base } = useTenant();
   const { row, save, busy } = useTenantRow();
   const t = useT();
   const [s, setS] = useState<Settings | null>(null);
@@ -57,6 +58,10 @@ export default function OrderingSettings() {
               onChange={v => !ro && set('payment_methods', v ? [...(s.payment_methods || []), k] : (s.payment_methods || []).filter(x => x !== k))} />
           ))}
         </div>
+        <p className="mt-3 text-sm">
+          {(s.payment_methods || []).includes('online') ? t('Online by card or wallet: on (a Paymob link after the order is placed).') : t('Online by card or wallet: off.')}{' '}
+          <Link href={`${base}/settings/payments`} className="text-gold-ink underline">{t('Settings → Payments')}</Link>
+        </p>
       </Card>
 
       <Card title={t('What the agent collects before placing an order')}>

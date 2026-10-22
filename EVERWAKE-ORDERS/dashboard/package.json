@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "i18n:check": "node scripts/check-i18n.mjs"
+    "i18n:check": "node scripts/check-i18n.mjs",
+    "paymob:check": "node --experimental-strip-types --no-warnings scripts/check-paymob.mts"
   },
   "dependencies": {
     "@geoman-io/leaflet-geoman-free": "2.20.2",

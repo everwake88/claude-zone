@@ -633,6 +633,13 @@ begin
                   'order_no', o.order_no, 'status', o.status, 'placed_at', o.placed_at,
                   'branch_id', o.branch_id, 'branch_name', b.name_ar, 'total', o.total,
                   'delivery_method', o.delivery_method, 'payment_method', o.payment_method,
+                  -- paying online (011): paid or not, and the live link to send again
+                  'payment_status', o.payment_status, 'paid_amount', o.paid_amount,
+                  'payment', (select jsonb_build_object('status', p.status, 'amount', p.amount, 'expires_at', p.expires_at,
+                                       'link', case when p.status = 'pending' and p.expires_at > now()
+                                                    then everwake.payment_short_url(p.tenant_id, p.ref) end,
+                                       'declined_attempts', p.attempts, 'last_error', p.last_error)
+                                from everwake.payments p where p.order_id = o.id order by p.id desc limit 1),
                   'address_text', o.address_text, 'eta_text', o.eta_text,
                   'last_update_at', greatest(o.accepted_at, o.ready_at, o.out_for_delivery_at, o.completed_at, o.cancelled_at),
                   -- the restaurant's driver on it, and how far they were at their last position
