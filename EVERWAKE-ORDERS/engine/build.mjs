@@ -3,12 +3,13 @@
 // Everwake Orders · engine builder
 //
 // The engine's code lives in src/ (one file per n8n Code node) and its
-// prompts in prompts/. This script assembles them into four workflows
+// prompts in prompts/. This script assembles them into five workflows
 // you import into n8n (dist/*.json):
 //
 //   Everwake — Main (Brain + Agent)            the WhatsApp webhook, every restaurant
 //   Everwake — Tool: manage_cart               called by the Agent
 //   Everwake — Tool: save_customer_details     called by the Agent
+//   Everwake — Tool: manage_reservation        called by the Agent (table bookings)
 //   Everwake — Outbox + Housekeeping           staff replies, status messages,
 //                                              "we're back", every minute
 //
@@ -136,7 +137,7 @@ function buildMain() {
     '### After import',
     '1. Pick the **Everwake DB** Postgres credential on every Postgres node (Supabase: Settings → Database → connection string, port 5432).',
     '2. Pick your OpenAI credential on Brain Model, Agent Model and Rewrite Model.',
-    '3. Import the two tool workflows, then set them on **manage_cart** and **save_customer_details** (they show SET_AFTER_IMPORT).',
+    '3. Import the three tool workflows, then set them on **manage_cart**, **save_customer_details** and **manage_reservation** (they show SET_AFTER_IMPORT).',
     '4. Activate. Nothing here is per restaurant: a new restaurant is a row in the database.'
   ].join('\n'), [-2400, 1000], 1100, 260, 3));
 
@@ -233,6 +234,12 @@ function buildMain() {
     wa_id: `={{ ${I}.wa_id }}`,
     details_json: "={{ $fromAI('details_json', 'A JSON object (as a string) with only the customer details that are new or changed in this turn, e.g. {\"full_name\":\"أحمد\",\"address_area\":\"المعادي\"}. Add \"reset_address\":true when they give a different address; \"use_saved_address\":\"<number>\" to reuse a saved one.', 'string') }}"
   }, [1720, 720]));
+  w.add(tool('manage_reservation', 'Everwake — Tool: manage_reservation', prompt('tool_manage_reservation.md'), {
+    tenant_id: `={{ ${I}.tenant_id }}`,
+    wa_id: `={{ ${I}.wa_id }}`,
+    action: "={{ $fromAI('action', 'Exactly one of: update, summary, submit, cancel, status', 'string') }}",
+    details_json: "={{ $fromAI('details_json', 'Only for update (and cancel when they have several bookings): a JSON object (as a string) with only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}. date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Empty string for summary, submit and status.', 'string') }}"
+  }, [1880, 900]));
 
   w.add(pg('Read Back State', 'select everwake.read_back($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [1840, 460]));
   w.add(code('Check Reply', 'main/check_reply.js', [2060, 460]));
@@ -286,6 +293,7 @@ function buildMain() {
   w.link('Agent Output Parser', 'Agent', 0, 'ai_outputParser');
   w.link('manage_cart', 'Agent', 0, 'ai_tool');
   w.link('save_customer_details', 'Agent', 0, 'ai_tool');
+  w.link('manage_reservation', 'Agent', 0, 'ai_tool');
   w.link('Rewrite Model', 'Rewrite', 0, 'ai_languageModel');
   w.link('Route: Needs Rewrite?', 'Build Rewrite Request', 0); w.link('Route: Needs Rewrite?', 'Build Persist Payload', 1);
   w.chain('Build Rewrite Request', 'Rewrite', 'Finalize Rewrite', 'Build Persist Payload');
@@ -352,6 +360,26 @@ function buildDetails() {
 }
 
 // =========================================================================
+// Tool: manage_reservation
+// =========================================================================
+function buildReservation() {
+  const w = new Workflow('Everwake — Tool: manage_reservation');
+  w.add(sticky('Sticky — manage_reservation', [
+    '## Everwake · manage_reservation',
+    'Called BY THE AGENT for table bookings (dine-in), at branches set to take bookings on WhatsApp.',
+    '**actions** **update** (any of branch, date, time, guests, name, phone, occasion, special requests — every value is checked: in the future, not too far ahead, while the branch is open, not more guests than it seats) · **summary** (the text the customer confirms) · **submit** (only a summary they agreed to, unchanged since: the branch\'s operations WhatsApp gets the ticket with the customer\'s details, and the dashboard\'s Reservations page shows it) · **cancel** · **status**.',
+    'The team calls the customer and presses Confirm on the dashboard — that is when the customer hears it is confirmed.'
+  ].join('\n'), [0, 0], 1200, 240, 5));
+  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'action', 'details_json'], [0, 320]));
+  w.add(code('Read Args', 'reservation/read_args.js', [220, 320]));
+  w.add(pg('Booking', "select everwake.reservation_tool($1::uuid, $2::text, $3::text, convert_from(decode($4::text, 'base64'), 'UTF8')) as r;",
+           '={{ [ $json.tenant_id, $json.wa_id, $json.action, $json.details_b64 ] }}', [440, 320]));
+  w.add(code('Return To Agent', 'reservation/return_to_agent.js', [660, 320]));
+  w.chain('Tool Called By Agent', 'Read Args', 'Booking', 'Return To Agent');
+  return w;
+}
+
+// =========================================================================
 // Outbox + housekeeping
 // =========================================================================
 function buildOutbox() {
@@ -389,13 +417,14 @@ function buildOutbox() {
   return w;
 }
 
-export const workflows = { main: buildMain, cart: buildCart, details: buildDetails, outbox: buildOutbox };
+export const workflows = { main: buildMain, cart: buildCart, details: buildDetails, reservation: buildReservation, outbox: buildOutbox };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   mkdirSync(join(ROOT, 'dist'), { recursive: true });
   const files = {
     main: 'everwake-main.json', cart: 'everwake-tool-manage-cart.json',
-    details: 'everwake-tool-save-customer-details.json', outbox: 'everwake-outbox.json'
+    details: 'everwake-tool-save-customer-details.json', reservation: 'everwake-tool-manage-reservation.json',
+    outbox: 'everwake-outbox.json'
   };
   for (const [k, build] of Object.entries(workflows)) {
     const w = build();

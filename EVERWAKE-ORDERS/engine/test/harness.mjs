@@ -94,6 +94,14 @@ export async function saveDetails(db, intake, details) {
   return JSON.parse((await runCode('details/return_to_agent.js', { input: persisted, nodes: { 'Validate + Patch': v } }))[0].response);
 }
 
+export async function manageReservation(db, intake, action, details = '') {
+  const args = (await runCode('reservation/read_args.js', { input: { tenant_id: intake.tenant_id, wa_id: intake.wa_id, action,
+    details_json: details } }))[0];
+  const res = await sql(db, "select everwake.reservation_tool($1::uuid, $2::text, $3::text, convert_from(decode($4::text, 'base64'), 'UTF8')) as r",
+                        [args.tenant_id, args.wa_id, args.action, args.details_b64]);
+  return JSON.parse((await runCode('reservation/return_to_agent.js', { input: res }))[0].response);
+}
+
 // ---- one whole turn of the Main workflow ----------------------------------------
 // script(brief) → { plan, tools: async (call) => [...steps], reply }
 export async function turn(db, payload, script, opts = {}) {
@@ -133,7 +141,9 @@ export async function turn(db, payload, script, opts = {}) {
   for (const call of s.tools || []) {
     const result = call.tool === 'manage_cart'
       ? await manageCart(db, r, call.action, call.items || [], call.branch || '')
-      : await saveDetails(db, r, call.details || {});
+      : call.tool === 'manage_reservation'
+        ? await manageReservation(db, r, call.action, call.details || '')
+        : await saveDetails(db, r, call.details || {});
     steps.push({ action: { tool: call.tool }, observation: JSON.stringify(result), result });
   }
   const reply = typeof s.reply === 'function' ? s.reply(steps) : s.reply;

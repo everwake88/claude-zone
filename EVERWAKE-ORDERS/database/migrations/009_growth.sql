@@ -262,6 +262,14 @@ begin
     join everwake.drivers d on d.id = q.driver_id;
   if x is not null then v := v || E'\n' || '🛵 الطيارين: ' || x; end if;
 
+  -- table bookings (010): asked for in the period, and what still waits for the team
+  select case when count(*) = 0 and count(*) filter (where status = 'requested') = 0 then null
+              else count(*) || ' طلب حجز' || case when count(*) filter (where status = 'requested') > 0
+                                                 then ' · مستنيين تأكيد: ' || count(*) filter (where status = 'requested') else '' end end
+    into x
+    from everwake.reservations where tenant_id = p_tenant and status <> 'draft' and requested_at >= p_from and requested_at < p_to;
+  if x is not null then v := v || E'\n' || '🍽 الحجوزات: ' || x; end if;
+
   v := v || E'\n\n' || '⚠️ فرص ضايعة:'
        || E'\n' || '• سلات مكملتش: ' || (l -> 'abandoned' ->> 'count')
        || case when (l -> 'abandoned' ->> 'value')::numeric > 0 then ' (بقيمة ' || everwake.fmt_int((l -> 'abandoned' ->> 'value')::numeric) || sym || ')' else '' end

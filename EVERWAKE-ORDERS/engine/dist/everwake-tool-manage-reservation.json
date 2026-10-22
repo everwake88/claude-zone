@@ -1,0 +1,143 @@
+{
+  "name": "Everwake — Tool: manage_reservation",
+  "nodes": [
+    {
+      "name": "Sticky — manage_reservation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "content": "## Everwake · manage_reservation\nCalled BY THE AGENT for table bookings (dine-in), at branches set to take bookings on WhatsApp.\n**actions** **update** (any of branch, date, time, guests, name, phone, occasion, special requests — every value is checked: in the future, not too far ahead, while the branch is open, not more guests than it seats) · **summary** (the text the customer confirms) · **submit** (only a summary they agreed to, unchanged since: the branch's operations WhatsApp gets the ticket with the customer's details, and the dashboard's Reservations page shows it) · **cancel** · **status**.\nThe team calls the customer and presses Confirm on the dashboard — that is when the customer hears it is confirmed.",
+        "width": 1200,
+        "height": 240,
+        "color": 5
+      },
+      "id": "be80dc4a-7285-5fbe-a20b-80baa22562d8"
+    },
+    {
+      "name": "Tool Called By Agent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        320
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tenant_id"
+            },
+            {
+              "name": "wa_id"
+            },
+            {
+              "name": "action"
+            },
+            {
+              "name": "details_json"
+            }
+          ]
+        }
+      },
+      "id": "29ccc0c4-1134-54d9-a9c8-3b540e3179a7"
+    },
+    {
+      "name": "Read Args",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        320
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Tool: manage_reservation · NODE: Read Args\n// Normalises what n8n hands over: details_json may arrive as a string or\n// as an object; it reaches the database as base64 so no quote or comma\n// in a name or a special request can break the query.\n// =====================================================================\nconst t = $input.first().json || {};\nlet a = t;\nif (t.action === undefined && t.input !== undefined) {\n  try { a = typeof t.input === 'string' ? JSON.parse(t.input) : (t.input || {}); } catch (e) { a = {}; }\n  if (typeof a === 'string') { try { a = JSON.parse(a); } catch (e) { a = {}; } }\n}\nconst s = (v) => String(v == null ? '' : v).trim();\nlet details = a.details_json !== undefined ? a.details_json : t.details_json;\nif (details && typeof details === 'object') details = JSON.stringify(details);\ndetails = s(details);\n\nreturn [{\n  json: {\n    tenant_id: s(t.tenant_id || a.tenant_id),\n    wa_id: s(t.wa_id || a.wa_id),\n    action: s(a.action !== undefined ? a.action : t.action).toLowerCase(),\n    details_b64: Buffer.from(details, 'utf8').toString('base64')\n  }\n}];\n"
+      },
+      "id": "e7e166fa-42e3-5391-a517-07e06393eb5d"
+    },
+    {
+      "name": "Booking",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.reservation_tool($1::uuid, $2::text, $3::text, convert_from(decode($4::text, 'base64'), 'UTF8')) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, $json.wa_id, $json.action, $json.details_b64 ] }}"
+        }
+      },
+      "id": "8be61193-9802-5020-a018-749404797470"
+    },
+    {
+      "name": "Return To Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        320
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Tool: manage_reservation · NODE: Return To Agent\n// The database's answer, as it is: the booking so far, what is still\n// missing, any problem with a value, the summary to show, or the\n// reference once it went to the branch team.\n// =====================================================================\nconst r = $input.first().json.r;\nconst res = typeof r === 'string' ? r : JSON.stringify(r || { ok: false, error: 'NO_ANSWER', fact: 'the booking could not be saved — try once more' });\nreturn [{ json: { response: res } }];\n"
+      },
+      "id": "c6818dfb-a3b0-5914-a2b3-13766b8cec0c"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Tool Called By Agent": {
+      "main": [
+        [
+          {
+            "node": "Read Args",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Args": {
+      "main": [
+        [
+          {
+            "node": "Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking": {
+      "main": [
+        [
+          {
+            "node": "Return To Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

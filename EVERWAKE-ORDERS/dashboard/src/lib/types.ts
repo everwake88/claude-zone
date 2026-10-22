@@ -42,6 +42,11 @@ export interface Settings {
   daily_report?: { enabled?: boolean; numbers?: string[]; time?: string };
   // extra "where did you find us" sources for the QR links, beyond the built-in ones
   growth_sources?: string[];
+  // table bookings (010): the restaurant's rules; each branch says whether it books on WhatsApp, by phone or not at all
+  reservation_max_guests?: number;
+  reservation_occasions?: string[];
+  reservation_lead_minutes?: number;
+  reservation_days_ahead?: number;
   allowed_links?: string[];
   templates?: Record<string, string>;
 }
@@ -57,6 +62,16 @@ export interface Branch {
   delivery_enabled: boolean; pickup_enabled: boolean; delivery_fee: number | null; min_order: number | null;
   max_delivery_km: number | null; vat_percent: number | null; price_note_ar: string | null; prep_minutes: number | null;
   delivery_eta_text: string | null; serves_hint_ar: string | null; seasonal: boolean; is_active: boolean; sort: number;
+  reservations: 'off' | 'whatsapp' | 'phone'; reservation_note_ar: string | null; reservation_max_guests: number | null;
+}
+
+export type ReservationStatus = 'requested' | 'confirmed' | 'declined' | 'cancelled' | 'seated' | 'no_show';
+export interface Reservation {
+  id: number; tenant_id: string; ref_no: string; wa_id: string; conversation_id: number | null; customer_id: number | null;
+  branch_id: string | null; status: ReservationStatus; reserve_date: string; reserve_time: string; reserved_for: string;
+  guests: number; occasion: string | null; full_name: string | null; phone: string | null; requests: string | null;
+  source: string; requested_at: string | null; decided_at: string | null; decline_reason: string | null; ops_notified: boolean;
+  created_at: string;
 }
 
 export interface Zone {

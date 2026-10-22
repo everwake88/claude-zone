@@ -40,11 +40,11 @@ create policy "everwake imports" on storage.objects for all to authenticated
   using (bucket_id = 'imports' and (storage.foldername(name))[1] in (select unnest(everwake.my_editor_tenant_ids())::text))
   with check (bucket_id = 'imports' and (storage.foldername(name))[1] in (select unnest(everwake.my_editor_tenant_ids())::text));
 
--- live dashboard: new orders ring, new messages appear, the switch updates
+-- live dashboard: new orders ring, new messages appear, the switch updates, booking requests ring
 do $$
 declare t text;
 begin
-  foreach t in array array['orders', 'conversations', 'messages', 'tenants'] loop
+  foreach t in array array['orders', 'conversations', 'messages', 'tenants', 'reservations'] loop
     begin
       execute format('alter publication supabase_realtime add table everwake.%I', t);
     exception when duplicate_object then null;

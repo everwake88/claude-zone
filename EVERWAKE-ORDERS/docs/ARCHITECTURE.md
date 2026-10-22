@@ -70,6 +70,8 @@ the message changes. This also keeps the model's prompt caching effective.
 
 Offers are computed in code (`src/shared/offers.js`): percent or amount off, a special price, free delivery or a free item. They can depend on dishes or categories, a minimum order, days and hours, branches, the customer's first order, or a promo code. Offers that stack all apply; of the rest, the customer gets the one worth the most.
 
+**manage_reservation** takes table bookings at branches set to book on WhatsApp. `update` saves any of branch, day, time, guests, name, phone, occasion and special requests, checking each value (in the future, not too far ahead, the branch open then, not more guests than it seats); `summary` writes the text the customer confirms; `submit` refuses unless that summary was shown and nothing changed since, then gives the booking its reference and puts the ticket on the branch's WhatsApp; `cancel` drops a booking in progress or cancels one already sent. The team confirms on the dashboard, which tells the customer.
+
 **save_customer_details** whitelists fields and normalises them. It also:
 - keeps a ledger so nothing is asked twice
 - reuses a saved address
@@ -132,5 +134,6 @@ Sensitive actions go through `SECURITY DEFINER` functions that check the role fi
 | People | `customers`, `customer_identities`, `customer_addresses` |
 | Talk | `conversations` (the engine's state, takeover, attention), `messages`, `outbox`, `inbound_buffer`, `conversation_locks` |
 | Orders | `orders` (one draft per customer, then placed), `order_items`, `order_events` |
+| Bookings | `reservations` (one draft per customer, then requested → confirmed / declined → arrived / did not come) |
 | Switch | `agent_pauses`, `pause_contacts` |
 | Engine | `menu_snapshot`, `agent_events`, `audit_log` |

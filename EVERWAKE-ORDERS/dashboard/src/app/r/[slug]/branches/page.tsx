@@ -1,9 +1,9 @@
 'use client';
-import { Clock, MapPin, Pause, Pencil, Phone, Plus, Store } from 'lucide-react';
+import { CalendarDays, Clock, MapPin, Pause, Pencil, Phone, Plus, Store } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { HoursEditor } from '@/components/branches/HoursEditor';
-import { Badge, Button, Card, Checkbox, Drawer, Empty, Field, Input, Modal, PageHeader, Spinner, Switch, Textarea, useAction } from '@/components/ui';
+import { Badge, Button, Card, Checkbox, Drawer, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Switch, Textarea, useAction } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { clock, money, parseLatLng } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -50,8 +50,10 @@ export default function BranchesPage() {
       delivery_fee: b.delivery_fee ?? null, min_order: b.min_order ?? null, max_delivery_km: b.max_delivery_km ?? null,
       vat_percent: b.vat_percent ?? null, price_note_ar: b.price_note_ar || null, prep_minutes: b.prep_minutes ?? null,
       delivery_eta_text: b.delivery_eta_text || null, serves_hint_ar: b.serves_hint_ar || null, seasonal: !!b.seasonal,
-      is_active: b.is_active !== false, sort: b.sort ?? ((list?.length || 0) + 1) * 10
+      is_active: b.is_active !== false, sort: b.sort ?? ((list?.length || 0) + 1) * 10,
+      reservations: b.reservations || 'off', reservation_note_ar: b.reservation_note_ar || null, reservation_max_guests: b.reservation_max_guests ?? null
     };
+    if (row.reservations === 'phone' && !row.phone) throw new Error(t('Bookings by phone need the branch phone — the agent gives that number.'));
     const { error } = b.id ? await sb().from('branches').update(row).eq('id', b.id) : await sb().from('branches').insert(row);
     if (error) throw new Error(error.message.includes('branches_tenant_id_code_key') ? t('Another branch already uses that code') : error.message);
     setEdit(null); await load();
@@ -93,6 +95,10 @@ export default function BranchesPage() {
                   {b.address_ar && <p className="flex items-start gap-1.5" dir="auto"><MapPin className="mt-0.5 size-3.5 shrink-0" />{b.address_ar}</p>}
                   {b.phone && <p className="flex items-center gap-1.5"><Phone className="size-3.5" />{b.phone}</p>}
                   {b.hours_text_ar && <p className="flex items-center gap-1.5" dir="auto"><Clock className="size-3.5" />{b.hours_text_ar}</p>}
+                  {b.reservations !== 'off' && (
+                    <p className="flex items-center gap-1.5"><CalendarDays className="size-3.5" />
+                      {b.reservations === 'whatsapp' ? t('Table bookings on WhatsApp') : t('Table bookings by phone only')}</p>
+                  )}
                   <p>{b.delivery_enabled ? t('Delivery {fee}', { fee: b.delivery_fee != null ? money(b.delivery_fee, tenant.currency_symbol) : t('(fee by zone)') }) : t('No delivery')} · {b.pickup_enabled ? t('Pickup') : t('No pickup')}{b.vat_percent != null ? ' · ' + t('VAT {v}%', { v: b.vat_percent }) : ''}</p>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
@@ -147,6 +153,30 @@ export default function BranchesPage() {
             <Field label={t('Pickup ready in (minutes)')}><Input type="number" value={edit.prep_minutes ?? ''} onChange={e => set('prep_minutes', num(e.target.value))} /></Field>
             <Field label={t('Areas it usually serves')} hint={t('For customers who type an area instead of sharing a pin.')} className="sm:col-span-2"><Input dir="rtl" value={edit.serves_hint_ar || ''} onChange={e => set('serves_hint_ar', e.target.value)} /></Field>
             <Field label={t('Note about prices')} className="sm:col-span-2"><Textarea dir="rtl" rows={2} value={edit.price_note_ar || ''} onChange={e => set('price_note_ar', e.target.value)} placeholder="الأسعار من غير ضريبة 14%" /></Field>
+            <div className="space-y-3 border-t border-hairline pt-4 sm:col-span-2">
+              <p className="flex items-center gap-2 text-sm font-medium"><CalendarDays className="size-4 text-gold" /> {t('Table bookings (dine-in)')}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={t('How this branch takes bookings')}>
+                  <Select value={edit.reservations || 'off'} onChange={e => set('reservations', e.target.value as Branch['reservations'])}>
+                    <option value="off">{t('No table bookings')}</option>
+                    <option value="whatsapp">{t('On WhatsApp — the agent takes them')}</option>
+                    <option value="phone">{t('By phone only — the agent gives the branch phone')}</option>
+                  </Select>
+                </Field>
+                {edit.reservations === 'whatsapp' && (
+                  <Field label={t('Largest group the agent books')} hint={t('Bigger groups are passed to the team. Empty = the restaurant’s default (20).')}>
+                    <Input type="number" min={1} value={edit.reservation_max_guests ?? ''} onChange={e => set('reservation_max_guests', num(e.target.value))} />
+                  </Field>
+                )}
+                {edit.reservations && edit.reservations !== 'off' && (
+                  <Field label={t('What the agent should tell customers about booking here')} hint={t('Optional, in Arabic.')} className="sm:col-span-2">
+                    <Input dir="rtl" value={edit.reservation_note_ar || ''} onChange={e => set('reservation_note_ar', e.target.value)}
+                      placeholder={edit.reservations === 'phone' ? 'الحجز في الفرع ده بالتليفون بس' : 'الترابيزات اللي على البحر محدودة'} />
+                  </Field>
+                )}
+              </div>
+              {edit.reservations === 'whatsapp' && <p className="text-xs text-muted">{t('The agent collects the day, time, number of people, name and any occasion, shows a summary, and after the customer says yes sends the request to this branch’s WhatsApp for new-order tickets and to Table bookings here. The customer is told it is confirmed only when your team presses Confirm.')}</p>}
+            </div>
           </div>
         )}
       </Drawer>

@@ -1,6 +1,6 @@
 'use client';
 import {
-  BarChart3, Bike, BookOpen, ChefHat, ChevronDown, LayoutDashboard, LogOut, Map, Megaphone, MessageCircle, Percent, Settings,
+  BarChart3, Bike, BookOpen, CalendarDays, ChefHat, ChevronDown, LayoutDashboard, LogOut, Map, Megaphone, MessageCircle, Percent, Settings,
   ShoppingBag, Store, Users, Menu as MenuIcon
 } from 'lucide-react';
 import Link from 'next/link';
@@ -18,6 +18,7 @@ const NAV = [
   { href: '', label: 'Overview', icon: LayoutDashboard },
   { href: '/orders', label: 'Orders', icon: ShoppingBag, badge: 'orders' as const },
   { href: '/inbox', label: 'Inbox', icon: MessageCircle, badge: 'inbox' as const },
+  { href: '/reservations', label: 'Table bookings', icon: CalendarDays, badge: 'bookings' as const },
   { href: '/menu', label: 'Menu', icon: ChefHat },
   { href: '/offers', label: 'Offers', icon: Percent },
   { href: '/growth', label: 'Get customers', icon: Megaphone },
@@ -36,22 +37,28 @@ export function Shell({ children }: { children: ReactNode }) {
   const toast = useToast();
   const [newOrders, setNewOrders] = useState(0);
   const [attention, setAttention] = useState(0);
+  // table bookings: shown once a branch takes them (or one is still waiting)
+  const [bookings, setBookings] = useState({ waiting: 0, on: false });
   const [mobileNav, setMobileNav] = useState(false);
   const [switcher, setSwitcher] = useState(false);
   const seen = useRef<Set<number>>(new Set());
+  const seenBookings = useRef<Set<number>>(new Set());
   const { t, lang } = useLang();
 
   // badges + the new-order alarm, on every page
   useEffect(() => {
     const db = sb();
     const counts = async () => {
-      const [o, c] = await Promise.all([
+      const [o, c, r, b] = await Promise.all([
         db.from('orders').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'placed'),
         db.from('conversations').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id)
-          .or('needs_attention.eq.true,and(mode.eq.human,unread_count.gt.0)')
+          .or('needs_attention.eq.true,and(mode.eq.human,unread_count.gt.0)'),
+        db.from('reservations').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'requested'),
+        db.from('branches').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('is_active', true).neq('reservations', 'off')
       ]);
       setNewOrders(o.count || 0);
       setAttention(c.count || 0);
+      setBookings({ waiting: r.count || 0, on: (b.count || 0) > 0 || (r.count || 0) > 0 });
     };
     counts();
     askNotificationPermission();
@@ -67,6 +74,16 @@ export function Shell({ children }: { children: ReactNode }) {
         counts();
       })
       .on('postgres_changes', { event: '*', schema: 'everwake', table: 'conversations', filter: `tenant_id=eq.${tenant.id}` }, () => counts())
+      .on('postgres_changes', { event: '*', schema: 'everwake', table: 'reservations', filter: `tenant_id=eq.${tenant.id}` }, (p) => {
+        const row = p.new as { id: number; status: string; ref_no: string; guests: number };
+        if (row && row.status === 'requested' && !seenBookings.current.has(row.id)) {
+          seenBookings.current.add(row.id);
+          chime();
+          notify(t('New table booking {ref}', { ref: row.ref_no }), t('{n} people', { n: row.guests }));
+          toast(t('New table booking {ref} — {n} people', { ref: row.ref_no, n: row.guests }), 'neutral');
+        }
+        counts();
+      })
       .subscribe();
     return () => { db.removeChannel(ch); };
   }, [tenant.id, tenant.currency_symbol, toast, t]);
@@ -76,15 +93,15 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const nav = (
     <nav className="flex flex-col gap-0.5 px-3">
-      {NAV.map(({ href, label, icon: Icon, badge }) => {
-        const n = badge === 'orders' ? newOrders : badge === 'inbox' ? attention : 0;
+      {NAV.filter(x => x.badge !== 'bookings' || bookings.on).map(({ href, label, icon: Icon, badge }) => {
+        const n = badge === 'orders' ? newOrders : badge === 'inbox' ? attention : badge === 'bookings' ? bookings.waiting : 0;
         return (
           <Link key={href} href={base + href} onClick={() => setMobileNav(false)}
             className={cx('flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
               active(href) ? 'bg-navy-soft text-white' : 'text-on-navy-muted hover:bg-navy-raised hover:text-white')}>
             <Icon className="size-4" />
             <span className="flex-1">{t(label)}</span>
-            {n > 0 && <span className={cx('rounded-full px-1.5 text-xs font-semibold', badge === 'orders' ? 'bg-gold text-navy ring-new' : 'bg-critical text-white')}>{n}</span>}
+            {n > 0 && <span className={cx('rounded-full px-1.5 text-xs font-semibold', badge === 'inbox' ? 'bg-critical text-white' : 'bg-gold text-navy ring-new')}>{n}</span>}
           </Link>
         );
       })}

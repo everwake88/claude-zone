@@ -17,6 +17,7 @@ it alone, or you do it with them on a call. Until they press **Go live**:
 | Where each branch delivers | The zone decides the fee, the minimum and the branch | **Delivery zones** — draw them on the map; list the area names customers type |
 | The commission the delivery apps take from them | The "saved commission" figure owners watch | Settings → **Ordering** |
 | The owner's WhatsApp number(s) and a time for the daily report | Their numbers every day without opening the dashboard | Settings → **Daily report** |
+| Dine-in: which branches take table bookings on WhatsApp, which only by phone, the largest group, and anything to tell customers (e.g. "the sea-view tables are limited") | The agent books a table in conversation and sends the request to the branch; or gives the number | **Branches** → a branch → *Table bookings*; rules on **Table bookings** |
 | Their own drivers: name and WhatsApp number, and which branches each drives for | Orders go to a driver; the customer hears who is coming and when they are close | **Drivers** — each gets a sign-in link on WhatsApp |
 | Payment methods they accept | The agent never promises anything else | Settings → **Ordering** |
 | The kitchen's WhatsApp for order tickets (per branch or one for all) | New orders as a WhatsApp message too | Branches / Settings → Ordering |

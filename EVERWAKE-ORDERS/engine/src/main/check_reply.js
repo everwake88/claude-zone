@@ -6,12 +6,13 @@
 // added to the cart twice) with the exact reason:
 //   · a number that is not a real price / total / fee / detail on file
 //   · saying the order is placed when place_order did not return PLACED
+//   · saying a table booking is confirmed (only the branch team confirms)
 //   · internal codes, ids or tool names leaking to the customer
 //   · a link that is not the restaurant's or the customer's own
 //   · menu pictures or a dish photo promised when none is being sent
 //   · far too long for WhatsApp
 // Facts it may ADD without asking: the order number after a placement,
-// when the host forgot to include it.
+// or the booking's reference after it was sent, when the host forgot it.
 // =====================================================================
 // @include shared/basics.js
 // @include shared/arabic.js
@@ -40,6 +41,8 @@ const toolsUsed = [];
 let placedNo = null, placedTotal = null;
 const toolNumbers = [];
 const toolProblems = [];
+const bookingTexts = [];
+let bookingRef = null;
 for (const st of steps) {
   const tool = str(obj(obj(st).action).tool);
   if (tool) toolsUsed.push(tool);
@@ -48,6 +51,13 @@ for (const st of steps) {
   if (Array.isArray(o)) o = o[0];
   if (!o || typeof o !== 'object') continue;
   if (o.response && typeof o.response === 'string') { try { o = JSON.parse(o.response); } catch (e) {} }
+  if (tool === 'manage_reservation') {
+    // the booking's day, time, guests, phone and reference are facts the host may repeat
+    bookingTexts.push(JSON.stringify(o));
+    if (str(o.status) === 'REQUESTED' && o.ref_no) bookingRef = str(o.ref_no);
+    for (const p of arr(o.problems)) toolProblems.push(p);
+    continue;
+  }
   if (str(o.status) === 'PLACED' && o.order_no) { placedNo = str(o.order_no); placedTotal = o.total; }
   for (const k of ['subtotal', 'discount_total', 'vat', 'vat_percent', 'delivery_fee', 'total', 'minimum', 'short_by'])
     if (o[k] != null) toolNumbers.push(num(o[k]));
@@ -125,7 +135,8 @@ for (const a of arr(ctx.saved_addresses)) addDigits(a.text);
 [100, 200, 250, 500, 750, 1000, 1500, 2000].forEach(add);
 const textPool = [pre.customer_message, pre.history_text, JSON.stringify(state.customer || {}), str(obj(db.last_placed).order_no),
                   placedNo, pre.wa_id, JSON.stringify(ctx.last_orders || null), JSON.stringify(ctx.customer || null),
-                  pre.facts_text].map(toWesternDigits).join(' ');
+                  pre.facts_text, JSON.stringify(ctx.reservation || null), JSON.stringify(ctx.reservations_upcoming || null),
+                  ...bookingTexts].map(toWesternDigits).join(' ');
 for (const m of textPool.match(/\d+(?:\.\d+)?/g) || []) add(Number(m));
 
 // ---- links the host may send ------------------------------------------------------------------
@@ -139,17 +150,32 @@ const violations = [];
 const joined = messages.join('\n');
 if (!joined) violations.push('The reply was empty — write the reply.');
 
-// placement claim without a placement
+// placement claim without a placement (a sentence about a table booking is judged below, not here)
+const BOOKING_WORDS = /(حجز|ترابيز|طاول|booking|reservation|\btable\b)/i;
+const orderText = joined.split(/(?<=[.؟?!\n])/).filter(x => !BOOKING_WORDS.test(x)).join('');
 const CLAIM = /(الأوردر|الاوردر|الطلب|طلبك|طلب حضرتك|أوردرك|اوردرك)[^.؟!\n]{0,25}(اتسجل|اتأكد|تم تأكيده|تم تسجيله|اتبعت للفرع|في الطريق)|(تم|اتعمل|اتم)\s*(تأكيد|تسجيل)\s*(الأوردر|الاوردر|الطلب)|order\s+(is|has been|was)\s+(placed|confirmed|sent)/i;
-if (!placedNo && CLAIM.test(joined)) {
+if (!placedNo && CLAIM.test(orderText)) {
   const known = [str(obj(db.last_placed).order_no)].concat(arr(ctx.last_orders).map(o => str(o.order_no))).filter(Boolean);
   if (!known.some(no => joined.includes(no))) {
     violations.push('The reply says the order is placed/confirmed, but place_order did NOT return PLACED this turn. Do not claim it — say what is actually next (e.g. the summary to confirm, or what is still missing).');
   }
 }
 
+// a table booking is confirmed by the branch team, never by the host
+const BOOKED = /(تم|اتم|اتعمل)\s*(تأكيد\s*)?(الحجز|حجزك|حجز حضرتك|حجزكم)|(الحجز|حجزك|حجز حضرتك|حجزكم|الترابيزة|ترابيزتك)\s*(اتأكد|اتأكدت|اتثبت|مؤكد|متأكد|تمام ومتأكد)|اتحجز(ت|تلك|تلكم)?(?![\u0600-\u06FF])|حجزت(لك|لكم|لكو)|حجزنا(لك|لكم|لكو)|(booking|reservation|table)\s+(is|has been|was)\s+(confirmed|booked|reserved)|(you'?re|you are)\s+(all\s+)?booked/i;
+const NOT_YET = /(?<!\p{L})(مش|مو|لسه|لسا|لما|عشان|علشان|بعد ما|أول ما|اول ما|not|once|until|will|pending)(?!\p{L})|(?<!\p{L})(هيت|هيأ|هيك|هير|هنت|هنأ|هنك|يأكد|يتأكد|بيأكد|للتأكيد)|n't/iu;
+const confirmedBooking = arr(ctx.reservations_upcoming).some(x => str(obj(x).status) === 'confirmed');
+if (!confirmedBooking) {
+  const said = joined.split(/(?<=[.؟?!\n])/).find(x => BOOKED.test(x) && !NOT_YET.test(x));
+  if (said) {
+    violations.push('The reply says the table booking is booked or confirmed — it is not: ' + (bookingRef
+      ? 'it was just SENT to the branch team, who will contact the customer to confirm it. Say that, with the reference number.'
+      : 'only the branch team confirms a booking after it is sent. Say what is actually next.'));
+  }
+}
+
 // internal leakage
-const LEAK = /\bM\d{3,5}\b|\bP\d+-M\d{3,5}\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-|\bmanage_cart\b|\bsave_customer_details\b|\bpending_id\b|\bline_id\b|\bmenu_id\b|\bset_branch\b|\bplace_order\b|\breorder_last\b|\bapply_code\b|\buse_saved_address\b|\bsaved_address\b|\bitems_json\b|\bdetails_json\b|\bjson\b|\bundefined\b|\bNaN\b|\bnull\b/i;
+const LEAK = /\bM\d{3,5}\b|\bP\d+-M\d{3,5}\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-|\bmanage_cart\b|\bsave_customer_details\b|\bpending_id\b|\bline_id\b|\bmenu_id\b|\bset_branch\b|\bplace_order\b|\breorder_last\b|\bapply_code\b|\buse_saved_address\b|\bsaved_address\b|\bitems_json\b|\bdetails_json\b|\bmanage_reservation\b|\bsummary_text\b|\bref_no\b|\bready_for_summary\b|\bjson\b|\bundefined\b|\bNaN\b|\bnull\b/i;
 const leak = joined.match(LEAK);
 if (leak) violations.push(`The reply shows an internal code or word ("${leak[0]}") — say it in plain words for the customer.`);
 
@@ -206,6 +232,12 @@ if (placedNo && !joined.includes(placedNo) && messages.length) {
   messages[messages.length - 1] += (en ? `\nOrder number: ${placedNo}` : `\nرقم الأوردر: ${placedNo}`);
 }
 
+// a booking sent to the branch always carries its reference
+if (bookingRef && !joined.includes(bookingRef) && messages.length) {
+  const en = /^[\x00-\x7F\s\p{P}\p{Emoji}]*$/u.test(messages[messages.length - 1]);
+  messages[messages.length - 1] += (en ? `\nBooking reference: ${bookingRef}` : `\nرقم طلب الحجز: ${bookingRef}`);
+}
+
 const handoff = obj(decision.handoff);
 return [{
   json: {
@@ -222,6 +254,8 @@ return [{
     tools_used: toolsUsed,
     tool_problems: toolProblems,
     order_placed_no: placedNo,
+    booking_requested_ref: bookingRef,
+    booking_confirmed: confirmedBooking,
     cart_items_after: items.length,
     pending_after: pending.length,
     branch_after: branchId || null,

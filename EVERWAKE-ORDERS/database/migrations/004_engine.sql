@@ -674,6 +674,14 @@ begin
                 from everwake.pause_contacts pc join everwake.agent_pauses ap on ap.id = pc.pause_id
                where pc.tenant_id = p_tenant and pc.wa_id = p_wa and pc.last_message_at > now() - interval '24 hours'
                order by pc.last_message_at desc limit 1),
+    -- table bookings (010): the rules, the one in progress, and what is coming up
+    'reservation_setup', everwake.reservation_setup(p_tenant),
+    'reservation', (select everwake.reservation_view(x) from everwake.reservations x
+                     where x.tenant_id = p_tenant and x.wa_id = p_wa and x.status = 'draft'),
+    'reservations_upcoming', coalesce((select jsonb_agg(everwake.reservation_view(x) order by x.reserved_for)
+                                         from everwake.reservations x
+                                        where x.tenant_id = p_tenant and x.wa_id = p_wa and x.status in ('requested', 'confirmed')
+                                          and x.reserved_for > now() - interval '3 hours'), '[]'::jsonb),
     'all_lookup', coalesce(v_all.lookup, '{}'::jsonb),
     'all_digest', coalesce(v_all.digest_text, ''),
     'branch_lookup', coalesce(v_br.lookup, '{}'::jsonb),

@@ -23,16 +23,17 @@ rows in the database, not a copy of the workflows.
 | Folder | What it is |
 |---|---|
 | `database/` | The schema, every function the engine and the dashboard call, row-level security, a demo restaurant, the importer that moves an old Seagull-style client over (`tools/`), and the SQL tests |
-| `engine/` | The n8n workflows. Code lives in `src/` (one file per Code node) and `prompts/`; `build.mjs` writes the four importable workflows to `dist/` |
-| `dashboard/` | The restaurant dashboard (Next.js + Supabase): live orders, inbox with takeover, menu, AI menu import, offers, branches, delivery zones, customers, analytics, settings |
+| `engine/` | The n8n workflows. Code lives in `src/` (one file per Code node) and `prompts/`; `build.mjs` writes the five importable workflows to `dist/` |
+| `dashboard/` | The restaurant dashboard (Next.js + Supabase): live orders, inbox with takeover, table bookings, menu, AI menu import, offers, branches, delivery zones, drivers, customers, analytics, settings |
 | `docs/` | How it works, how to set it up, how to sign up a restaurant, how to run it |
 
 ## What a restaurant gets
 
-- **The agent** answers in Egyptian Arabic or English. It knows every dish, every choice, every branch's prices and hours. It finds the delivery zone from a location pin (or the area name), applies the offers, and never invents a price. It remembers each customer's last order and addresses, whether they come back by number or by the private ID WhatsApp sometimes shows instead. It sends a dish's photo when someone wants to see it, and the menu when asked.
+- **The agent** answers in Egyptian Arabic or English. It knows every dish, every choice, every branch's prices and hours. It finds the delivery zone from a location pin (or the area name), applies the offers, and never invents a price. It remembers each customer's last order and addresses, whether they come back by number or by the private ID WhatsApp sometimes shows instead. It sends a dish's photo when someone wants to see it, and the menu when asked. At restaurants with dine-in it books a table in conversation and sends the request to the branch to confirm.
 - **The dashboard**
   - Live order board that rings for new orders. Every step (accepted, out for delivery…) is sent to the customer on WhatsApp.
   - Inbox of every conversation. Take over a chat, reply, hand it back; the agent reads what you wrote and carries on.
+  - Table bookings: the requests the agent took, to confirm or decline after a call — the customer hears it on WhatsApp.
   - Menu editor with an out-of-stock switch (for an hour, for today, or until switched back), per-branch prices and photos.
   - AI menu import from a PDF, photos, a link, pasted text or a spreadsheet.
   - Offers and promo codes, branches with hours and a "too busy" pause, delivery zones drawn on a map, customers, analytics with "commission saved", and every automatic message in the restaurant's own words.

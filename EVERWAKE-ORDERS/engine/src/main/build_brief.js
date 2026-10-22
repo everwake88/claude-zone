@@ -198,6 +198,62 @@ if (savedAddresses.length) {
 }
 const profileName = str(customer.full_name);
 
+// ---- table bookings ----------------------------------------------------------------------------
+const rsv = obj(ctx.reservation_setup);
+const rsvBranches = arr(rsv.branches);
+const rsvWa = rsvBranches.filter(b => b.mode === 'whatsapp');
+const rsvPhone = rsvBranches.filter(b => b.mode === 'phone');
+const draft = ctx.reservation && typeof ctx.reservation === 'object' ? ctx.reservation : null;
+const upcoming = arr(ctx.reservations_upcoming);
+const RSV_STATUS = {
+  requested: 'REQUESTED — sent to the branch team, who contact the customer to confirm it (NOT confirmed yet)',
+  confirmed: 'CONFIRMED by the branch team'
+};
+const RSV_NEED = { branch: 'which branch', date: 'the day', time: 'the time', guests: 'how many people', full_name: 'the name', phone: 'a phone number' };
+const bookingLines = [];
+if (!rsvBranches.length && !upcoming.length) {
+  bookingLines.push('TABLE BOOKINGS: not taken on WhatsApp — someone who wants a table: a team member follows up (handoff)');
+} else {
+  bookingLines.push('TABLE BOOKINGS (dine-in — not an order: no cart, no prices):');
+  if (rsvWa.length) {
+    const [yy, mm, dd] = now.date.split('-').map(Number);
+    const days = Array.from({ length: 8 }, (_, i) => {
+      const iso = new Date(Date.UTC(yy, mm - 1, dd + i)).toISOString().slice(0, 10);
+      return `${i === 0 ? 'today ' : i === 1 ? 'tomorrow ' : ''}${DAY_AR[DAYS[(now.day + i) % 7]] || ''} ${iso}`;
+    });
+    bookingLines.push(`- taken here on WhatsApp (manage_reservation) at: ${rsvWa.map(b => `${b.name_ar} (code ${b.code}, up to ${num(b.max_guests)} guests${b.note ? ' — ' + b.note : ''})`).join(' · ')}`);
+    bookingLines.push(`- rules: at least ${num(rsv.lead_minutes, 60)} min ahead · up to ${num(rsv.days_ahead, 30)} days ahead · within the branch's opening hours`);
+    bookingLines.push(`- the coming days (for the date field): ${days.join(' · ')}`);
+    if (arr(rsv.occasions).length) bookingLines.push(`- occasions people book for here: ${arr(rsv.occasions).join('، ')} (optional — never required)`);
+  } else {
+    bookingLines.push('- NOT taken on WhatsApp');
+  }
+  if (rsvPhone.length) {
+    bookingLines.push(`- by phone only — give the number, do not take the booking: ${rsvPhone.map(b => `${b.name_ar} ${b.phone || '(number not on file)'}${b.note ? ' — ' + b.note : ''}`).join(' · ')}`);
+  }
+  if (draft) {
+    const waLocal = str(customer.phone || intake.wa_id).replace(/^20(\d{10})$/, '0$1');
+    const parts = [
+      draft.branch ? `branch ${draft.branch}` : '',
+      draft.date ? `date ${draft.date} (${draft.day})` : '',
+      draft.time ? `time ${draft.time} (${draft.time_ar})` : '',
+      draft.guests ? `${draft.guests} guests` : '',
+      draft.occasion ? `occasion: ${draft.occasion}` : '',
+      draft.full_name ? `name ${draft.full_name}` : '',
+      draft.phone ? `phone ${draft.phone}${draft.phone === waLocal ? ' (their WhatsApp number — the summary shows it; another only if they give one)' : ''}` : '',
+      draft.requests ? `special requests: ${draft.requests}` : ''
+    ].filter(Boolean);
+    const need = Object.keys(RSV_NEED).filter(k => !draft[k]).map(k => RSV_NEED[k]);
+    bookingLines.push(`- BOOKING IN PROGRESS: ${parts.join(' · ') || 'just started'}`);
+    bookingLines.push(`  still needed: ${need.length ? need.join(' · ') : 'nothing — ready for the summary'} · summary: ${draft.summary || 'not shown yet'}`);
+  }
+  if (upcoming.length) {
+    bookingLines.push('- THEIR BOOKINGS:');
+    upcoming.forEach(u => bookingLines.push(`  ${u.ref_no} · ${u.branch || ''} · ${u.day || ''} ${u.time_ar || ''} · ${num(u.guests)} guests`
+      + `${u.occasion ? ' · ' + u.occasion : ''} · ${RSV_STATUS[u.status] || u.status}`));
+  }
+}
+
 // ---- conversation -------------------------------------------------------------------------------
 const spokeBefore = recent.some(m => m.direction === 'outbound');
 let gapH = null;
@@ -287,6 +343,8 @@ const facts = [
   `DISH PHOTOS: ${photoCodes.length ? `dishes marked 📷 in the MENU have a photo you can send (send_item_photos)${photosSent.length ? '; already sent: ' + photosSent.join(', ') : ''}` : 'none uploaded'}`,
   `RULED OUT BY THE CUSTOMER (food_prefs): ${str(details.food_prefs) || 'nothing — everything is open'}`,
   `PAYMENT METHODS YOU MAY PROMISE: ${arr(settings.payment_methods).join(', ') || 'cash'} (anything else: the branch confirms)`,
+  '',
+  ...bookingLines,
   memory.length ? 'NOTES FROM EARLIER IN THIS CONVERSATION:\n' + memory.map(m => '- ' + m).join('\n') : ''
 ].filter(x => x !== '').join('\n');
 
@@ -370,6 +428,8 @@ return [{
     menu_pages_available: pageCount,
     menu_already_sent: menuSentFor.includes(menuKey),
     photo_codes: photoCodes,
+    reservations_on_whatsapp: rsvWa.length > 0,
+    reservation_in_progress: !!draft,
     facts_text: factsText,
     business_text: businessText,
     menu_text: menuSafe,

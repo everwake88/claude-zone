@@ -24,8 +24,12 @@ You need:
    database/migrations/005_operations.sql
    database/migrations/006_dashboard.sql
    database/migrations/007_security.sql
+   database/migrations/008_drivers.sql
+   database/migrations/009_growth.sql
+   database/migrations/010_reservations.sql
    database/migrations/090_supabase.sql      ← storage buckets + live updates (Supabase only)
    ```
+   Or paste `everwake_supabase_setup.sql` (all of them in one file) and run it once.
    With `psql`:
    ```sh
    for f in database/migrations/0*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done
@@ -85,16 +89,18 @@ You now see every restaurant in the switcher.
      - Supabase's direct host is IPv6-only, so from most VPSs use the **Session pooler**: host `aws-0-<region>.pooler.supabase.com`, port `5432`, user `postgres.<project-ref>`, your database password, SSL on.
    - **OpenAI** — the account the Seagull agent already uses is fine.
    - **Header Auth → name it "Everwake Outbox Secret".** Header name `x-everwake-secret`; value = the same string as the dashboard's `N8N_OUTBOX_SECRET`.
-2. **Import the four workflows** from `engine/dist/`, in this order:
+2. **Import the five workflows** from `engine/dist/`, in this order:
    1. `everwake-tool-manage-cart.json`
    2. `everwake-tool-save-customer-details.json`
-   3. `everwake-outbox.json`
-   4. `everwake-main.json`
+   3. `everwake-tool-manage-reservation.json`
+   4. `everwake-outbox.json`
+   5. `everwake-main.json`
 3. **In "Everwake — Main (Brain + Agent)":**
-   - Open the **manage_cart** and **save_customer_details** tool nodes, which show `SET_AFTER_IMPORT`, and pick the two tool workflows you just imported.
+   - Open the **manage_cart**, **save_customer_details** and **manage_reservation** tool nodes, which show `SET_AFTER_IMPORT`, and pick the three tool workflows you just imported.
    - Pick the **Everwake DB** credential on every Postgres node, and your OpenAI credential on Brain Model, Agent Model and Rewrite Model. n8n lists the nodes missing a credential.
 4. **In "Everwake — Outbox + Housekeeping":** pick **Everwake DB** on the Postgres nodes and **Everwake Outbox Secret** on *Ping From Dashboard*.
-5. **Activate** Main and Outbox. The two tools are called by Main and need no activation.
+5. **Activate** Main and Outbox. The three tools are called by Main and need no activation.
+   Each tool workflow has one Postgres node: pick **Everwake DB** on it too.
 6. *(Busy platform)* Run n8n in **queue mode** with a couple of workers once you pass a handful of restaurants. The debounce and conversation locks already make concurrent runs safe.
 
 The workflows are generated. To change the engine:
@@ -166,6 +172,34 @@ Things to know:
   platform should switch to a paid tile service (MapTiler, Stadia, Carto).
 - On the official WhatsApp Cloud API, messages to a driver who has not written
   to the restaurant in 24 hours need an approved template.
+
+## Table bookings (dine-in)
+
+Each branch chooses how it takes bookings (Branches → a branch → *Table bookings*):
+- **No table bookings** — the default. Someone asking for a table is passed to the team.
+- **On WhatsApp** — the agent takes the booking itself.
+- **By phone only** — the agent gives the branch's phone number and the note you
+  write (e.g. "الحجز في الفرع ده بالتليفون بس"); it never takes the booking.
+
+On WhatsApp the agent gathers the branch, day, time and number of people in
+one natural question, then the name with a light optional line about an
+occasion or anything to prepare — never a form, never one field per message.
+Their WhatsApp number is already the booking's number. Every value is checked
+(at least an hour ahead, up to 30 days ahead, while the branch is open, no more
+guests than the branch seats); then the customer sees a summary, and only a
+clear yes to that summary sends it. Sending it:
+- puts a ticket with the customer's details on the branch's WhatsApp for
+  new-order tickets (or the restaurant's), with the reference (e.g. NG-R1001);
+- shows it on the dashboard's **Table bookings** page, which rings like a new order.
+
+The team calls the customer and presses **Confirm**: that is when the customer
+hears on WhatsApp that the table is theirs. The agent never says a booking is
+confirmed before that (a rail in Check Reply rewrites a reply that does).
+**Decline** (with an optional reason) offers them another time; after the day,
+mark **Arrived** or **Did not come**. A customer can cancel on WhatsApp, and the
+branch is told. **Booking rules** on that page sets the largest group, how far
+ahead, and the occasions the agent may mention. The daily report counts the
+requests and how many still wait for the team.
 
 ## Growth and reports
 

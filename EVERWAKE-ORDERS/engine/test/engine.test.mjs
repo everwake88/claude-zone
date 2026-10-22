@@ -326,6 +326,96 @@ test('moved over from Seagull: known by number or private id, and "same as last 
   assert.equal((await sql(db, `select order_no_prefix || '-' || (order_seq + 1) as r from everwake.tenants where id = $1`, [tenant])).r, 'SG-1044');
 });
 
+test('a table booking: asked in two natural steps, a summary, sent to the branch team, never "confirmed" by the host', async () => {
+  const phone = '201055556666';
+  const tenant = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  await db.query(`update everwake.branches set reservations = 'whatsapp', reservation_max_guests = 10 where tenant_id = $1 and code = 'zamalek'`, [tenant]);
+  await db.query(`update everwake.branches set reservations = 'phone', reservation_note_ar = 'الحجز بالتليفون بس' where tenant_id = $1 and code <> 'zamalek'`, [tenant]);
+  const tomorrow = (await sql(db, `select to_char((now() at time zone 'Africa/Cairo')::date + 1, 'YYYY-MM-DD') as r`)).r;
+
+  // 1. "a table tomorrow": the day is saved, the rest is asked together
+  let t = await turn(db, evolutionPayload({ phone, pushName: 'Karim', text: 'عايز أحجز ترابيزة بكرة' }), async (brief) => {
+    assert.match(brief.facts_text, /TABLE BOOKINGS \(dine-in/);
+    assert.match(brief.facts_text, /taken here on WhatsApp \(manage_reservation\) at: الزمالك \(code zamalek, up to 10 guests\)/);
+    assert.match(brief.facts_text, /by phone only — give the number, do not take the booking: .*الحجز بالتليفون بس/);
+    assert.ok(brief.facts_text.includes(`tomorrow `) && brief.facts_text.includes(tomorrow), 'the coming days, for the date');
+    assert.equal(brief.reservations_on_whatsapp, true);
+    return {
+      plan: { stage: 'reservation', objective: 'start the booking', actions: [{ tool: 'manage_reservation', do: `update date ${tomorrow}` }] },
+      tools: [{ tool: 'manage_reservation', action: 'update', details: JSON.stringify({ date: tomorrow }) }],
+      reply: quiet('أكيد! بكرة في فرع الزمالك؟ تحب الساعة كام، وهتكونوا كام شخص؟')
+    };
+  });
+  assert.equal(t.steps[0].result.status, 'SAVED', JSON.stringify(t.steps[0].result));
+  assert.deepEqual(t.steps[0].result.missing, ['branch', 'time', 'guests', 'full_name']);
+  assert.deepEqual(t.checked.violations, []);
+
+  // 2. branch, time, guests and the occasion in one answer
+  t = await turn(db, evolutionPayload({ phone, text: 'الزمالك الساعة 9 بالليل، هنكون 4، عيد ميلاد مراتي' }), async (brief) => {
+    assert.match(brief.facts_text, new RegExp(`BOOKING IN PROGRESS: date ${tomorrow}`));
+    assert.match(brief.facts_text, /phone 01055556666 \(their WhatsApp number/);
+    assert.match(brief.facts_text, /still needed: which branch · the time · how many people · the name · summary: not shown yet/);
+    return {
+      plan: { stage: 'reservation', actions: [{ tool: 'manage_reservation', do: 'update branch zamalek, time 21:00, guests 4, occasion عيد ميلاد' }] },
+      tools: [{ tool: 'manage_reservation', action: 'update', details: { branch: 'الزمالك', time: '21:00', guests: 4, occasion: 'عيد ميلاد' } }],
+      reply: quiet('كل سنة وهي طيبة 🎉 الحجز يكون باسم مين؟ ولو حابب نجهز حاجة مخصوص للمناسبة قولي.')
+    };
+  });
+  assert.deepEqual(t.steps[0].result.missing, ['full_name']);
+  assert.equal(t.steps[0].result.reservation.time_ar, '9:00 مساءً');
+  assert.deepEqual(t.checked.violations, []);
+
+  // 3. the name and a request: the summary, shown as the tool wrote it
+  t = await turn(db, evolutionPayload({ phone, text: 'باسم كريم، ولو ينفع ترابيزة جنب الشباك' }), async () => ({
+    plan: { stage: 'reservation', actions: [{ tool: 'manage_reservation', do: 'update full_name كريم, requests' }, { tool: 'manage_reservation', do: 'summary' }] },
+    tools: [{ tool: 'manage_reservation', action: 'update', details: { full_name: 'كريم', requests: 'ترابيزة جنب الشباك' } },
+            { tool: 'manage_reservation', action: 'summary' }],
+    reply: (steps) => quiet(`${steps[1].result.summary_text}\n\nكده تمام أبعته للفرع؟`)
+  }));
+  assert.equal(t.steps[1].result.status, 'SUMMARY_READY');
+  assert.match(t.checked.decision.reply_messages[0], /👥 4 أشخاص\n🎉 المناسبة: عيد ميلاد\n👤 باسم: كريم · 📞 01055556666\n📝 طلبات خاصة: ترابيزة جنب الشباك/);
+  assert.deepEqual(t.checked.violations, [], 'the day, the time and the phone are facts');
+
+  // 4. yes: sent to the branch team with the customer's details; the reference is added when the host forgets it
+  t = await turn(db, evolutionPayload({ phone, text: 'تمام ابعته' }), async (brief) => {
+    assert.match(brief.facts_text, /summary: shown and still matches/);
+    return {
+      plan: { stage: 'reservation', actions: [{ tool: 'manage_reservation', do: 'submit' }] },
+      tools: [{ tool: 'manage_reservation', action: 'submit' }],
+      reply: quiet('تمام! بعتنا طلب الحجز لفرع الزمالك، وهيكلموك يأكدوا معاك قريب.')
+    };
+  });
+  const ref = t.steps[0].result.ref_no;
+  assert.equal(t.steps[0].result.status, 'REQUESTED');
+  assert.match(ref, /^NG-R\d+$/);
+  assert.deepEqual(t.checked.violations, []);
+  assert.ok(t.checked.decision.reply_messages.at(-1).endsWith(`رقم طلب الحجز: ${ref}`), t.checked.decision.reply_messages.join('|'));
+  const ticket = (await sql(db, `select body as r from everwake.outbox where purpose = 'order_ticket' and body like $1`, [`🍽 طلب حجز ترابيزة ${ref}%`])).r;
+  assert.match(ticket, /🏪 فرع الزمالك[\s\S]*👥 4 أشخاص · 🎉 عيد ميلاد\n👤 كريم · 📞 01055556666\n📝 ترابيزة جنب الشباك/);
+
+  // 5. "is it confirmed?" — it is not, and a reply that says so is rewritten
+  t = await turn(db, evolutionPayload({ phone, text: 'هو الحجز اتأكد؟' }), async (brief) => {
+    assert.match(brief.facts_text, new RegExp(`THEIR BOOKINGS:\\n  ${ref} · الزمالك · .* 9:00 مساءً · 4 guests · عيد ميلاد · REQUESTED`));
+    assert.doesNotMatch(brief.facts_text, /BOOKING IN PROGRESS/);
+    return { plan: { stage: 'reservation' }, reply: quiet('أيوه حجزك اتأكد ✅ مستنيينك بكرة!'),
+             rewrite: [`لسه الفرع هيكلمك يأكد الحجز ${ref} — أول ما يأكدوا هيوصلك تأكيد هنا.`] };
+  });
+  assert.equal(t.checked.repair_used, true);
+  assert.match(t.nodes['Check Reply'].violations[0], /booked or confirmed/);
+  assert.match(t.checked.decision.reply_messages[0], /^لسه الفرع هيكلمك/);
+
+  // 6. the team confirms on the dashboard: the customer hears it, and now the host may say so
+  const rid = (await sql(db, `select id as r from everwake.reservations where ref_no = $1`, [ref])).r;
+  await sql(db, `select everwake.set_reservation_status($1, 'confirmed') as r`, [rid]);
+  assert.ok((await sql(db, `select count(*)::int as r from everwake.outbox where wa_id = $1 and purpose = 'order_status' and body like 'تم تأكيد حجزك ✅%'`, [phone])).r === 1);
+  t = await turn(db, evolutionPayload({ phone, text: 'تمام شكراً' }), async (brief) => {
+    assert.match(brief.facts_text, /CONFIRMED by the branch team/);
+    return { plan: { stage: 'reservation' }, reply: quiet('العفو! حجزك متأكد، مستنيينك بكرة 🎉') };
+  });
+  assert.deepEqual(t.checked.violations, []);
+  await db.query(`update everwake.branches set reservations = 'off', reservation_note_ar = null where tenant_id = $1`, [tenant]);
+});
+
 test('normalize: groups, reactions, voice notes and the restaurant\'s own phone', async () => {
   const group = evolutionPayload({ phone: '201000', text: 'hi' });
   group.body.data.key.remoteJid = '1203630@g.us';
