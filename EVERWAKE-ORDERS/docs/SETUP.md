@@ -28,6 +28,7 @@ You need:
    database/migrations/009_growth.sql
    database/migrations/010_reservations.sql
    database/migrations/011_payments.sql
+   database/migrations/012_branch_differences.sql
    database/migrations/090_supabase.sql      ← storage buckets + live updates (Supabase only)
    ```
    Or paste `everwake_supabase_setup.sql` (all of them in one file) and run it once.

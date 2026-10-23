@@ -12,7 +12,7 @@
 //   · a typed area is matched to a delivery zone (in the persist query)
 //   · a phone typed for the order is remembered as this customer's, so a
 //     customer hidden behind a WhatsApp private id is found by it later
-//   · payment methods are the ones this restaurant accepts
+//   · payment methods are the ones the customer's branch takes
 // The branch is NOT a field here — manage_cart set_branch re-prices.
 // =====================================================================
 // @include shared/basics.js
@@ -54,7 +54,12 @@ const ledger = obj(state.ledger);
 const prevLog = arr(ledger.details_log);
 const prevAsked = obj(ledger.asked);
 const nowIso = new Date().toISOString();
-const PAY_OK = arr(settings.payment_methods).map(s => str(s).toLowerCase());
+// each branch takes its own payment methods; before a branch is chosen, what any branch takes
+const payByBranch = obj(db.payment_methods_by_branch);
+const branchNow = str(obj(state.branch).id);
+const PAY_OK = (branchNow && Array.isArray(payByBranch[branchNow]) ? payByBranch[branchNow]
+  : (Object.keys(payByBranch).length ? [...new Set(Object.values(payByBranch).flatMap(arr))] : arr(settings.payment_methods)))
+  .map(s => str(s).toLowerCase());
 
 const accepted = {};
 const cleared = [];
@@ -128,7 +133,7 @@ for (const [k, v] of Object.entries(incoming)) {
     if ((pm === 'card' || pm === 'wallet') && PAY_OK.includes('online') && !PAY_OK.includes(pm)) pm = 'online';
     if (!['cash', 'card', 'wallet', 'instapay', 'online'].includes(pm)) { rejected.push({ field: k, reason: 'MUST_BE cash|card|wallet|instapay|online' }); continue; }
     if (PAY_OK.length && !PAY_OK.includes(pm)) {
-      rejected.push({ field: k, reason: 'NOT_ACCEPTED_BY_THE_RESTAURANT', accepted: PAY_OK }); continue;
+      rejected.push({ field: k, reason: branchNow ? 'NOT_TAKEN_AT_THIS_BRANCH' : 'NOT_ACCEPTED_BY_THE_RESTAURANT', accepted: PAY_OK }); continue;
     }
     accepted[k] = pm; continue;
   }

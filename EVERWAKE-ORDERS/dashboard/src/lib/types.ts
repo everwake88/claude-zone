@@ -63,6 +63,8 @@ export interface Branch {
   max_delivery_km: number | null; vat_percent: number | null; price_note_ar: string | null; prep_minutes: number | null;
   delivery_eta_text: string | null; serves_hint_ar: string | null; seasonal: boolean; is_active: boolean; sort: number;
   reservations: 'off' | 'whatsapp' | 'phone'; reservation_note_ar: string | null; reservation_max_guests: number | null;
+  // branches that differ (012): seating (null = not said), and its own payment methods (null = the restaurant's)
+  dine_in: boolean | null; payment_methods: string[] | null;
 }
 
 export type ReservationStatus = 'requested' | 'confirmed' | 'declined' | 'cancelled' | 'seated' | 'no_show';
@@ -84,6 +86,7 @@ export interface Zone {
 export interface Category {
   id: string; tenant_id: string; name_ar: string; name_en: string | null; description_ar: string | null;
   available_from: string | null; available_to: string | null; is_active: boolean; sort: number;
+  branch_ids: string[] | null;   // null = every branch
 }
 
 export interface Item {
@@ -105,6 +108,10 @@ export interface Option {
 export interface ItemBranch {
   tenant_id: string; item_id: string; branch_id: string; is_listed: boolean; price: number | null;
   is_available: boolean; sold_out_until: string | null;
+}
+// a choice at one branch: its own price, or not offered there
+export interface OptionBranch {
+  tenant_id: string; option_id: string; branch_id: string; item_id: string; price_delta: number | null; is_available: boolean;
 }
 export interface ItemMedia { id: string; tenant_id: string; item_id: string; url: string; storage_path: string | null; mime: string; is_primary: boolean; sort: number }
 export interface MenuMedia {
@@ -217,7 +224,7 @@ export interface MenuImport {
   id: string; tenant_id: string; source_kind: 'pdf' | 'image' | 'url' | 'text' | 'csv'; source_url: string | null;
   files: { path: string; mime: string; name: string }[]; raw_text: string | null;
   status: 'uploaded' | 'extracting' | 'review' | 'published' | 'failed'; extracted: ExtractedMenu | null; error: string | null;
-  created_at: string; published_at: string | null;
+  created_at: string; published_at: string | null; branch_id: string | null;
 }
 export interface ExtractedChoice { name_ar: string; name_en: string | null; price_delta: number }
 export interface ExtractedGroup { label_ar: string; label_en: string | null; required: boolean; min: number; max: number | null; choices: ExtractedChoice[] }

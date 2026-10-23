@@ -57,6 +57,9 @@ const branchSource = str(obj(state.branch).source);
 const bStatus = branch ? branchStatus(branch, now, tz) : null;
 const SOURCE_TEXT = { zone: 'automatically from their location pin', only_branch: 'the restaurant has one branch',
                       agent: 'during this conversation', gps: 'automatically from their location pin' };
+// each branch takes its own payment methods (the restaurant's when it set none)
+const payOf = (b) => arr(b && b.payment_methods).length ? arr(b.payment_methods).map(str) : arr(settings.payment_methods).map(str);
+const seating = (b) => b.dine_in === true ? 'seating: yes (they can eat there)' : (b.dine_in === false ? 'NO seating — delivery and pickup only' : '');
 
 // ---- order type, zone, fee ---------------------------------------------------
 const dm = str(details.delivery_method).toLowerCase();
@@ -129,6 +132,8 @@ const missing = arr(REQ[mode] || ['phone_confirmed', 'full_name', 'delivery_meth
   .filter(f => !(f === 'address_street' && hasPin))
   .filter(f => !str(details[f]));
 if (!branchId) missing.push('branch');
+const payNotTaken = branch && str(details.payment_method) && !payOf(branch).includes(str(details.payment_method)) ? str(details.payment_method) : '';
+if (payNotTaken && !missing.includes('payment_method')) missing.push('payment_method');
 if (mode === 'delivery' && zonesDrawn && settings.require_zone_for_delivery !== false && !zoneHere) missing.push('delivery_area');
 const pinAddress = hasPin && str(details.address_source) === 'pin';
 const pinAddressUnconfirmed = pinAddress && str(details.address_confirmed) !== 'yes';
@@ -177,6 +182,20 @@ const PAY_FACT = {
   cash: 'cash', card: 'card on delivery', wallet: 'mobile wallet on delivery', instapay: 'InstaPay',
   online: 'online (payment_method "online": a secure payment link by card or mobile wallet, sent right after the order is placed)'
 };
+const PAY_SHORT = { cash: 'cash', card: 'card on delivery', wallet: 'mobile wallet on delivery', instapay: 'InstaPay', online: 'online payment link' };
+const payNames = (list, long) => list.map(m => (long ? PAY_FACT : PAY_SHORT)[m] || m).join(', ') || 'cash';
+let payFact;
+if (branch) {
+  payFact = `PAYMENT METHODS YOU MAY PROMISE at ${branch.name_ar}: ${payNames(payOf(branch), true)} (anything else: the branch confirms)`;
+} else {
+  const lists = branches.map(b => [b, payOf(b)]);
+  payFact = lists.length > 1 && lists.some(([, l]) => l.join() !== lists[0][1].join())
+    ? `PAYMENT METHODS YOU MAY PROMISE — each branch its own: ${lists.map(([b, l]) => `${b.name_ar}: ${payNames(l, false)}`).join(' · ')}`
+      + (lists.some(([, l]) => l.includes('online')) ? ' · online = payment_method "online": a secure payment link by card or mobile wallet, sent right after the order is placed' : '')
+      + ' (anything else: the branch confirms)'
+    : `PAYMENT METHODS YOU MAY PROMISE: ${payNames(lists.length ? lists[0][1] : arr(settings.payment_methods), true)} (anything else: the branch confirms)`;
+}
+if (payNotTaken) payFact += `\n  ⚠ the payment method on file (${PAY_SHORT[payNotTaken] || payNotTaken}) is NOT taken at ${branch.name_ar} — ask how they will pay instead`;
 const payLine = (o) => {
   if (o.payment_method !== 'online' && (!o.payment_status || o.payment_status === 'none')) return '';
   const p = obj(o.payment);
@@ -327,6 +346,7 @@ const facts = [
   `BRANCH: ${branch
     ? `${branch.name_ar} (code ${branch.code}) — chosen ${SOURCE_TEXT[branchSource] || 'earlier'} · ${bStatus.text}`
       + ` · delivery ${branch.delivery_enabled === false ? 'NOT offered' : 'yes'} · pickup ${branch.pickup_enabled === false ? 'NOT offered' : 'yes'}`
+      + (seating(branch) ? ' · ' + seating(branch) : '')
       + ` · delivery fee: ${fee == null ? 'not set — the branch confirms it' : money$(fee)}${minOrder ? ' · minimum order ' + money$(minOrder) : ''}`
       + (bStatus.state === 'closed' && settings.accept_orders_when_closed ? ' · orders taken now are prepared when it opens' : '')
       + (bStatus.state === 'closed' && !settings.accept_orders_when_closed ? ' · orders cannot be placed until it opens' : '')
@@ -360,7 +380,7 @@ const facts = [
   `MENU PICTURES: ${menuPics}`,
   `DISH PHOTOS: ${photoCodes.length ? `dishes marked 📷 in the MENU have a photo you can send (send_item_photos)${photosSent.length ? '; already sent: ' + photosSent.join(', ') : ''}` : 'none uploaded'}`,
   `RULED OUT BY THE CUSTOMER (food_prefs): ${str(details.food_prefs) || 'nothing — everything is open'}`,
-  `PAYMENT METHODS YOU MAY PROMISE: ${arr(settings.payment_methods).map(m => PAY_FACT[m] || m).join(', ') || 'cash'} (anything else: the branch confirms)`,
+  payFact,
   '',
   ...bookingLines,
   memory.length ? 'NOTES FROM EARLIER IN THIS CONVERSATION:\n' + memory.map(m => '- ' + m).join('\n') : ''
@@ -373,6 +393,8 @@ const branchBlock = branches.map(b => {
     + ` · ${b.hours_text_ar || 'hours: see status'} · ${b.phone || ''}`
     + ` · ${st.text}`
     + ` · ${[b.delivery_enabled === false ? 'no delivery' : 'delivery', b.pickup_enabled === false ? 'no pickup' : 'pickup'].join(' + ')}`
+    + (seating(b) ? ' · ' + seating(b) : '')
+    + (b.own_payment_methods ? ` · pays: ${payNames(payOf(b), false)}` : '')
     + (b.serves_hint_ar ? ` · usually serves: ${b.serves_hint_ar}` : '')
     + (b.vat_percent != null ? ` · +${fmt(b.vat_percent)}% VAT` : ' · prices exclude the branch fees')
     + (b.maps_url ? ` · map: ${b.maps_url}` : '');

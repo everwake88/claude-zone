@@ -61,7 +61,7 @@ if (r.action === 'place_order') {
     menu_changes: changes,
     items_waiting_on_choices: waiting,
     missing_details: arr(r.missing_details),
-    fact: 'Nothing was placed. SUMMARY_NOT_SHOWN / SUMMARY_OUTDATED / MENU_CHANGED / TOTALS_CHANGED mean the customer must see and confirm an up-to-date summary first. BRANCH_CLOSED / BRANCH_BUSY: say when it can be ordered. OUT_OF_DELIVERY_AREA / ADDRESS_SERVED_BY_OTHER_BRANCH / DELIVERY_AREA_UNKNOWN: sort out the address or the branch, or offer pickup.'
+    fact: 'Nothing was placed. SUMMARY_NOT_SHOWN / SUMMARY_OUTDATED / MENU_CHANGED / TOTALS_CHANGED mean the customer must see and confirm an up-to-date summary first. BRANCH_CLOSED / BRANCH_BUSY: say when it can be ordered. OUT_OF_DELIVERY_AREA / ADDRESS_SERVED_BY_OTHER_BRANCH / DELIVERY_AREA_UNKNOWN: sort out the address or the branch, or offer pickup. PAYMENT_NOT_TAKEN_AT_BRANCH: that branch does not take their payment method — ask how they will pay from what it takes, save it, then show the summary again.'
   });
 }
 
@@ -79,8 +79,9 @@ if (r.action === 'set_branch' || r.action === 'reorder_last') {
     next_question: pending[0] ? { pending_id: pending[0].pending_id, name: pending[0].item_name, ask_about: pending[0].ask_now } : null,
     problems,
     missing_details_for_order: arr(r.missing_details),
+    payment_not_taken_here: r.payment_not_taken ? { method: r.payment_not_taken, this_branch_takes: arr(r.payment_methods_here) } : undefined,
     fact: r.action === 'set_branch'
-      ? 'Every price and the menu now come from this branch.'
+      ? 'Every price and the menu now come from this branch.' + (r.payment_not_taken ? ' This branch does not take the payment method they chose — ask again from what it takes.' : '')
       : 'Their last order is back in the cart, priced from today\'s menu. Anything in problems or menu_changes did not come back as before — tell them.'
   });
 }

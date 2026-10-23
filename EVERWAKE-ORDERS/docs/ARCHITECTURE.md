@@ -89,6 +89,22 @@ zone, an offer, an answer, the agent's name — it rebuilds the restaurant's
 snapshot before the model sees anything. "Out of stock until 6 pm" also sets
 an expiry, so the dish comes back by itself.
 
+## Branches that differ
+
+There is one restaurant menu, and each branch's snapshot is that branch's own
+version of it: a dish is on every branch at the restaurant's price unless
+`menu_item_branches` says otherwise (off this branch's menu, its own price, out
+of stock here); a choice likewise through `menu_option_branches`; a category
+can be limited to some branches (`menu_categories.branch_ids`); a branch with
+no seating (`branches.dine_in = false`) leaves out dine-in only dishes and
+takes no table bookings. `branches.payment_methods` (empty = the restaurant's)
+is what the agent offers there, `save_customer_details` accepts, and
+`place_order` checks. The dashboard changes a branch's menu many dishes at a
+time (`branch_menu_update`), copies one branch's set-up to another
+(`copy_branch_menu`), and imports a printed menu for one branch
+(`publish_menu(…, p_branch)`); saving a dish's choices keeps each branch's
+choice prices.
+
 ## Identity: number or private ID
 
 WhatsApp may show a customer as a private ID (`…@lid`) instead of a number.
@@ -130,8 +146,8 @@ Sensitive actions go through `SECURITY DEFINER` functions that check the role fi
 | Area | Tables |
 |---|---|
 | Restaurant | `tenants` (profile = what the agent knows, settings = how it operates), `tenant_members`, `tenant_invites`, `platform_admins` |
-| Where | `branches` (hours with split shifts, busy pause, fees, VAT), `delivery_zones`, `whatsapp_channels` |
-| Menu | `menu_categories`, `menu_items` (codes M001…), `menu_option_groups` (levels), `menu_options`, `menu_item_branches` (per-branch listing, price, stock), `item_media` (dish photos), `menu_media` (full menu pages or PDF), `menu_imports` |
+| Where | `branches` (hours with split shifts, busy pause, fees, VAT, seating `dine_in`, its own `payment_methods`), `delivery_zones`, `whatsapp_channels` |
+| Menu | `menu_categories` (`branch_ids`: only some branches), `menu_items` (codes M001…), `menu_option_groups` (levels), `menu_options`, `menu_item_branches` (per-branch listing, price, stock), `menu_option_branches` (per-branch choice price, choice not offered), `item_media` (dish photos), `menu_media` (full menu pages or PDF), `menu_imports` (for every branch or one) |
 | Knowledge | `offers`, `knowledge_entries` |
 | People | `customers`, `customer_identities`, `customer_addresses` |
 | Talk | `conversations` (the engine's state, takeover, attention), `messages`, `outbox`, `inbound_buffer`, `conversation_locks` |

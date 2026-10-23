@@ -220,9 +220,18 @@ end $$;
 --           "required","min","max","choices":[{"name_ar","name_en","price_delta"}]}]}]}]}
 -- merge   = add new dishes, update the ones that match by name
 -- replace = the same, and archive dishes that are not in the import
+--
+-- p_branch: the menu of ONE branch (012). The restaurant's dishes stay as
+-- they are; for that branch only:
+--   · a dish already on the menu (same name) is put on its menu, at the
+--     imported price when it differs from the restaurant's, and its
+--     choices (same names) at the imported choice prices
+--   · a new dish (or category) is created on that branch's menu only
+--   · replace = dishes not in the import come off that branch's menu
+--     (nothing is archived)
 -- ---------------------------------------------------------------------
 create or replace function everwake.publish_menu(p_tenant uuid, p_menu jsonb, p_mode text default 'merge',
-                                                 p_import uuid default null)
+                                                 p_import uuid default null, p_branch uuid default null)
 returns jsonb language plpgsql security definer set search_path = everwake, pg_temp as $$
 declare
   cat      jsonb;
@@ -237,28 +246,47 @@ declare
   v_level  int;
   v_osort  int;
   v_seen   uuid[] := '{}';
-  n_cat_new int := 0; n_new int := 0; n_upd int := 0; n_arch int := 0;
+  n_cat_new int := 0; n_new int := 0; n_upd int := 0; n_arch int := 0; n_unlisted int := 0; n_choice int := 0;
   v_unit   text;
+  v_kept   jsonb;
+  v_was    everwake.menu_items%rowtype;
+  v_price  numeric;
+  v_cbr    uuid[];
+  v_cact   boolean;
 begin
   perform everwake.require_role(p_tenant, array['owner', 'manager']);
   if p_mode not in ('merge', 'replace') then raise exception 'mode must be merge or replace'; end if;
+  if p_branch is not null and not exists (select 1 from everwake.branches where id = p_branch and tenant_id = p_tenant) then
+    raise exception 'branch not found';
+  end if;
 
   for cat in select * from jsonb_array_elements(coalesce(p_menu -> 'categories', '[]'::jsonb)) loop
     v_csort := v_csort + 10;
     continue when coalesce(btrim(cat ->> 'name_ar'), btrim(cat ->> 'name_en'), '') = '';
-    select id into v_cat from everwake.menu_categories
+    v_cat := null;
+    select id, branch_ids, is_active into v_cat, v_cbr, v_cact from everwake.menu_categories
      where tenant_id = p_tenant
        and (everwake.norm(name_ar) = everwake.norm(coalesce(cat ->> 'name_ar', cat ->> 'name_en'))
             or (nullif(cat ->> 'name_en', '') is not null and everwake.norm(name_en) = everwake.norm(cat ->> 'name_en')))
      limit 1;
     if v_cat is null then
-      insert into everwake.menu_categories (tenant_id, name_ar, name_en, sort)
-      values (p_tenant, coalesce(nullif(btrim(cat ->> 'name_ar'), ''), btrim(cat ->> 'name_en')), nullif(btrim(cat ->> 'name_en'), ''), v_csort)
+      insert into everwake.menu_categories (tenant_id, name_ar, name_en, sort, branch_ids)
+      values (p_tenant, coalesce(nullif(btrim(cat ->> 'name_ar'), ''), btrim(cat ->> 'name_en')), nullif(btrim(cat ->> 'name_en'), ''), v_csort,
+              case when p_branch is not null then array[p_branch] end)
       returning id into v_cat;
       n_cat_new := n_cat_new + 1;
-    else
+    elsif p_branch is null then
       update everwake.menu_categories set is_active = true, sort = v_csort,
              name_en = coalesce(nullif(btrim(cat ->> 'name_en'), ''), name_en)
+       where id = v_cat;
+    else
+      -- the branch serves this category; a hidden one comes back for this branch only
+      update everwake.menu_categories
+         set is_active = true,
+             branch_ids = case when not v_cact then array[p_branch]
+                               when branch_ids is null or p_branch = any(branch_ids) then branch_ids
+                               else branch_ids || p_branch end,
+             name_en = coalesce(name_en, nullif(btrim(cat ->> 'name_en'), ''))
        where id = v_cat;
     end if;
 
@@ -267,6 +295,8 @@ begin
       v_isort := v_isort + 10;
       continue when coalesce(btrim(it ->> 'name_ar'), btrim(it ->> 'name_en'), '') = '';
       v_unit := case when it ->> 'unit' in ('portion', 'piece', 'kg', 'person') then it ->> 'unit' else 'portion' end;
+      v_price := nullif(it ->> 'price', '')::numeric;
+      v_item := null;
       select id into v_item from everwake.menu_items
        where tenant_id = p_tenant
          and (everwake.norm(name_ar) = everwake.norm(coalesce(it ->> 'name_ar', it ->> 'name_en'))
@@ -281,19 +311,24 @@ begin
                 nullif(btrim(it ->> 'name_en'), ''),
                 coalesce((select array_agg(btrim(a)) from jsonb_array_elements_text(it -> 'aliases') a where btrim(a) <> ''), '{}'),
                 nullif(btrim(it ->> 'description_ar'), ''), nullif(btrim(it ->> 'description_en'), ''),
-                v_unit, nullif(it ->> 'price', '')::numeric,
+                v_unit, v_price,
                 case when v_unit = 'kg' then 0.25 end, case when v_unit = 'kg' then 0.5 end,
                 coalesce((select array_agg(lower(btrim(a))) from jsonb_array_elements_text(it -> 'tags') a where btrim(a) <> ''), '{}'),
                 coalesce((it ->> 'is_signature')::boolean, false), v_isort, p_import)
         returning id into v_item;
         n_new := n_new + 1;
-      else
+        if p_branch is not null then
+          -- a dish from this branch's menu: on this branch only
+          insert into everwake.menu_item_branches (tenant_id, item_id, branch_id, is_listed)
+          select p_tenant, v_item, b.id, false from everwake.branches b where b.tenant_id = p_tenant and b.id <> p_branch;
+        end if;
+      elsif p_branch is null then
         update everwake.menu_items
            set category_id = v_cat, is_active = true, sort = v_isort, unit = v_unit,
                name_en = coalesce(nullif(btrim(it ->> 'name_en'), ''), name_en),
                description_ar = coalesce(nullif(btrim(it ->> 'description_ar'), ''), description_ar),
                description_en = coalesce(nullif(btrim(it ->> 'description_en'), ''), description_en),
-               price = coalesce(nullif(it ->> 'price', '')::numeric, price),
+               price = coalesce(v_price, price),
                aliases = case when jsonb_array_length(coalesce(it -> 'aliases', '[]'::jsonb)) > 0
                               then (select array_agg(distinct x) from unnest(aliases || (select array_agg(btrim(a)) from jsonb_array_elements_text(it -> 'aliases') a where btrim(a) <> '')) x)
                               else aliases end,
@@ -301,51 +336,100 @@ begin
                source_import_id = coalesce(p_import, source_import_id)
          where id = v_item;
         n_upd := n_upd + 1;
+      else
+        -- the restaurant's dish, now on this branch's menu at this branch's price
+        select * into v_was from everwake.menu_items where id = v_item;
+        update everwake.menu_items
+           set is_active = true,
+               name_en = coalesce(name_en, nullif(btrim(it ->> 'name_en'), '')),
+               description_ar = coalesce(description_ar, nullif(btrim(it ->> 'description_ar'), '')),
+               description_en = coalesce(description_en, nullif(btrim(it ->> 'description_en'), ''))
+         where id = v_item;
+        if not v_was.is_active then
+          -- an archived dish comes back for this branch only
+          insert into everwake.menu_item_branches as mb (tenant_id, item_id, branch_id, is_listed)
+          select p_tenant, v_item, b.id, false from everwake.branches b where b.tenant_id = p_tenant and b.id <> p_branch
+          on conflict (item_id, branch_id) do update set is_listed = false;
+        end if;
+        insert into everwake.menu_item_branches as mb (tenant_id, item_id, branch_id, is_listed, price)
+        values (p_tenant, v_item, p_branch, true, case when v_price is distinct from v_was.price then v_price end)
+        on conflict (item_id, branch_id) do update
+          set is_listed = true,
+              price = case when v_price is null then mb.price
+                           when v_price is distinct from v_was.price then v_price end;
+        n_upd := n_upd + 1;
       end if;
       v_seen := v_seen || v_item;
 
-      -- the choices are replaced as a whole when the import carries any
       if jsonb_array_length(coalesce(it -> 'options', '[]'::jsonb)) > 0 then
-        delete from everwake.menu_option_groups where item_id = v_item;
-        v_level := 0;
-        for grp in select * from jsonb_array_elements(it -> 'options') loop
-          continue when jsonb_array_length(coalesce(grp -> 'choices', '[]'::jsonb)) = 0;
-          v_level := v_level + 1;
-          insert into everwake.menu_option_groups (tenant_id, item_id, level, label_ar, label_en, required, min_select, max_select)
-          values (p_tenant, v_item, v_level,
-                  coalesce(nullif(btrim(grp ->> 'label_ar'), ''), nullif(btrim(grp ->> 'label_en'), ''), 'اختيار'),
-                  nullif(btrim(grp ->> 'label_en'), ''),
-                  coalesce((grp ->> 'required')::boolean, false),
-                  greatest(0, coalesce((grp ->> 'min')::int, case when coalesce((grp ->> 'required')::boolean, false) then 1 else 0 end)),
-                  nullif(grp ->> 'max', '')::int)
-          returning id into v_group;
-          v_osort := 0;
-          for ch in select * from jsonb_array_elements(grp -> 'choices') loop
-            v_osort := v_osort + 10;
-            continue when coalesce(btrim(ch ->> 'name_ar'), btrim(ch ->> 'name_en'), '') = '';
-            insert into everwake.menu_options (tenant_id, group_id, name_ar, name_en, price_delta, sort)
-            values (p_tenant, v_group, coalesce(nullif(btrim(ch ->> 'name_ar'), ''), btrim(ch ->> 'name_en')),
-                    nullif(btrim(ch ->> 'name_en'), ''), coalesce(nullif(ch ->> 'price_delta', '')::numeric, 0), v_osort);
+        if p_branch is not null and exists (select 1 from everwake.menu_option_groups where item_id = v_item) then
+          -- the dish has its choices: this branch's choice prices, by name
+          insert into everwake.menu_option_branches as x (tenant_id, option_id, branch_id, item_id, price_delta)
+          select distinct on (o.id) p_tenant, o.id, p_branch, v_item,
+                 nullif(coalesce(nullif(c ->> 'price_delta', '')::numeric, 0), o.price_delta)
+            from jsonb_array_elements(it -> 'options') gj
+            cross join jsonb_array_elements(coalesce(gj -> 'choices', '[]'::jsonb)) c
+            join everwake.menu_option_groups g on g.item_id = v_item
+            join everwake.menu_options o on o.group_id = g.id
+                 and everwake.norm(o.name_ar) = everwake.norm(coalesce(nullif(c ->> 'name_ar', ''), c ->> 'name_en'))
+           order by o.id, (everwake.norm(g.label_ar) = everwake.norm(gj ->> 'label_ar')) desc
+          on conflict (option_id, branch_id) do update set price_delta = excluded.price_delta, is_available = true;
+          get diagnostics v_level = row_count;
+          n_choice := n_choice + v_level;
+        else
+          -- the choices are replaced as a whole when the import carries any
+          v_kept := everwake.choice_overrides(v_item);
+          delete from everwake.menu_option_groups where item_id = v_item;
+          v_level := 0;
+          for grp in select * from jsonb_array_elements(it -> 'options') loop
+            continue when jsonb_array_length(coalesce(grp -> 'choices', '[]'::jsonb)) = 0;
+            v_level := v_level + 1;
+            insert into everwake.menu_option_groups (tenant_id, item_id, level, label_ar, label_en, required, min_select, max_select)
+            values (p_tenant, v_item, v_level,
+                    coalesce(nullif(btrim(grp ->> 'label_ar'), ''), nullif(btrim(grp ->> 'label_en'), ''), 'اختيار'),
+                    nullif(btrim(grp ->> 'label_en'), ''),
+                    coalesce((grp ->> 'required')::boolean, false),
+                    greatest(0, coalesce((grp ->> 'min')::int, case when coalesce((grp ->> 'required')::boolean, false) then 1 else 0 end)),
+                    nullif(grp ->> 'max', '')::int)
+            returning id into v_group;
+            v_osort := 0;
+            for ch in select * from jsonb_array_elements(grp -> 'choices') loop
+              v_osort := v_osort + 10;
+              continue when coalesce(btrim(ch ->> 'name_ar'), btrim(ch ->> 'name_en'), '') = '';
+              insert into everwake.menu_options (tenant_id, group_id, name_ar, name_en, price_delta, sort)
+              values (p_tenant, v_group, coalesce(nullif(btrim(ch ->> 'name_ar'), ''), btrim(ch ->> 'name_en')),
+                      nullif(btrim(ch ->> 'name_en'), ''), coalesce(nullif(ch ->> 'price_delta', '')::numeric, 0), v_osort);
+            end loop;
           end loop;
-        end loop;
+          perform everwake.restore_choice_overrides(v_item, v_kept);
+        end if;
       end if;
     end loop;
   end loop;
 
-  if p_mode = 'replace' then
+  if p_mode = 'replace' and p_branch is null then
     update everwake.menu_items set is_active = false
      where tenant_id = p_tenant and is_active and not (id = any(v_seen));
     get diagnostics n_arch = row_count;
+  elsif p_mode = 'replace' then
+    insert into everwake.menu_item_branches as mb (tenant_id, item_id, branch_id, is_listed)
+    select p_tenant, i.id, p_branch, false
+      from everwake.menu_items i
+     where i.tenant_id = p_tenant and i.is_active and not (i.id = any(v_seen))
+    on conflict (item_id, branch_id) do update set is_listed = false where mb.is_listed;
+    get diagnostics n_unlisted = row_count;
   end if;
 
   if p_import is not null then
     update everwake.menu_imports
-       set status = 'published', published_at = now(), published_by = everwake.current_user_id(), extracted = p_menu
+       set status = 'published', published_at = now(), published_by = everwake.current_user_id(), extracted = p_menu,
+           branch_id = p_branch
      where id = p_import and tenant_id = p_tenant;
   end if;
 
   return jsonb_build_object('categories_created', n_cat_new, 'items_created', n_new, 'items_updated', n_upd,
-                            'items_archived', n_arch);
+                            'items_archived', n_arch, 'items_unlisted', n_unlisted, 'choice_prices', n_choice,
+                            'branch_id', p_branch);
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -546,10 +630,12 @@ declare
   v_group uuid;
   v_level int := 0;
   v_sort int;
+  v_kept jsonb;
 begin
   select tenant_id into v_tenant from everwake.menu_items where id = p_item;
   if v_tenant is null then raise exception 'dish not found'; end if;
   perform everwake.require_role(v_tenant, array['owner', 'manager']);
+  v_kept := everwake.choice_overrides(p_item);            -- the branches' own choice prices (012)
   delete from everwake.menu_option_groups where item_id = p_item;
   for g in select * from jsonb_array_elements(coalesce(p_groups, '[]'::jsonb)) loop
     continue when jsonb_array_length(coalesce(g -> 'options', '[]'::jsonb)) = 0 or coalesce(btrim(g ->> 'label_ar'), '') = '';
@@ -571,5 +657,6 @@ begin
               coalesce((o ->> 'is_available')::boolean, true), v_sort);
     end loop;
   end loop;
+  perform everwake.restore_choice_overrides(p_item, v_kept);
   return v_level;
 end $$;

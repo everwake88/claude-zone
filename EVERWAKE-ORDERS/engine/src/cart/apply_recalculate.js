@@ -652,6 +652,11 @@ const missingDetails = arr(REQ[mode] || ['phone_confirmed', 'full_name', 'delive
   .filter(f => !(f === 'address_street' && hasPin))
   .filter(f => !str(customer[f]));
 if (needZone && !zoneHere) missingDetails.push('delivery_area');
+// each branch takes its own payment methods (the restaurant's when it set none)
+const payHere = arr(branchInfo.payment_methods).length ? arr(branchInfo.payment_methods).map(str) : arr(settings.payment_methods).map(str);
+const payOnFile = str(customer.payment_method);
+const payNotTaken = targetBranchId && payOnFile && payHere.length && !payHere.includes(payOnFile) ? payOnFile : null;
+if (payNotTaken && !missingDetails.includes('payment_method')) missingDetails.push('payment_method');
 
 // ---- pending workspace after this call -------------------------------------------------------
 const pendingAfter = pendingChoices.map(pc => ({
@@ -680,6 +685,7 @@ if (action === 'place_order') {
   }
   if (mode === 'delivery' && branchInfo.delivery_enabled === false) reasons.push({ code: 'DELIVERY_NOT_OFFERED_BY_BRANCH' });
   if (mode === 'pickup' && branchInfo.pickup_enabled === false) reasons.push({ code: 'PICKUP_NOT_OFFERED_BY_BRANCH' });
+  if (payNotTaken) reasons.push({ code: 'PAYMENT_NOT_TAKEN_AT_BRANCH', method: payNotTaken, branch: branchInfo.name_ar, takes: payHere });
   if (needZone && !zoneHere) {
     reasons.push(zone && zone.branch_id
       ? { code: 'ADDRESS_SERVED_BY_OTHER_BRANCH', branch: zone.branch_name, branch_code: zone.branch_code }
@@ -788,6 +794,8 @@ return [{
     pending_choices: pendingChoices,
     pending_after: pendingAfter,
     missing_details: missingDetails,
+    payment_methods_here: targetBranchId ? payHere : null,
+    payment_not_taken: payNotTaken,
     place,
     is_place: placeNow,
     b64_place: placeNow ? b64(place.payload) : '',

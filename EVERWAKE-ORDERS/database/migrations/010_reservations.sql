@@ -261,6 +261,7 @@ begin
           'fact', 'this branch takes bookings by phone only — give them the number');
       elsif b.reservations = 'off' then
         problems := problems || jsonb_build_object('problem', 'NO_BOOKINGS_AT_THIS_BRANCH', 'branch', b.name_ar,
+          'no_seating', b.dine_in is false,          -- delivery and pickup only (012)
           'branches_taking_bookings', (select jsonb_agg(x ->> 'name_ar') from jsonb_array_elements(setup -> 'branches') x where x ->> 'mode' = 'whatsapp'));
       elsif r.branch_id is distinct from b.id then
         r.branch_id := b.id; v_changed := true;

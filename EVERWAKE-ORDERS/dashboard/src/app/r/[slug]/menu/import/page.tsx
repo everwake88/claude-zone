@@ -1,6 +1,7 @@
 'use client';
 import { ArrowLeft, Download, FileText, Link2, Loader2, Plus, Sheet, Sparkles, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Badge, Button, Card, Checkbox, Field, Input, PageHeader, Select, Tabs, Textarea, useAction, useToast } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
@@ -8,7 +9,7 @@ import { CSV_TEMPLATE, csvToMenu } from '@/lib/csv-menu';
 import { dateTime } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
-import type { ExtractedItem, ExtractedMenu, MenuImport } from '@/lib/types';
+import type { Branch, ExtractedItem, ExtractedMenu, MenuImport } from '@/lib/types';
 
 type Source = 'files' | 'url' | 'text' | 'csv';
 
@@ -24,6 +25,10 @@ export default function ImportMenu() {
   const [menu, setMenu] = useState<ExtractedMenu | null>(null);
   const [mode, setMode] = useState<'merge' | 'replace'>('merge');
   const [history, setHistory] = useState<MenuImport[]>([]);
+  // a menu for one branch only (its own dishes and prices), or the restaurant's
+  const params = useSearchParams();
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [forBranch, setForBranch] = useState(params.get('branch') || '');
   const pick = useRef<HTMLInputElement>(null);
   const { busy, run } = useAction();
   const t = useT();
@@ -31,6 +36,12 @@ export default function ImportMenu() {
   const loadHistory = () => sb().from('menu_imports').select('*').eq('tenant_id', tenant.id).order('created_at', { ascending: false }).limit(10)
     .then(({ data }) => setHistory((data || []) as MenuImport[]));
   useEffect(() => { loadHistory(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tenant.id]);
+  useEffect(() => {
+    sb().from('branches').select('*').eq('tenant_id', tenant.id).eq('is_active', true).order('sort')
+      .then(({ data }) => setBranches((data || []) as Branch[]));
+  }, [tenant.id]);
+  const target = branches.find(b => b.id === forBranch) || null;
+  const targetName = target ? target.name_en || target.name_ar : '';
 
   const read = async () => {
     setReading(true);
@@ -77,10 +88,13 @@ export default function ImportMenu() {
 
   const publish = () => run(async () => {
     if (!menu) return;
-    const { data, error } = await sb().rpc('publish_menu', { p_tenant: tenant.id, p_menu: menu, p_mode: mode, p_import: importId });
+    const { data, error } = await sb().rpc('publish_menu', { p_tenant: tenant.id, p_menu: menu, p_mode: mode, p_import: importId, p_branch: target?.id || null });
     if (error) throw new Error(error.message);
-    const r = data as { items_created: number; items_updated: number; items_archived: number };
-    toast(t('Published: {created} new, {updated} updated, {archived} archived. The agent uses it from the next message.', { created: r.items_created, updated: r.items_updated, archived: r.items_archived || 0 }));
+    const r = data as { items_created: number; items_updated: number; items_archived: number; items_unlisted: number };
+    toast(target
+      ? t('Published for {branch}: {created} new, {updated} on its menu, {unlisted} taken off it. The agent uses it from the next message.',
+          { branch: targetName, created: r.items_created, updated: r.items_updated, unlisted: r.items_unlisted || 0 })
+      : t('Published: {created} new, {updated} updated, {archived} archived. The agent uses it from the next message.', { created: r.items_created, updated: r.items_updated, archived: r.items_archived || 0 }));
     setMenu(null); setImportId(null); setFiles([]); setUrl(''); setText('');
     loadHistory();
   });
@@ -188,13 +202,25 @@ export default function ImportMenu() {
           </Card>
 
           <Card>
+            {branches.length > 1 && (
+              <Field label={t('This menu is for')} className="mb-4 max-w-md">
+                <Select value={forBranch} onChange={e => setForBranch(e.target.value)}>
+                  <option value="">{t('Every branch (the restaurant’s menu)')}</option>
+                  {branches.map(b => <option key={b.id} value={b.id}>{t('{branch} only', { branch: b.name_en || b.name_ar })}</option>)}
+                </Select>
+              </Field>
+            )}
             <div className="flex flex-wrap items-center gap-4">
               <Checkbox checked={mode === 'replace'} onChange={v => setMode(v ? 'replace' : 'merge')}
-                label={<>{t('This is the whole menu —')} <span className="text-muted">{t('archive dishes that are not in it')}</span></>} />
+                label={target
+                  ? <>{t('This is {branch}’s whole menu —', { branch: targetName })} <span className="text-muted">{t('take dishes that are not in it off its menu')}</span></>
+                  : <>{t('This is the whole menu —')} <span className="text-muted">{t('archive dishes that are not in it')}</span></>} />
               <span className="flex-1" />
               <Button variant="gold" busy={busy} onClick={publish}>{t('Publish {n} dishes', { n: total })}</Button>
             </div>
-            <p className="mt-2 text-xs text-muted">{t('Dishes that already exist (same name) are updated, not duplicated. Their photos and stock switches are kept.')}</p>
+            <p className="mt-2 text-xs text-muted">{target
+              ? t('For {branch} only: dishes the restaurant already has (same name) go on its menu at these prices, choice prices included; new dishes are added for {branch} alone. The other branches do not change.', { branch: targetName })
+              : t('Dishes that already exist (same name) are updated, not duplicated. Their photos and stock switches are kept.')}</p>
           </Card>
         </>
       )}

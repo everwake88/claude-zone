@@ -95,7 +95,7 @@ grant execute on function
   everwake.merged_profile(jsonb), everwake.render_template(text, jsonb),
   everwake.create_tenant(text, text, text, text, text, text, text), everwake.my_tenants(),
   everwake.onboarding_checklist(uuid), everwake.go_live(uuid, boolean),
-  everwake.publish_menu(uuid, jsonb, text, uuid), everwake.save_item_choices(uuid, jsonb),
+  everwake.publish_menu(uuid, jsonb, text, uuid, uuid), everwake.save_item_choices(uuid, jsonb),
   everwake.analytics(uuid, timestamptz, timestamptz),
   everwake.save_channel(uuid, jsonb), everwake.channel_webhook_token(uuid),
   everwake.invite_member(uuid, text, text, uuid[]), everwake.accept_invites(),

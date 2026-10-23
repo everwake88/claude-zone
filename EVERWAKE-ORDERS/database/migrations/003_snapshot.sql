@@ -5,6 +5,8 @@
 -- one prepared snapshot per restaurant ('all') and one per branch:
 --   digest_text — the MENU the model reads (codes, prices, choices)
 --   lookup      — the same facts as JSON for the code that prices carts
+-- A branch's snapshot is that branch's own menu: its dishes and
+-- categories, its prices, its choice prices and choices (012).
 --
 -- Any dashboard edit bumps tenants.menu_rev (002). ensure_snapshot()
 -- rebuilds when the stored snapshot is older than that revision, or
@@ -23,47 +25,55 @@ returns boolean language sql stable as $$
        and (s.valid_until is null or s.valid_until > now()))
 $$;
 
--- one dish's choices as the engine reads them
-create or replace function everwake.item_choices_json(p_item uuid)
-returns jsonb language sql stable as $$
-  select coalesce(jsonb_agg(jsonb_build_object(
-           'level', g.level, 'label_ar', g.label_ar, 'label_en', g.label_en,
-           'required', g.required, 'min', g.min_select, 'max', g.max_select,
-           'options', coalesce((
-             select jsonb_agg(jsonb_build_object(
-                      'name', o.name_ar, 'name_en', o.name_en, 'aliases', to_jsonb(o.aliases),
-                      'price', o.price_delta, 'extra_charge', o.extra_charge)
-                    order by o.sort, o.name_ar)
-               from everwake.menu_options o
-              where o.group_id = g.id and o.is_available), '[]'::jsonb))
-         order by g.level), '[]'::jsonb)
-    from everwake.menu_option_groups g
-   where g.item_id = p_item
-$$;
+-- one dish's choices as the engine reads them, at one branch (its own
+-- choice prices, without the choices it doesn't have — 012)
+create or replace function everwake.item_choices_json(p_item uuid, p_branch uuid default null)
+returns jsonb language plpgsql stable as $$
+begin
+  return (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'level', g.level, 'label_ar', g.label_ar, 'label_en', g.label_en,
+             'required', g.required, 'min', g.min_select, 'max', g.max_select,
+             'options', coalesce((
+               select jsonb_agg(jsonb_build_object(
+                        'name', o.name_ar, 'name_en', o.name_en, 'aliases', to_jsonb(o.aliases),
+                        'price', coalesce(x.price_delta, o.price_delta), 'extra_charge', o.extra_charge)
+                      order by o.sort, o.name_ar)
+                 from everwake.menu_options o
+                 left join everwake.menu_option_branches x on x.option_id = o.id and x.branch_id = p_branch
+                where o.group_id = g.id and o.is_available and coalesce(x.is_available, true)), '[]'::jsonb))
+           order by g.level), '[]'::jsonb)
+      from everwake.menu_option_groups g
+     where g.item_id = p_item);
+end $$;
 
--- one dish's choices as the model reads them (one line)
-create or replace function everwake.item_choices_text(p_item uuid, p_sym text)
-returns text language sql stable as $$
-  select string_agg(
-           g.label_ar
-           || ' (' || case when g.required then 'مطلوب' else 'اختياري' end
-           || case when coalesce(g.max_select, 99) > 1 and g.max_select is not null then '، لحد ' || g.max_select
-                   when g.max_select is null and not g.required then '، أكتر من اختيار'
-                   else '' end
-           || '): '
-           || coalesce((
-                select string_agg(o.name_ar
-                                  || case when o.price_delta > 0 then ' +' || everwake.fmt_money(o.price_delta) || p_sym
-                                          when o.price_delta < 0 then ' ' || everwake.fmt_money(o.price_delta) || p_sym
-                                          else '' end
-                                  || case when o.extra_charge then ' (+رسوم تسوية يحددها الفرع)' else '' end,
-                                  ' / ' order by o.sort, o.name_ar)
-                  from everwake.menu_options o
-                 where o.group_id = g.id and o.is_available), '—'),
-           ' · ' order by g.level)
-    from everwake.menu_option_groups g
-   where g.item_id = p_item
-$$;
+-- one dish's choices as the model reads them (one line), at one branch
+create or replace function everwake.item_choices_text(p_item uuid, p_sym text, p_branch uuid default null)
+returns text language plpgsql stable as $$
+begin
+  return (
+    select string_agg(
+             g.label_ar
+             || ' (' || case when g.required then 'مطلوب' else 'اختياري' end
+             || case when coalesce(g.max_select, 99) > 1 and g.max_select is not null then '، لحد ' || g.max_select
+                     when g.max_select is null and not g.required then '، أكتر من اختيار'
+                     else '' end
+             || '): '
+             || coalesce((
+                  select string_agg(o.name_ar
+                                    || case when p.price > 0 then ' +' || everwake.fmt_money(p.price) || p_sym
+                                            when p.price < 0 then ' ' || everwake.fmt_money(p.price) || p_sym
+                                            else '' end
+                                    || case when o.extra_charge then ' (+رسوم تسوية يحددها الفرع)' else '' end,
+                                    ' / ' order by o.sort, o.name_ar)
+                    from everwake.menu_options o
+                    left join everwake.menu_option_branches x on x.option_id = o.id and x.branch_id = p_branch
+                    cross join lateral (select coalesce(x.price_delta, o.price_delta) as price) p
+                   where o.group_id = g.id and o.is_available and coalesce(x.is_available, true)), '—'),
+             ' · ' order by g.level)
+      from everwake.menu_option_groups g
+     where g.item_id = p_item);
+end $$;
 
 create or replace function everwake.rebuild_snapshot(p_tenant uuid, p_force boolean default true)
 returns void language plpgsql as $$
@@ -123,7 +133,9 @@ begin
     left join everwake.menu_item_branches mib on mib.item_id = i.id and mib.branch_id = br.id
    where br.tenant_id = p_tenant and br.is_active
      and coalesce(c.is_active, true)
-     and coalesce(mib.is_listed, true);
+     and (c.branch_ids is null or br.id = any(c.branch_ids))      -- a category only some branches serve
+     and coalesce(mib.is_listed, true)
+     and (i.orderable or br.dine_in is not false);               -- dine-in only: not where there is no seating
 
   select min(sold_out_until) into v_valid from _ew_eff where sold_out_until is not null;
 
@@ -139,6 +151,9 @@ begin
            'vat_percent', br.vat_percent, 'price_note_ar', br.price_note_ar,
            'prep_minutes', br.prep_minutes, 'delivery_eta_text', br.delivery_eta_text,
            'serves_hint_ar', br.serves_hint_ar, 'seasonal', br.seasonal,
+           'dine_in', br.dine_in,
+           'payment_methods', everwake.payment_methods_at(p_tenant, br.id),
+           'own_payment_methods', br.payment_methods is not null,
            'zones', (select count(*) from everwake.delivery_zones z where z.branch_id = br.id and z.is_active))
          order by br.sort, br.name_ar), '[]'::jsonb)
     into v_branches
@@ -277,7 +292,7 @@ begin
              'window', case when e.cat_from is not null and e.cat_to is not null
                             then jsonb_build_object('from', to_char(e.cat_from, 'HH24:MI'), 'to', to_char(e.cat_to, 'HH24:MI'))
                        end)), '{}'::jsonb),
-           coalesce(jsonb_object_agg(e.code, jsonb_build_object('levels', everwake.item_choices_json(e.item_id)))
+           coalesce(jsonb_object_agg(e.code, jsonb_build_object('levels', everwake.item_choices_json(e.item_id, b.id)))
                       filter (where exists (select 1 from everwake.menu_option_groups g where g.item_id = e.item_id)),
                     '{}'::jsonb)
       into v_items, v_choices
@@ -307,7 +322,7 @@ begin
                             else '' end
                     || case when e.has_photo then ' 📷' else '' end
                     || coalesce(E'\n  ' || left(nullif(btrim(e.description_ar), ''), 140), '')
-                    || coalesce(E'\n  اختيارات: ' || everwake.item_choices_text(e.item_id, v_sym), ''),
+                    || coalesce(E'\n  اختيارات: ' || everwake.item_choices_text(e.item_id, v_sym, b.id), ''),
                     E'\n' order by e.item_sort, e.name_ar) as cat_block
           from _ew_eff e
          where e.branch_id = b.id

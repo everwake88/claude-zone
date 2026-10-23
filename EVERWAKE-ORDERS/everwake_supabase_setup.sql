@@ -1,4 +1,4 @@
--- Everwake Orders · full database setup for Supabase (migrations 001–011 + 090, in order)
+-- Everwake Orders · full database setup for Supabase (migrations 001–012 + 090, in order)
 -- Paste into Supabase → SQL Editor → New query, then Run. Run it once.
 
 -- ================= 001_schema.sql =================
@@ -1027,6 +1027,8 @@ end $$;
 -- one prepared snapshot per restaurant ('all') and one per branch:
 --   digest_text — the MENU the model reads (codes, prices, choices)
 --   lookup      — the same facts as JSON for the code that prices carts
+-- A branch's snapshot is that branch's own menu: its dishes and
+-- categories, its prices, its choice prices and choices (012).
 --
 -- Any dashboard edit bumps tenants.menu_rev (002). ensure_snapshot()
 -- rebuilds when the stored snapshot is older than that revision, or
@@ -1045,47 +1047,55 @@ returns boolean language sql stable as $$
        and (s.valid_until is null or s.valid_until > now()))
 $$;
 
--- one dish's choices as the engine reads them
-create or replace function everwake.item_choices_json(p_item uuid)
-returns jsonb language sql stable as $$
-  select coalesce(jsonb_agg(jsonb_build_object(
-           'level', g.level, 'label_ar', g.label_ar, 'label_en', g.label_en,
-           'required', g.required, 'min', g.min_select, 'max', g.max_select,
-           'options', coalesce((
-             select jsonb_agg(jsonb_build_object(
-                      'name', o.name_ar, 'name_en', o.name_en, 'aliases', to_jsonb(o.aliases),
-                      'price', o.price_delta, 'extra_charge', o.extra_charge)
-                    order by o.sort, o.name_ar)
-               from everwake.menu_options o
-              where o.group_id = g.id and o.is_available), '[]'::jsonb))
-         order by g.level), '[]'::jsonb)
-    from everwake.menu_option_groups g
-   where g.item_id = p_item
-$$;
+-- one dish's choices as the engine reads them, at one branch (its own
+-- choice prices, without the choices it doesn't have — 012)
+create or replace function everwake.item_choices_json(p_item uuid, p_branch uuid default null)
+returns jsonb language plpgsql stable as $$
+begin
+  return (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'level', g.level, 'label_ar', g.label_ar, 'label_en', g.label_en,
+             'required', g.required, 'min', g.min_select, 'max', g.max_select,
+             'options', coalesce((
+               select jsonb_agg(jsonb_build_object(
+                        'name', o.name_ar, 'name_en', o.name_en, 'aliases', to_jsonb(o.aliases),
+                        'price', coalesce(x.price_delta, o.price_delta), 'extra_charge', o.extra_charge)
+                      order by o.sort, o.name_ar)
+                 from everwake.menu_options o
+                 left join everwake.menu_option_branches x on x.option_id = o.id and x.branch_id = p_branch
+                where o.group_id = g.id and o.is_available and coalesce(x.is_available, true)), '[]'::jsonb))
+           order by g.level), '[]'::jsonb)
+      from everwake.menu_option_groups g
+     where g.item_id = p_item);
+end $$;
 
--- one dish's choices as the model reads them (one line)
-create or replace function everwake.item_choices_text(p_item uuid, p_sym text)
-returns text language sql stable as $$
-  select string_agg(
-           g.label_ar
-           || ' (' || case when g.required then 'مطلوب' else 'اختياري' end
-           || case when coalesce(g.max_select, 99) > 1 and g.max_select is not null then '، لحد ' || g.max_select
-                   when g.max_select is null and not g.required then '، أكتر من اختيار'
-                   else '' end
-           || '): '
-           || coalesce((
-                select string_agg(o.name_ar
-                                  || case when o.price_delta > 0 then ' +' || everwake.fmt_money(o.price_delta) || p_sym
-                                          when o.price_delta < 0 then ' ' || everwake.fmt_money(o.price_delta) || p_sym
-                                          else '' end
-                                  || case when o.extra_charge then ' (+رسوم تسوية يحددها الفرع)' else '' end,
-                                  ' / ' order by o.sort, o.name_ar)
-                  from everwake.menu_options o
-                 where o.group_id = g.id and o.is_available), '—'),
-           ' · ' order by g.level)
-    from everwake.menu_option_groups g
-   where g.item_id = p_item
-$$;
+-- one dish's choices as the model reads them (one line), at one branch
+create or replace function everwake.item_choices_text(p_item uuid, p_sym text, p_branch uuid default null)
+returns text language plpgsql stable as $$
+begin
+  return (
+    select string_agg(
+             g.label_ar
+             || ' (' || case when g.required then 'مطلوب' else 'اختياري' end
+             || case when coalesce(g.max_select, 99) > 1 and g.max_select is not null then '، لحد ' || g.max_select
+                     when g.max_select is null and not g.required then '، أكتر من اختيار'
+                     else '' end
+             || '): '
+             || coalesce((
+                  select string_agg(o.name_ar
+                                    || case when p.price > 0 then ' +' || everwake.fmt_money(p.price) || p_sym
+                                            when p.price < 0 then ' ' || everwake.fmt_money(p.price) || p_sym
+                                            else '' end
+                                    || case when o.extra_charge then ' (+رسوم تسوية يحددها الفرع)' else '' end,
+                                    ' / ' order by o.sort, o.name_ar)
+                    from everwake.menu_options o
+                    left join everwake.menu_option_branches x on x.option_id = o.id and x.branch_id = p_branch
+                    cross join lateral (select coalesce(x.price_delta, o.price_delta) as price) p
+                   where o.group_id = g.id and o.is_available and coalesce(x.is_available, true)), '—'),
+             ' · ' order by g.level)
+      from everwake.menu_option_groups g
+     where g.item_id = p_item);
+end $$;
 
 create or replace function everwake.rebuild_snapshot(p_tenant uuid, p_force boolean default true)
 returns void language plpgsql as $$
@@ -1145,7 +1155,9 @@ begin
     left join everwake.menu_item_branches mib on mib.item_id = i.id and mib.branch_id = br.id
    where br.tenant_id = p_tenant and br.is_active
      and coalesce(c.is_active, true)
-     and coalesce(mib.is_listed, true);
+     and (c.branch_ids is null or br.id = any(c.branch_ids))      -- a category only some branches serve
+     and coalesce(mib.is_listed, true)
+     and (i.orderable or br.dine_in is not false);               -- dine-in only: not where there is no seating
 
   select min(sold_out_until) into v_valid from _ew_eff where sold_out_until is not null;
 
@@ -1161,6 +1173,9 @@ begin
            'vat_percent', br.vat_percent, 'price_note_ar', br.price_note_ar,
            'prep_minutes', br.prep_minutes, 'delivery_eta_text', br.delivery_eta_text,
            'serves_hint_ar', br.serves_hint_ar, 'seasonal', br.seasonal,
+           'dine_in', br.dine_in,
+           'payment_methods', everwake.payment_methods_at(p_tenant, br.id),
+           'own_payment_methods', br.payment_methods is not null,
            'zones', (select count(*) from everwake.delivery_zones z where z.branch_id = br.id and z.is_active))
          order by br.sort, br.name_ar), '[]'::jsonb)
     into v_branches
@@ -1299,7 +1314,7 @@ begin
              'window', case when e.cat_from is not null and e.cat_to is not null
                             then jsonb_build_object('from', to_char(e.cat_from, 'HH24:MI'), 'to', to_char(e.cat_to, 'HH24:MI'))
                        end)), '{}'::jsonb),
-           coalesce(jsonb_object_agg(e.code, jsonb_build_object('levels', everwake.item_choices_json(e.item_id)))
+           coalesce(jsonb_object_agg(e.code, jsonb_build_object('levels', everwake.item_choices_json(e.item_id, b.id)))
                       filter (where exists (select 1 from everwake.menu_option_groups g where g.item_id = e.item_id)),
                     '{}'::jsonb)
       into v_items, v_choices
@@ -1329,7 +1344,7 @@ begin
                             else '' end
                     || case when e.has_photo then ' 📷' else '' end
                     || coalesce(E'\n  ' || left(nullif(btrim(e.description_ar), ''), 140), '')
-                    || coalesce(E'\n  اختيارات: ' || everwake.item_choices_text(e.item_id, v_sym), ''),
+                    || coalesce(E'\n  اختيارات: ' || everwake.item_choices_text(e.item_id, v_sym, b.id), ''),
                     E'\n' order by e.item_sort, e.name_ar) as cat_block
           from _ew_eff e
          where e.branch_id = b.id
@@ -2431,7 +2446,12 @@ returns jsonb language sql stable as $$
          from everwake.customer_addresses a
          join everwake.conversations c on c.customer_id = a.customer_id
         where c.tenant_id = p_tenant and c.wa_id = p_wa), '[]'::jsonb),
-    'zones_drawn', exists (select 1 from everwake.delivery_zones where tenant_id = p_tenant and is_active))
+    'zones_drawn', exists (select 1 from everwake.delivery_zones where tenant_id = p_tenant and is_active),
+    -- each branch takes its own payment methods (012)
+    'payment_methods_by_branch', coalesce((
+       select jsonb_object_agg(b ->> 'id', b -> 'payment_methods')
+         from everwake.menu_snapshot s, jsonb_array_elements(s.lookup -> 'branches') b
+        where s.tenant_id = p_tenant and s.scope = 'all'), '{}'::jsonb))
 $$;
 
 create or replace function everwake.persist_details(p jsonb)
@@ -3330,9 +3350,18 @@ end $$;
 --           "required","min","max","choices":[{"name_ar","name_en","price_delta"}]}]}]}]}
 -- merge   = add new dishes, update the ones that match by name
 -- replace = the same, and archive dishes that are not in the import
+--
+-- p_branch: the menu of ONE branch (012). The restaurant's dishes stay as
+-- they are; for that branch only:
+--   · a dish already on the menu (same name) is put on its menu, at the
+--     imported price when it differs from the restaurant's, and its
+--     choices (same names) at the imported choice prices
+--   · a new dish (or category) is created on that branch's menu only
+--   · replace = dishes not in the import come off that branch's menu
+--     (nothing is archived)
 -- ---------------------------------------------------------------------
 create or replace function everwake.publish_menu(p_tenant uuid, p_menu jsonb, p_mode text default 'merge',
-                                                 p_import uuid default null)
+                                                 p_import uuid default null, p_branch uuid default null)
 returns jsonb language plpgsql security definer set search_path = everwake, pg_temp as $$
 declare
   cat      jsonb;
@@ -3347,28 +3376,47 @@ declare
   v_level  int;
   v_osort  int;
   v_seen   uuid[] := '{}';
-  n_cat_new int := 0; n_new int := 0; n_upd int := 0; n_arch int := 0;
+  n_cat_new int := 0; n_new int := 0; n_upd int := 0; n_arch int := 0; n_unlisted int := 0; n_choice int := 0;
   v_unit   text;
+  v_kept   jsonb;
+  v_was    everwake.menu_items%rowtype;
+  v_price  numeric;
+  v_cbr    uuid[];
+  v_cact   boolean;
 begin
   perform everwake.require_role(p_tenant, array['owner', 'manager']);
   if p_mode not in ('merge', 'replace') then raise exception 'mode must be merge or replace'; end if;
+  if p_branch is not null and not exists (select 1 from everwake.branches where id = p_branch and tenant_id = p_tenant) then
+    raise exception 'branch not found';
+  end if;
 
   for cat in select * from jsonb_array_elements(coalesce(p_menu -> 'categories', '[]'::jsonb)) loop
     v_csort := v_csort + 10;
     continue when coalesce(btrim(cat ->> 'name_ar'), btrim(cat ->> 'name_en'), '') = '';
-    select id into v_cat from everwake.menu_categories
+    v_cat := null;
+    select id, branch_ids, is_active into v_cat, v_cbr, v_cact from everwake.menu_categories
      where tenant_id = p_tenant
        and (everwake.norm(name_ar) = everwake.norm(coalesce(cat ->> 'name_ar', cat ->> 'name_en'))
             or (nullif(cat ->> 'name_en', '') is not null and everwake.norm(name_en) = everwake.norm(cat ->> 'name_en')))
      limit 1;
     if v_cat is null then
-      insert into everwake.menu_categories (tenant_id, name_ar, name_en, sort)
-      values (p_tenant, coalesce(nullif(btrim(cat ->> 'name_ar'), ''), btrim(cat ->> 'name_en')), nullif(btrim(cat ->> 'name_en'), ''), v_csort)
+      insert into everwake.menu_categories (tenant_id, name_ar, name_en, sort, branch_ids)
+      values (p_tenant, coalesce(nullif(btrim(cat ->> 'name_ar'), ''), btrim(cat ->> 'name_en')), nullif(btrim(cat ->> 'name_en'), ''), v_csort,
+              case when p_branch is not null then array[p_branch] end)
       returning id into v_cat;
       n_cat_new := n_cat_new + 1;
-    else
+    elsif p_branch is null then
       update everwake.menu_categories set is_active = true, sort = v_csort,
              name_en = coalesce(nullif(btrim(cat ->> 'name_en'), ''), name_en)
+       where id = v_cat;
+    else
+      -- the branch serves this category; a hidden one comes back for this branch only
+      update everwake.menu_categories
+         set is_active = true,
+             branch_ids = case when not v_cact then array[p_branch]
+                               when branch_ids is null or p_branch = any(branch_ids) then branch_ids
+                               else branch_ids || p_branch end,
+             name_en = coalesce(name_en, nullif(btrim(cat ->> 'name_en'), ''))
        where id = v_cat;
     end if;
 
@@ -3377,6 +3425,8 @@ begin
       v_isort := v_isort + 10;
       continue when coalesce(btrim(it ->> 'name_ar'), btrim(it ->> 'name_en'), '') = '';
       v_unit := case when it ->> 'unit' in ('portion', 'piece', 'kg', 'person') then it ->> 'unit' else 'portion' end;
+      v_price := nullif(it ->> 'price', '')::numeric;
+      v_item := null;
       select id into v_item from everwake.menu_items
        where tenant_id = p_tenant
          and (everwake.norm(name_ar) = everwake.norm(coalesce(it ->> 'name_ar', it ->> 'name_en'))
@@ -3391,19 +3441,24 @@ begin
                 nullif(btrim(it ->> 'name_en'), ''),
                 coalesce((select array_agg(btrim(a)) from jsonb_array_elements_text(it -> 'aliases') a where btrim(a) <> ''), '{}'),
                 nullif(btrim(it ->> 'description_ar'), ''), nullif(btrim(it ->> 'description_en'), ''),
-                v_unit, nullif(it ->> 'price', '')::numeric,
+                v_unit, v_price,
                 case when v_unit = 'kg' then 0.25 end, case when v_unit = 'kg' then 0.5 end,
                 coalesce((select array_agg(lower(btrim(a))) from jsonb_array_elements_text(it -> 'tags') a where btrim(a) <> ''), '{}'),
                 coalesce((it ->> 'is_signature')::boolean, false), v_isort, p_import)
         returning id into v_item;
         n_new := n_new + 1;
-      else
+        if p_branch is not null then
+          -- a dish from this branch's menu: on this branch only
+          insert into everwake.menu_item_branches (tenant_id, item_id, branch_id, is_listed)
+          select p_tenant, v_item, b.id, false from everwake.branches b where b.tenant_id = p_tenant and b.id <> p_branch;
+        end if;
+      elsif p_branch is null then
         update everwake.menu_items
            set category_id = v_cat, is_active = true, sort = v_isort, unit = v_unit,
                name_en = coalesce(nullif(btrim(it ->> 'name_en'), ''), name_en),
                description_ar = coalesce(nullif(btrim(it ->> 'description_ar'), ''), description_ar),
                description_en = coalesce(nullif(btrim(it ->> 'description_en'), ''), description_en),
-               price = coalesce(nullif(it ->> 'price', '')::numeric, price),
+               price = coalesce(v_price, price),
                aliases = case when jsonb_array_length(coalesce(it -> 'aliases', '[]'::jsonb)) > 0
                               then (select array_agg(distinct x) from unnest(aliases || (select array_agg(btrim(a)) from jsonb_array_elements_text(it -> 'aliases') a where btrim(a) <> '')) x)
                               else aliases end,
@@ -3411,51 +3466,100 @@ begin
                source_import_id = coalesce(p_import, source_import_id)
          where id = v_item;
         n_upd := n_upd + 1;
+      else
+        -- the restaurant's dish, now on this branch's menu at this branch's price
+        select * into v_was from everwake.menu_items where id = v_item;
+        update everwake.menu_items
+           set is_active = true,
+               name_en = coalesce(name_en, nullif(btrim(it ->> 'name_en'), '')),
+               description_ar = coalesce(description_ar, nullif(btrim(it ->> 'description_ar'), '')),
+               description_en = coalesce(description_en, nullif(btrim(it ->> 'description_en'), ''))
+         where id = v_item;
+        if not v_was.is_active then
+          -- an archived dish comes back for this branch only
+          insert into everwake.menu_item_branches as mb (tenant_id, item_id, branch_id, is_listed)
+          select p_tenant, v_item, b.id, false from everwake.branches b where b.tenant_id = p_tenant and b.id <> p_branch
+          on conflict (item_id, branch_id) do update set is_listed = false;
+        end if;
+        insert into everwake.menu_item_branches as mb (tenant_id, item_id, branch_id, is_listed, price)
+        values (p_tenant, v_item, p_branch, true, case when v_price is distinct from v_was.price then v_price end)
+        on conflict (item_id, branch_id) do update
+          set is_listed = true,
+              price = case when v_price is null then mb.price
+                           when v_price is distinct from v_was.price then v_price end;
+        n_upd := n_upd + 1;
       end if;
       v_seen := v_seen || v_item;
 
-      -- the choices are replaced as a whole when the import carries any
       if jsonb_array_length(coalesce(it -> 'options', '[]'::jsonb)) > 0 then
-        delete from everwake.menu_option_groups where item_id = v_item;
-        v_level := 0;
-        for grp in select * from jsonb_array_elements(it -> 'options') loop
-          continue when jsonb_array_length(coalesce(grp -> 'choices', '[]'::jsonb)) = 0;
-          v_level := v_level + 1;
-          insert into everwake.menu_option_groups (tenant_id, item_id, level, label_ar, label_en, required, min_select, max_select)
-          values (p_tenant, v_item, v_level,
-                  coalesce(nullif(btrim(grp ->> 'label_ar'), ''), nullif(btrim(grp ->> 'label_en'), ''), 'اختيار'),
-                  nullif(btrim(grp ->> 'label_en'), ''),
-                  coalesce((grp ->> 'required')::boolean, false),
-                  greatest(0, coalesce((grp ->> 'min')::int, case when coalesce((grp ->> 'required')::boolean, false) then 1 else 0 end)),
-                  nullif(grp ->> 'max', '')::int)
-          returning id into v_group;
-          v_osort := 0;
-          for ch in select * from jsonb_array_elements(grp -> 'choices') loop
-            v_osort := v_osort + 10;
-            continue when coalesce(btrim(ch ->> 'name_ar'), btrim(ch ->> 'name_en'), '') = '';
-            insert into everwake.menu_options (tenant_id, group_id, name_ar, name_en, price_delta, sort)
-            values (p_tenant, v_group, coalesce(nullif(btrim(ch ->> 'name_ar'), ''), btrim(ch ->> 'name_en')),
-                    nullif(btrim(ch ->> 'name_en'), ''), coalesce(nullif(ch ->> 'price_delta', '')::numeric, 0), v_osort);
+        if p_branch is not null and exists (select 1 from everwake.menu_option_groups where item_id = v_item) then
+          -- the dish has its choices: this branch's choice prices, by name
+          insert into everwake.menu_option_branches as x (tenant_id, option_id, branch_id, item_id, price_delta)
+          select distinct on (o.id) p_tenant, o.id, p_branch, v_item,
+                 nullif(coalesce(nullif(c ->> 'price_delta', '')::numeric, 0), o.price_delta)
+            from jsonb_array_elements(it -> 'options') gj
+            cross join jsonb_array_elements(coalesce(gj -> 'choices', '[]'::jsonb)) c
+            join everwake.menu_option_groups g on g.item_id = v_item
+            join everwake.menu_options o on o.group_id = g.id
+                 and everwake.norm(o.name_ar) = everwake.norm(coalesce(nullif(c ->> 'name_ar', ''), c ->> 'name_en'))
+           order by o.id, (everwake.norm(g.label_ar) = everwake.norm(gj ->> 'label_ar')) desc
+          on conflict (option_id, branch_id) do update set price_delta = excluded.price_delta, is_available = true;
+          get diagnostics v_level = row_count;
+          n_choice := n_choice + v_level;
+        else
+          -- the choices are replaced as a whole when the import carries any
+          v_kept := everwake.choice_overrides(v_item);
+          delete from everwake.menu_option_groups where item_id = v_item;
+          v_level := 0;
+          for grp in select * from jsonb_array_elements(it -> 'options') loop
+            continue when jsonb_array_length(coalesce(grp -> 'choices', '[]'::jsonb)) = 0;
+            v_level := v_level + 1;
+            insert into everwake.menu_option_groups (tenant_id, item_id, level, label_ar, label_en, required, min_select, max_select)
+            values (p_tenant, v_item, v_level,
+                    coalesce(nullif(btrim(grp ->> 'label_ar'), ''), nullif(btrim(grp ->> 'label_en'), ''), 'اختيار'),
+                    nullif(btrim(grp ->> 'label_en'), ''),
+                    coalesce((grp ->> 'required')::boolean, false),
+                    greatest(0, coalesce((grp ->> 'min')::int, case when coalesce((grp ->> 'required')::boolean, false) then 1 else 0 end)),
+                    nullif(grp ->> 'max', '')::int)
+            returning id into v_group;
+            v_osort := 0;
+            for ch in select * from jsonb_array_elements(grp -> 'choices') loop
+              v_osort := v_osort + 10;
+              continue when coalesce(btrim(ch ->> 'name_ar'), btrim(ch ->> 'name_en'), '') = '';
+              insert into everwake.menu_options (tenant_id, group_id, name_ar, name_en, price_delta, sort)
+              values (p_tenant, v_group, coalesce(nullif(btrim(ch ->> 'name_ar'), ''), btrim(ch ->> 'name_en')),
+                      nullif(btrim(ch ->> 'name_en'), ''), coalesce(nullif(ch ->> 'price_delta', '')::numeric, 0), v_osort);
+            end loop;
           end loop;
-        end loop;
+          perform everwake.restore_choice_overrides(v_item, v_kept);
+        end if;
       end if;
     end loop;
   end loop;
 
-  if p_mode = 'replace' then
+  if p_mode = 'replace' and p_branch is null then
     update everwake.menu_items set is_active = false
      where tenant_id = p_tenant and is_active and not (id = any(v_seen));
     get diagnostics n_arch = row_count;
+  elsif p_mode = 'replace' then
+    insert into everwake.menu_item_branches as mb (tenant_id, item_id, branch_id, is_listed)
+    select p_tenant, i.id, p_branch, false
+      from everwake.menu_items i
+     where i.tenant_id = p_tenant and i.is_active and not (i.id = any(v_seen))
+    on conflict (item_id, branch_id) do update set is_listed = false where mb.is_listed;
+    get diagnostics n_unlisted = row_count;
   end if;
 
   if p_import is not null then
     update everwake.menu_imports
-       set status = 'published', published_at = now(), published_by = everwake.current_user_id(), extracted = p_menu
+       set status = 'published', published_at = now(), published_by = everwake.current_user_id(), extracted = p_menu,
+           branch_id = p_branch
      where id = p_import and tenant_id = p_tenant;
   end if;
 
   return jsonb_build_object('categories_created', n_cat_new, 'items_created', n_new, 'items_updated', n_upd,
-                            'items_archived', n_arch);
+                            'items_archived', n_arch, 'items_unlisted', n_unlisted, 'choice_prices', n_choice,
+                            'branch_id', p_branch);
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -3656,10 +3760,12 @@ declare
   v_group uuid;
   v_level int := 0;
   v_sort int;
+  v_kept jsonb;
 begin
   select tenant_id into v_tenant from everwake.menu_items where id = p_item;
   if v_tenant is null then raise exception 'dish not found'; end if;
   perform everwake.require_role(v_tenant, array['owner', 'manager']);
+  v_kept := everwake.choice_overrides(p_item);            -- the branches' own choice prices (012)
   delete from everwake.menu_option_groups where item_id = p_item;
   for g in select * from jsonb_array_elements(coalesce(p_groups, '[]'::jsonb)) loop
     continue when jsonb_array_length(coalesce(g -> 'options', '[]'::jsonb)) = 0 or coalesce(btrim(g ->> 'label_ar'), '') = '';
@@ -3681,6 +3787,7 @@ begin
               coalesce((o ->> 'is_available')::boolean, true), v_sort);
     end loop;
   end loop;
+  perform everwake.restore_choice_overrides(p_item, v_kept);
   return v_level;
 end $$;
 
@@ -3782,7 +3889,7 @@ grant execute on function
   everwake.merged_profile(jsonb), everwake.render_template(text, jsonb),
   everwake.create_tenant(text, text, text, text, text, text, text), everwake.my_tenants(),
   everwake.onboarding_checklist(uuid), everwake.go_live(uuid, boolean),
-  everwake.publish_menu(uuid, jsonb, text, uuid), everwake.save_item_choices(uuid, jsonb),
+  everwake.publish_menu(uuid, jsonb, text, uuid, uuid), everwake.save_item_choices(uuid, jsonb),
   everwake.analytics(uuid, timestamptz, timestamptz),
   everwake.save_channel(uuid, jsonb), everwake.channel_webhook_token(uuid),
   everwake.invite_member(uuid, text, text, uuid[]), everwake.accept_invites(),
@@ -4976,6 +5083,7 @@ begin
           'fact', 'this branch takes bookings by phone only — give them the number');
       elsif b.reservations = 'off' then
         problems := problems || jsonb_build_object('problem', 'NO_BOOKINGS_AT_THIS_BRANCH', 'branch', b.name_ar,
+          'no_seating', b.dine_in is false,          -- delivery and pickup only (012)
           'branches_taking_bookings', (select jsonb_agg(x ->> 'name_ar') from jsonb_array_elements(setup -> 'branches') x where x ->> 'mode' = 'whatsapp'));
       elsif r.branch_id is distinct from b.id then
         r.branch_id := b.id; v_changed := true;
@@ -5890,6 +5998,315 @@ grant execute on all functions in schema everwake to service_role;
 grant execute on function everwake.payment_account_view(uuid), everwake.save_payment_account(uuid, jsonb),
   everwake.payment_authorize(bigint, uuid), everwake.set_order_payment(bigint, text, boolean),
   everwake.money_text(numeric, text)
+  to authenticated;
+
+-- ================= 012_branch_differences.sql =================
+-- =====================================================================
+-- Everwake Orders · 012 · branches that differ
+--
+-- The branches of one restaurant rarely sell the same things the same
+-- way. Each branch can have:
+--   · its own menu — dishes and whole categories on or off, its own dish
+--     prices (menu_item_branches, 001), its own choice prices and choices
+--     it doesn't have (menu_option_branches), categories only some
+--     branches serve (menu_categories.branch_ids)
+--   · seating or not (branches.dine_in): no seating → no table bookings
+--     and no "dine-in only" dishes there
+--   · its own payment methods (branches.payment_methods; empty = the
+--     restaurant's, Settings → Ordering)
+--
+-- The dashboard edits one branch's menu many dishes at a time
+-- (branch_menu_update), sets a branch up like another one or back to the
+-- restaurant's menu (copy_branch_menu), and imports a menu for one branch
+-- (publish_menu with a branch, 006). The agent reads all of it from the
+-- branch's snapshot (003).
+-- =====================================================================
+
+alter table everwake.branches
+  add column dine_in         boolean,   -- seating: true / false; null = not said (the agent promises nothing)
+  add column payment_methods text[]     -- null = the restaurant's list
+    check (payment_methods <@ array['cash', 'card', 'wallet', 'instapay', 'online'] and cardinality(payment_methods) > 0),
+  add constraint branches_bookings_need_seating check (dine_in is not false or reservations = 'off');
+
+alter table everwake.menu_categories
+  add column branch_ids uuid[];         -- null = every branch; else only these
+
+alter table everwake.menu_imports
+  add column branch_id uuid references everwake.branches(id) on delete set null;  -- imported for one branch
+
+-- per-branch choices: a choice has its dish's price and is offered at every
+-- branch unless a row here says otherwise
+create table everwake.menu_option_branches (
+  tenant_id    uuid not null references everwake.tenants(id) on delete cascade,
+  option_id    uuid not null references everwake.menu_options(id) on delete cascade,
+  branch_id    uuid not null references everwake.branches(id) on delete cascade,
+  item_id      uuid not null references everwake.menu_items(id) on delete cascade,
+  price_delta  numeric(10, 2),          -- null = the choice's own price
+  is_available boolean not null default true,
+  updated_at   timestamptz not null default now(),
+  primary key (option_id, branch_id)
+);
+create index menu_option_branches_item_idx on everwake.menu_option_branches (item_id, branch_id);
+
+create trigger menu_option_branches_touch before update on everwake.menu_option_branches
+  for each row execute function everwake.touch_updated_at();
+create trigger menu_option_branches_menu_rev after insert or update or delete on everwake.menu_option_branches
+  for each row execute function everwake.bump_menu_rev();
+create trigger menu_option_branches_audit after insert or update or delete on everwake.menu_option_branches
+  for each row execute function everwake.audit_change();
+
+-- ---------------------------------------------------------------------
+-- The payment methods a branch takes: its own list, or the restaurant's.
+-- "online" only while the restaurant's Paymob account is on. No branch
+-- given: every method at least one branch takes.
+-- ---------------------------------------------------------------------
+create or replace function everwake.payment_methods_at(p_tenant uuid, p_branch uuid default null)
+returns jsonb language sql stable as $$
+  with t as (
+    select array(select jsonb_array_elements_text(coalesce(everwake.merged_settings(x.settings) -> 'payment_methods',
+                                                           '["cash"]'::jsonb))) as pm,
+           exists (select 1 from everwake.payment_accounts a where a.tenant_id = p_tenant and a.enabled) as online
+      from everwake.tenants x where x.id = p_tenant
+  ), lists as (
+    select coalesce(nullif(array(select m from unnest(b.payment_methods) m where m <> 'online' or (select online from t)), '{}'),
+                    (select pm from t)) as pm
+      from everwake.branches b
+     where b.tenant_id = p_tenant and b.is_active and (p_branch is null or b.id = p_branch)
+  )
+  select to_jsonb(array(
+           select k.m from unnest(array['cash', 'card', 'wallet', 'instapay', 'online']) with ordinality k(m, n)
+            where k.m = any (coalesce((select array_agg(x) from lists, unnest(lists.pm) x), (select pm from t)))
+              and (k.m <> 'online' or (select online from t))
+            order by k.n))
+$$;
+
+-- ---------------------------------------------------------------------
+-- A dish's choices are saved as a whole (006: written again from scratch).
+-- The branches' own choice prices and switches are kept across that, on
+-- the choice with the same name (in the question with the same name, or
+-- at the same level).
+-- ---------------------------------------------------------------------
+create or replace function everwake.choice_overrides(p_item uuid)
+returns jsonb language sql stable as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'label', everwake.norm(g.label_ar), 'level', g.level, 'name', everwake.norm(o.name_ar),
+           'branch_id', x.branch_id, 'price_delta', x.price_delta, 'is_available', x.is_available)), '[]'::jsonb)
+    from everwake.menu_option_branches x
+    join everwake.menu_options o on o.id = x.option_id
+    join everwake.menu_option_groups g on g.id = o.group_id
+   where x.item_id = p_item
+$$;
+
+create or replace function everwake.restore_choice_overrides(p_item uuid, p_kept jsonb)
+returns int language plpgsql as $$
+declare n int;
+begin
+  insert into everwake.menu_option_branches (tenant_id, option_id, branch_id, item_id, price_delta, is_available)
+  select distinct on (o.id, k ->> 'branch_id')
+         o.tenant_id, o.id, (k ->> 'branch_id')::uuid, p_item,
+         nullif(k ->> 'price_delta', '')::numeric, coalesce((k ->> 'is_available')::boolean, true)
+    from everwake.menu_option_groups g
+    join everwake.menu_options o on o.group_id = g.id
+    join jsonb_array_elements(coalesce(p_kept, '[]'::jsonb)) k
+      on k ->> 'name' = everwake.norm(o.name_ar)
+     and (k ->> 'label' = everwake.norm(g.label_ar) or (k ->> 'level')::int = g.level)
+    join everwake.branches b on b.id = (k ->> 'branch_id')::uuid
+   where g.item_id = p_item
+   order by o.id, k ->> 'branch_id', (k ->> 'label' = everwake.norm(g.label_ar)) desc
+  on conflict (option_id, branch_id) do nothing;
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+-- a price as menus print it: to the nearest p_step (1, 5, …); 0 = to the piastre
+create or replace function everwake.round_price(p numeric, p_step numeric)
+returns numeric language sql immutable as $$
+  select case when p is null then null
+              when coalesce(p_step, 0) <= 0 then round(p, 2)
+              else round(p / p_step) * p_step end
+$$;
+
+-- ---------------------------------------------------------------------
+-- Many dishes at one branch at once (the menu page with a branch chosen)
+-- p = {"items": ["<item id>", …],
+--      "listed": true | false,                        on / off this branch's menu
+--      "available": true | false,                     the stock switch at this branch
+--      "price": {"mode": "reset" | "set" | "percent" | "amount",
+--                "value": 10,                         the price, or +/- % or amount
+--                "from": "current" | "restaurant",    what a % or amount starts from
+--                "round": 1,                          to the nearest pound (5, 0.5, 0 = exact)
+--                "choices": true}}                    a % or a reset also moves the choice prices
+-- A price that comes out equal to the restaurant's is stored as "the
+-- restaurant's" (no override), so later restaurant price changes reach it.
+-- ---------------------------------------------------------------------
+create or replace function everwake.branch_menu_update(p_tenant uuid, p_branch uuid, p jsonb)
+returns jsonb language plpgsql security definer set search_path = everwake, pg_temp as $$
+declare
+  v_items   uuid[];
+  v_mode    text := nullif(p -> 'price' ->> 'mode', '');
+  v_val     numeric := nullif(p -> 'price' ->> 'value', '')::numeric;
+  v_from    text := coalesce(nullif(p -> 'price' ->> 'from', ''), 'current');
+  v_round   numeric := coalesce(nullif(p -> 'price' ->> 'round', '')::numeric, 1);
+  v_choices boolean := coalesce((p -> 'price' ->> 'choices')::boolean, true);
+  n_items   int := 0;
+  n_choices int := 0;
+  n         int;
+begin
+  perform everwake.require_role(p_tenant, array['owner', 'manager']);
+  if not exists (select 1 from everwake.branches where id = p_branch and tenant_id = p_tenant) then
+    raise exception 'branch not found';
+  end if;
+  if v_mode is not null and v_mode not in ('reset', 'set', 'percent', 'amount') then
+    raise exception 'price mode is reset, set, percent or amount';
+  end if;
+  if v_mode in ('set', 'percent', 'amount') and v_val is null then raise exception 'a price change needs a value'; end if;
+  if v_mode = 'set' and v_val < 0 then raise exception 'a price cannot be below zero'; end if;
+  if v_mode = 'percent' and v_val <= -100 then raise exception 'a price cannot go down by 100%% or more'; end if;
+  if v_from not in ('current', 'restaurant') then raise exception 'from is current or restaurant'; end if;
+
+  select array_agg(i.id) into v_items
+    from everwake.menu_items i
+   where i.tenant_id = p_tenant
+     and i.id in (select x::uuid from jsonb_array_elements_text(coalesce(p -> 'items', '[]'::jsonb)) x);
+  if v_items is null then
+    return jsonb_build_object('items', 0, 'choices', 0);
+  end if;
+
+  -- each dish gets its row for this branch (as it is now: on the menu, the restaurant's price)
+  insert into everwake.menu_item_branches (tenant_id, item_id, branch_id)
+  select p_tenant, x, p_branch from unnest(v_items) x
+  on conflict (item_id, branch_id) do nothing;
+
+  if p ? 'listed' then
+    update everwake.menu_item_branches set is_listed = (p ->> 'listed')::boolean
+     where branch_id = p_branch and item_id = any(v_items) and is_listed is distinct from (p ->> 'listed')::boolean;
+    get diagnostics n = row_count; n_items := greatest(n_items, n);
+  end if;
+
+  if p ? 'available' then
+    update everwake.menu_item_branches set is_available = (p ->> 'available')::boolean, sold_out_until = null
+     where branch_id = p_branch and item_id = any(v_items)
+       and (is_available is distinct from (p ->> 'available')::boolean or sold_out_until is not null);
+    get diagnostics n = row_count; n_items := greatest(n_items, n);
+  end if;
+
+  if v_mode is not null then
+    update everwake.menu_item_branches mb
+       set price = x.new_price
+      from (select mb2.item_id,
+                   case when v_mode = 'reset' then null
+                        else nullif(greatest(0, everwake.round_price(
+                               case v_mode
+                                 when 'set' then v_val
+                                 when 'percent' then b.base * (1 + v_val / 100)
+                                 when 'amount' then b.base + v_val end, v_round)), i.price) end as new_price,
+                   b.base
+              from everwake.menu_item_branches mb2
+              join everwake.menu_items i on i.id = mb2.item_id
+              cross join lateral (select case when v_from = 'restaurant' then i.price else coalesce(mb2.price, i.price) end as base) b
+             where mb2.branch_id = p_branch and mb2.item_id = any(v_items)) x
+     where mb.branch_id = p_branch and mb.item_id = x.item_id
+       and (v_mode in ('reset', 'set') or x.base is not null)        -- "+10%" of a price the branch confirms: nothing to move
+       and mb.price is distinct from x.new_price;
+    get diagnostics n = row_count; n_items := greatest(n_items, n);
+
+    if v_choices and v_mode = 'reset' then
+      update everwake.menu_option_branches set price_delta = null
+       where branch_id = p_branch and item_id = any(v_items) and price_delta is not null;
+      get diagnostics n_choices = row_count;
+    elsif v_choices and v_mode = 'percent' then
+      insert into everwake.menu_option_branches (tenant_id, option_id, branch_id, item_id)
+      select p_tenant, o.id, p_branch, g.item_id
+        from everwake.menu_options o join everwake.menu_option_groups g on g.id = o.group_id
+       where g.item_id = any(v_items) and o.price_delta <> 0
+      on conflict (option_id, branch_id) do nothing;
+      update everwake.menu_option_branches x
+         set price_delta = nullif(everwake.round_price(
+                             (case when v_from = 'restaurant' then o.price_delta else coalesce(x.price_delta, o.price_delta) end)
+                             * (1 + v_val / 100), v_round), o.price_delta)
+        from everwake.menu_options o
+       where o.id = x.option_id and x.branch_id = p_branch and x.item_id = any(v_items)
+         and (case when v_from = 'restaurant' then o.price_delta else coalesce(x.price_delta, o.price_delta) end) <> 0
+         and x.price_delta is distinct from nullif(everwake.round_price(
+                             (case when v_from = 'restaurant' then o.price_delta else coalesce(x.price_delta, o.price_delta) end)
+                             * (1 + v_val / 100), v_round), o.price_delta);
+      get diagnostics n_choices = row_count;
+    end if;
+  end if;
+
+  -- rows that change nothing any more
+  delete from everwake.menu_item_branches
+   where branch_id = p_branch and item_id = any(v_items)
+     and is_listed and price is null and is_available and sold_out_until is null;
+  delete from everwake.menu_option_branches
+   where branch_id = p_branch and item_id = any(v_items) and price_delta is null and is_available;
+
+  return jsonb_build_object('items', n_items, 'choices', n_choices);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- One branch's menu set up like another's (a new branch "the same as
+-- Zamalek"): the same dishes on and off, the same prices, the same choice
+-- prices and choices, the same categories. p_from null: back to the
+-- restaurant's menu — every dish, the restaurant's prices and choices.
+-- The stock switches stay as they are: those are the branch's own, today.
+-- ---------------------------------------------------------------------
+create or replace function everwake.copy_branch_menu(p_tenant uuid, p_from uuid, p_to uuid)
+returns jsonb language plpgsql security definer set search_path = everwake, pg_temp as $$
+declare n_items int; n_choices int; n_cats int := 0;
+begin
+  perform everwake.require_role(p_tenant, array['owner', 'manager']);
+  if not exists (select 1 from everwake.branches where id = p_to and tenant_id = p_tenant)
+     or (p_from is not null and not exists (select 1 from everwake.branches where id = p_from and tenant_id = p_tenant)) then
+    raise exception 'branch not found';
+  end if;
+  if p_from = p_to then raise exception 'choose another branch to copy from'; end if;
+
+  insert into everwake.menu_item_branches as mb (tenant_id, item_id, branch_id, is_listed, price)
+  select p_tenant, i.id, p_to, coalesce(f.is_listed, true), f.price
+    from everwake.menu_items i
+    left join everwake.menu_item_branches f on f.item_id = i.id and f.branch_id = p_from
+   where i.tenant_id = p_tenant
+  on conflict (item_id, branch_id) do update
+    set is_listed = excluded.is_listed, price = excluded.price
+    where (mb.is_listed, mb.price) is distinct from (excluded.is_listed, excluded.price);
+  get diagnostics n_items = row_count;
+  delete from everwake.menu_item_branches
+   where branch_id = p_to and is_listed and price is null and is_available and sold_out_until is null;
+
+  delete from everwake.menu_option_branches where branch_id = p_to;
+  insert into everwake.menu_option_branches (tenant_id, option_id, branch_id, item_id, price_delta, is_available)
+  select tenant_id, option_id, p_to, item_id, price_delta, is_available
+    from everwake.menu_option_branches where branch_id = p_from;
+  get diagnostics n_choices = row_count;
+
+  if p_from is not null then
+    update everwake.menu_categories
+       set branch_ids = case when p_from = any(branch_ids) then branch_ids || p_to else array_remove(branch_ids, p_to) end
+     where tenant_id = p_tenant and branch_ids is not null
+       and (p_from = any(branch_ids)) <> coalesce(p_to = any(branch_ids), false);
+    get diagnostics n_cats = row_count;
+  end if;
+
+  return jsonb_build_object('items', n_items, 'choices', n_choices, 'categories', n_cats);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- Who can see and change what
+-- ---------------------------------------------------------------------
+alter table everwake.menu_option_branches enable row level security;
+create policy member_read on everwake.menu_option_branches for select to authenticated
+  using (tenant_id = any ((select everwake.my_tenant_ids())::uuid[]));
+create policy editor_write on everwake.menu_option_branches for all to authenticated
+  using (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]))
+  with check (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]));
+grant select, insert, update, delete on everwake.menu_option_branches to authenticated;
+grant all on everwake.menu_option_branches to service_role;
+
+revoke execute on all functions in schema everwake from public, anon;
+grant execute on all functions in schema everwake to service_role;
+grant execute on function everwake.branch_menu_update(uuid, uuid, jsonb), everwake.copy_branch_menu(uuid, uuid, uuid),
+  everwake.payment_methods_at(uuid, uuid)
   to authenticated;
 
 -- ================= 090_supabase.sql =================

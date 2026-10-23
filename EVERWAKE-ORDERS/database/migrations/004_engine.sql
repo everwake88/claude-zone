@@ -1062,7 +1062,12 @@ returns jsonb language sql stable as $$
          from everwake.customer_addresses a
          join everwake.conversations c on c.customer_id = a.customer_id
         where c.tenant_id = p_tenant and c.wa_id = p_wa), '[]'::jsonb),
-    'zones_drawn', exists (select 1 from everwake.delivery_zones where tenant_id = p_tenant and is_active))
+    'zones_drawn', exists (select 1 from everwake.delivery_zones where tenant_id = p_tenant and is_active),
+    -- each branch takes its own payment methods (012)
+    'payment_methods_by_branch', coalesce((
+       select jsonb_object_agg(b ->> 'id', b -> 'payment_methods')
+         from everwake.menu_snapshot s, jsonb_array_elements(s.lookup -> 'branches') b
+        where s.tenant_id = p_tenant and s.scope = 'all'), '{}'::jsonb))
 $$;
 
 create or replace function everwake.persist_details(p jsonb)

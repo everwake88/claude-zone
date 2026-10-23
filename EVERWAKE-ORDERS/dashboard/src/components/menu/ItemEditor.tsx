@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
-import type { Branch, Category, Item, ItemBranch, ItemMedia, OptionGroup } from '@/lib/types';
+import type { Branch, Category, Item, ItemBranch, ItemMedia, OptionBranch, OptionGroup } from '@/lib/types';
 import { Badge, Button, Checkbox, Drawer, Field, Input, Select, Switch, Tabs, Textarea, useAction } from '../ui';
 import { useTenant } from '../tenant';
 import { StockButton } from './StockButton';
@@ -13,11 +13,15 @@ const csv = (a?: string[] | null) => (a || []).join('، ');
 const list = (s: string) => s.split(/[,،]/).map(x => x.trim()).filter(Boolean);
 type Tab = 'details' | 'choices' | 'branches' | 'photos';
 
+// a saved choice, for its price and switch per branch
+interface SavedOption { id: string; group: string; name_ar: string; price_delta: number; is_available: boolean }
+
 interface GroupDraft { label_ar: string; label_en: string; required: boolean; min: string; max: string;
   options: { name_ar: string; name_en: string; aliases: string; price_delta: string; extra_charge: boolean; is_available: boolean }[] }
 
-export function ItemEditor({ item, categories, branches, onClose, onSaved, defaultCategory }:
-  { item: Item | null | 'new'; categories: Category[]; branches: Branch[]; onClose: () => void; onSaved: () => void; defaultCategory?: string }) {
+export function ItemEditor({ item, categories, branches, onClose, onSaved, defaultCategory, defaultBranch }:
+  { item: Item | null | 'new'; categories: Category[]; branches: Branch[]; onClose: () => void; onSaved: () => void;
+    defaultCategory?: string; defaultBranch?: string }) {
   const { tenant } = useTenant();
   const t = useT();
   const [tab, setTab] = useState<Tab>('details');
@@ -26,33 +30,52 @@ export function ItemEditor({ item, categories, branches, onClose, onSaved, defau
   const [tags, setTags] = useState('');
   const [groups, setGroups] = useState<GroupDraft[]>([]);
   const [overrides, setOverrides] = useState<Record<string, ItemBranch>>({});
+  const [saved, setSaved] = useState<SavedOption[]>([]);
+  const [optOv, setOptOv] = useState<Record<string, OptionBranch>>({});
+  const [choicesAt, setChoicesAt] = useState<string | null>(null);
+  const [servedAt, setServedAt] = useState<string[]>([]);
   const [media, setMedia] = useState<ItemMedia[]>([]);
   const file = useRef<HTMLInputElement>(null);
   const { busy, run } = useAction();
   const isNew = item === 'new';
   const id = item && item !== 'new' ? item.id : (it.id as string | undefined);
 
-  useEffect(() => {
-    setTab('details');
-    if (!item) return;
-    if (item === 'new') {
-      setIt({ unit: 'portion', orderable: true, is_active: true, is_available: true, category_id: defaultCategory || categories[0]?.id || null });
-      setAliases(''); setTags(''); setGroups([]); setOverrides({}); setMedia([]);
-      return;
-    }
-    setIt(item); setAliases(csv(item.aliases)); setTags(csv(item.tags));
+  // the dish's choices, and their prices and switches at each branch (saving the choices gives them new ids)
+  const loadChoices = (itemId: string) => {
     const db = sb();
-    db.from('menu_option_groups').select('*, options:menu_options(*)').eq('item_id', item.id).order('level').then(({ data }) => {
-      setGroups(((data || []) as OptionGroup[]).map(g => ({
+    db.from('menu_option_groups').select('*, options:menu_options(*)').eq('item_id', itemId).order('level').then(({ data }) => {
+      const gs = (data || []) as OptionGroup[];
+      setGroups(gs.map(g => ({
         label_ar: g.label_ar, label_en: g.label_en || '', required: g.required, min: String(g.min_select ?? ''), max: g.max_select == null ? '' : String(g.max_select),
         options: (g.options || []).sort((a, b) => a.sort - b.sort).map(o => ({ name_ar: o.name_ar, name_en: o.name_en || '', aliases: csv(o.aliases),
           price_delta: String(o.price_delta ?? 0), extra_charge: o.extra_charge, is_available: o.is_available }))
       })));
+      setSaved(gs.flatMap(g => (g.options || []).sort((a, b) => a.sort - b.sort)
+        .map(o => ({ id: o.id, group: g.label_ar, name_ar: o.name_ar, price_delta: Number(o.price_delta), is_available: o.is_available }))));
     });
+    db.from('menu_option_branches').select('*').eq('item_id', itemId).then(({ data }) =>
+      setOptOv(Object.fromEntries(((data || []) as OptionBranch[]).map(o => [`${o.option_id}:${o.branch_id}`, o]))));
+  };
+
+  // a new dish, or another dish, opened: start over (not when the menu behind reloads after a save)
+  const opened = item === 'new' ? 'new' : item ? item.id : null;
+  useEffect(() => {
+    setTab('details'); setChoicesAt(null);
+    if (!item) return;
+    if (item === 'new') {
+      setIt({ unit: 'portion', orderable: true, is_active: true, is_available: true, category_id: defaultCategory || categories[0]?.id || null });
+      setAliases(''); setTags(''); setGroups([]); setOverrides({}); setMedia([]); setSaved([]); setOptOv({});
+      setServedAt(defaultBranch ? [defaultBranch] : branches.map(b => b.id));
+      return;
+    }
+    setIt(item); setAliases(csv(item.aliases)); setTags(csv(item.tags));
+    const db = sb();
+    loadChoices(item.id);
     db.from('menu_item_branches').select('*').eq('item_id', item.id).then(({ data }) =>
       setOverrides(Object.fromEntries(((data || []) as ItemBranch[]).map(o => [o.branch_id, o]))));
     db.from('item_media').select('*').eq('item_id', item.id).order('sort').then(({ data }) => setMedia((data || []) as ItemMedia[]));
-  }, [item, categories, defaultCategory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened]);
 
   const set = <K extends keyof Item>(k: K, v: Item[K]) => setIt(x => ({ ...x, [k]: v }));
 
@@ -66,13 +89,23 @@ export function ItemEditor({ item, categories, branches, onClose, onSaved, defau
       is_active: it.is_active !== false
     };
     if (!row.name_ar) throw new Error(t('The dish needs an Arabic name'));
+    if (!id && branches.length > 1 && !servedAt.length) throw new Error(t('Tick at least one branch that serves this dish'));
     if (id) {
       const { error } = await sb().from('menu_items').update(row).eq('id', id);
       if (error) throw new Error(error.message);
     } else {
       const { data, error } = await sb().from('menu_items').insert(row).select('*').single();
       if (error) throw new Error(error.message);
-      setIt(data as Item);
+      const created = data as Item;
+      // a new dish only some branches serve: off the others' menus
+      const off = branches.length > 1 ? branches.filter(b => !servedAt.includes(b.id)) : [];
+      if (off.length) {
+        const rows = off.map(b => ({ tenant_id: tenant.id, item_id: created.id, branch_id: b.id, is_listed: false }));
+        const { data: ob, error: e2 } = await sb().from('menu_item_branches').upsert(rows, { onConflict: 'item_id,branch_id' }).select('*');
+        if (e2) throw new Error(e2.message);
+        setOverrides(Object.fromEntries(((ob || []) as ItemBranch[]).map(o => [o.branch_id, o])));
+      }
+      setIt(created);
       setTab('choices');
     }
     onSaved();
@@ -84,8 +117,28 @@ export function ItemEditor({ item, categories, branches, onClose, onSaved, defau
       options: g.options.map(o => ({ ...o, aliases: list(o.aliases) })) }));
     const { error } = await sb().rpc('save_item_choices', { p_item: id, p_groups: payload });
     if (error) throw new Error(error.message);
+    loadChoices(id);
     onSaved();
   }, t('Choices saved'));
+
+  // one choice at one branch: its own price (empty = the dish's), or not offered there
+  const saveOptionBranch = (optionId: string, branchId: string, patch: Partial<OptionBranch>) => run(async () => {
+    if (!id) return;
+    const key = `${optionId}:${branchId}`;
+    const cur = optOv[key] || { price_delta: null, is_available: true };
+    const next = { tenant_id: tenant.id, option_id: optionId, branch_id: branchId, item_id: id,
+                   price_delta: cur.price_delta, is_available: cur.is_available, ...patch };
+    if (next.price_delta == null && next.is_available) {
+      const { error } = await sb().from('menu_option_branches').delete().eq('option_id', optionId).eq('branch_id', branchId);
+      if (error) throw new Error(error.message);
+      setOptOv(o => { const n = { ...o }; delete n[key]; return n; });
+    } else {
+      const { data, error } = await sb().from('menu_option_branches').upsert(next, { onConflict: 'option_id,branch_id' }).select('*').single();
+      if (error) throw new Error(error.message);
+      setOptOv(o => ({ ...o, [key]: data as OptionBranch }));
+    }
+    onSaved();
+  });
 
   const saveBranch = (branchId: string, patch: Partial<ItemBranch>) => run(async () => {
     if (!id) throw new Error(t('Save the details first'));
@@ -177,6 +230,16 @@ export function ItemEditor({ item, categories, branches, onClose, onSaved, defau
             <Checkbox checked={it.orderable === false} onChange={v => set('orderable', !v)} label={<>{t('Dine-in only')} <span className="text-muted">{t('— shown, never delivered or picked up (shisha, drinks…)')}</span></>} />
             <Checkbox checked={it.is_active === false} onChange={v => set('is_active', !v)} label={<>{t('Archived')} <span className="text-muted">{t('— hidden from the agent completely')}</span></>} />
           </div>
+          {!id && branches.length > 1 && (
+            <div className="space-y-2 rounded-lg border border-hairline p-3 sm:col-span-2">
+              <p className="text-sm font-medium">{t('Served at')}</p>
+              <div className="flex flex-wrap gap-4">
+                {branches.map(b => <Checkbox key={b.id} checked={servedAt.includes(b.id)} label={b.name_en || b.name_ar}
+                  onChange={v => setServedAt(x => v ? [...x.filter(y => y !== b.id), b.id] : x.filter(y => y !== b.id))} />)}
+              </div>
+              <p className="text-xs text-muted">{t('Its price and choices can differ by branch too — in the Branches tab, once it is created.')}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -239,9 +302,12 @@ export function ItemEditor({ item, categories, branches, onClose, onSaved, defau
           {branches.map(b => {
             const o = overrides[b.id];
             const listed = o ? o.is_listed : true;
+            const nOwn = saved.filter(x => optOv[`${x.id}:${b.id}`]).length;
             return (
-              <div key={b.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-hairline p-3">
-                <span className="min-w-32 flex-1 font-medium">{b.name_en || b.name_ar}</span>
+              <div key={b.id} className="rounded-xl border border-hairline p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="min-w-32 flex-1 font-medium">{b.name_en || b.name_ar}
+                  {!it.orderable && b.dine_in === false && <span className="block text-xs font-normal text-caution">{t('dine-in only, and this branch has no seating — not offered there')}</span>}</span>
                 <label className="flex items-center gap-2 text-sm">{t("On this branch's menu")} <Switch checked={listed} onChange={v => saveBranch(b.id, { is_listed: v })} /></label>
                 <label className="flex items-center gap-2 text-sm">{t('Price')}
                   <Input className="w-28" type="number" step="0.5" placeholder={it.price != null ? String(it.price) : '—'} defaultValue={o?.price ?? ''}
@@ -250,6 +316,36 @@ export function ItemEditor({ item, categories, branches, onClose, onSaved, defau
                 {id && listed && <StockButton itemId={id} branchId={b.id} available={o ? o.is_available : true} soldOutUntil={o?.sold_out_until || null}
                   onDone={() => sb().from('menu_item_branches').select('*').eq('item_id', id).then(({ data }) =>
                     setOverrides(Object.fromEntries(((data || []) as ItemBranch[]).map(x => [x.branch_id, x]))))} />}
+              </div>
+              {listed && saved.length > 0 && (
+                <div className="mt-2">
+                  <button className="text-xs text-gold-ink underline" onClick={() => setChoicesAt(choicesAt === b.id ? null : b.id)}>
+                    {choicesAt === b.id ? t('Hide the choices') : nOwn ? t('Choices at this branch ({n} different)', { n: nOwn }) : t('Choices at this branch')}
+                  </button>
+                  {choicesAt === b.id && (
+                    <table className="mt-2 w-full text-sm">
+                      <thead><tr className="text-start text-xs text-muted"><th className="pb-1">{t('Choice')}</th><th>{t('The dish’s price')}</th><th className="w-28">{t('Here')}</th><th className="w-20">{t('Offered here')}</th></tr></thead>
+                      <tbody>
+                        {saved.map(x => {
+                          const xo = optOv[`${x.id}:${b.id}`];
+                          return (
+                            <tr key={x.id}>
+                              <td className="py-0.5" dir="auto"><span className="text-muted">{x.group}:</span> {x.name_ar}</td>
+                              <td className="text-muted">+{money(x.price_delta, sym)}</td>
+                              <td><div className="w-24"><Input key={`${x.id}:${b.id}:${xo?.price_delta ?? ''}`} type="number" step="0.5" placeholder={String(x.price_delta)}
+                                aria-label={t('Price of {choice} at {branch}', { choice: x.name_ar, branch: b.name_en || b.name_ar })} defaultValue={xo?.price_delta ?? ''}
+                                onBlur={e => { const v = e.target.value === '' ? null : Number(e.target.value);
+                                               if (v !== (xo?.price_delta ?? null)) saveOptionBranch(x.id, b.id, { price_delta: v === x.price_delta ? null : v }); }} /></div></td>
+                              <td><Switch checked={x.is_available && (xo?.is_available ?? true)} disabled={!x.is_available} label={t('Offered here')}
+                                onChange={v => saveOptionBranch(x.id, b.id, { is_available: v })} /></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
               </div>
             );
           })}

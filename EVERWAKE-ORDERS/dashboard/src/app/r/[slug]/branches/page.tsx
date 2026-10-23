@@ -1,5 +1,5 @@
 'use client';
-import { CalendarDays, Clock, MapPin, Pause, Pencil, Phone, Plus, Store } from 'lucide-react';
+import { CalendarDays, Clock, CreditCard, MapPin, Pause, Pencil, Phone, Plus, Store, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { HoursEditor } from '@/components/branches/HoursEditor';
@@ -9,6 +9,9 @@ import { clock, money, parseLatLng } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch } from '@/lib/types';
+
+const PAYMENTS: [string, string][] = [['cash', 'Cash'], ['card', 'Card on delivery'], ['wallet', 'Mobile wallet'], ['instapay', 'InstaPay'],
+  ['online', 'Online (Paymob link)']];
 
 const STATE: Record<string, { label: string; tone: 'positive' | 'neutral' | 'caution' | 'critical' }> = {
   open: { label: 'Open now', tone: 'positive' }, closed: { label: 'Closed now', tone: 'neutral' },
@@ -22,10 +25,14 @@ export default function BranchesPage() {
   const [states, setStates] = useState<Record<string, string>>({});
   const [edit, setEdit] = useState<Partial<Branch> | null>(null);
   const [busyFor, setBusyFor] = useState<Branch | null>(null);
+  const [restPay, setRestPay] = useState<string[]>(['cash']);
   const { busy, run } = useAction();
   const t = useT();
+  const payName = (m: string) => t(PAYMENTS.find(p => p[0] === m)?.[1] || m);
 
   const load = useCallback(async () => {
+    const { data: tr } = await sb().from('tenants').select('settings').eq('id', tenant.id).single();
+    setRestPay(((tr as { settings?: { payment_methods?: string[] } } | null)?.settings?.payment_methods) || ['cash']);
     const { data } = await sb().from('branches').select('*').eq('tenant_id', tenant.id).order('sort');
     const rows = (data || []) as Branch[];
     setList(rows);
@@ -51,9 +58,12 @@ export default function BranchesPage() {
       vat_percent: b.vat_percent ?? null, price_note_ar: b.price_note_ar || null, prep_minutes: b.prep_minutes ?? null,
       delivery_eta_text: b.delivery_eta_text || null, serves_hint_ar: b.serves_hint_ar || null, seasonal: !!b.seasonal,
       is_active: b.is_active !== false, sort: b.sort ?? ((list?.length || 0) + 1) * 10,
-      reservations: b.reservations || 'off', reservation_note_ar: b.reservation_note_ar || null, reservation_max_guests: b.reservation_max_guests ?? null
+      reservations: b.dine_in === false ? 'off' : b.reservations || 'off', reservation_note_ar: b.reservation_note_ar || null,
+      reservation_max_guests: b.reservation_max_guests ?? null,
+      dine_in: b.dine_in ?? null, payment_methods: b.payment_methods ?? null
     };
     if (row.reservations === 'phone' && !row.phone) throw new Error(t('Bookings by phone need the branch phone — the agent gives that number.'));
+    if (row.payment_methods && !row.payment_methods.length) throw new Error(t('Tick at least one way to pay at this branch, or use the restaurant’s.'));
     const { error } = b.id ? await sb().from('branches').update(row).eq('id', b.id) : await sb().from('branches').insert(row);
     if (error) throw new Error(error.message.includes('branches_tenant_id_code_key') ? t('Another branch already uses that code') : error.message);
     setEdit(null); await load();
@@ -100,6 +110,9 @@ export default function BranchesPage() {
                       {b.reservations === 'whatsapp' ? t('Table bookings on WhatsApp') : t('Table bookings by phone only')}</p>
                   )}
                   <p>{b.delivery_enabled ? t('Delivery {fee}', { fee: b.delivery_fee != null ? money(b.delivery_fee, tenant.currency_symbol) : t('(fee by zone)') }) : t('No delivery')} · {b.pickup_enabled ? t('Pickup') : t('No pickup')}{b.vat_percent != null ? ' · ' + t('VAT {v}%', { v: b.vat_percent }) : ''}</p>
+                  {b.dine_in != null && <p className="flex items-center gap-1.5"><UtensilsCrossed className="size-3.5" />{b.dine_in ? t('Seating — customers can eat here') : t('No seating — delivery and pickup only')}</p>}
+                  {b.payment_methods && <p className="flex items-center gap-1.5"><CreditCard className="size-3.5" />{t('Takes: {list}', { list: b.payment_methods.map(payName).join('، ') })}</p>}
+                  <Link href={`${base}/menu?branch=${b.id}`} className="inline-block text-gold-ink underline">{t('This branch’s menu')}</Link>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
                   <label className="flex items-center gap-2 text-sm">{t('Taking orders')} <Switch checked={b.accepting_orders} onChange={v => accepting(b, v)} disabled={busy} /></label>
@@ -154,10 +167,41 @@ export default function BranchesPage() {
             <Field label={t('Areas it usually serves')} hint={t('For customers who type an area instead of sharing a pin.')} className="sm:col-span-2"><Input dir="rtl" value={edit.serves_hint_ar || ''} onChange={e => set('serves_hint_ar', e.target.value)} /></Field>
             <Field label={t('Note about prices')} className="sm:col-span-2"><Textarea dir="rtl" rows={2} value={edit.price_note_ar || ''} onChange={e => set('price_note_ar', e.target.value)} placeholder="الأسعار من غير ضريبة 14%" /></Field>
             <div className="space-y-3 border-t border-hairline pt-4 sm:col-span-2">
+              <p className="flex items-center gap-2 text-sm font-medium"><Store className="size-4 text-gold" /> {t('What is different at this branch')}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={t('Seating (dine-in)')} hint={t('No seating: the agent never offers to eat in here, takes no table bookings, and leaves out dine-in only dishes.')}>
+                  <Select value={edit.dine_in == null ? '' : edit.dine_in ? 'yes' : 'no'}
+                    onChange={e => setEdit(x => ({ ...x, dine_in: e.target.value === '' ? null : e.target.value === 'yes',
+                                                   ...(e.target.value === 'no' ? { reservations: 'off' as const } : {}) }))}>
+                    <option value="">{t('Not said — the agent does not promise either')}</option>
+                    <option value="yes">{t('Yes — customers can eat here')}</option>
+                    <option value="no">{t('No — delivery and pickup only')}</option>
+                  </Select>
+                </Field>
+                <Field label={t('Payment methods')} hint={t('The agent offers only these to customers of this branch.')}>
+                  <Select value={edit.payment_methods ? 'own' : 'same'}
+                    onChange={e => set('payment_methods', e.target.value === 'own' ? [...restPay] : null)}>
+                    <option value="same">{t('The restaurant’s ({list})', { list: restPay.map(payName).join('، ') })}</option>
+                    <option value="own">{t('Its own')}</option>
+                  </Select>
+                </Field>
+              </div>
+              {edit.payment_methods && (
+                <div className="flex flex-wrap gap-5">
+                  {PAYMENTS.filter(([k]) => k !== 'online' || restPay.includes('online')).map(([k, label]) => (
+                    <Checkbox key={k} checked={edit.payment_methods!.includes(k)} label={t(label)}
+                      onChange={v => set('payment_methods', v ? [...edit.payment_methods!.filter(x => x !== k), k] : edit.payment_methods!.filter(x => x !== k))} />
+                  ))}
+                </div>
+              )}
+              {edit.payment_methods && !restPay.includes('online') && <p className="text-xs text-muted">{t('Online payment links can be ticked here once Paymob is on (Settings → Payments).')}</p>}
+              <p className="text-xs text-muted">{t('Its own dishes, prices and choices: Menu, with this branch chosen at the top.')}</p>
+            </div>
+            <div className="space-y-3 border-t border-hairline pt-4 sm:col-span-2">
               <p className="flex items-center gap-2 text-sm font-medium"><CalendarDays className="size-4 text-gold" /> {t('Table bookings (dine-in)')}</p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={t('How this branch takes bookings')}>
-                  <Select value={edit.reservations || 'off'} onChange={e => set('reservations', e.target.value as Branch['reservations'])}>
+                <Field label={t('How this branch takes bookings')} hint={edit.dine_in === false ? t('No seating at this branch, so no table bookings.') : undefined}>
+                  <Select value={edit.reservations || 'off'} disabled={edit.dine_in === false} onChange={e => set('reservations', e.target.value as Branch['reservations'])}>
                     <option value="off">{t('No table bookings')}</option>
                     <option value="whatsapp">{t('On WhatsApp — the agent takes them')}</option>
                     <option value="phone">{t('By phone only — the agent gives the branch phone')}</option>

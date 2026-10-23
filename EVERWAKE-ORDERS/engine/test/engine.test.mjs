@@ -494,3 +494,68 @@ test('normalize: groups, reactions, voice notes and the restaurant\'s own phone'
   assert.equal(logged.logged, true);
   assert.equal(unb64(mine.b64_intake).from_me, true);
 });
+
+test('branches that differ: Maadi\'s own menu and choice prices, no seating there, cash only', async () => {
+  const phone = '201077778888';
+  const tenant = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  const maadi = (await sql(db, `select id as r from everwake.branches where tenant_id = $1 and code = 'maadi'`, [tenant])).r;
+  await sql(db, `update everwake.branches set dine_in = (code = 'zamalek'), payment_methods = case when code = 'maadi' then array['cash'] end,
+                   reservations = 'off' where tenant_id = $1 returning 1 as r`, [tenant]);
+  const sandwiches = `(select jsonb_agg(id) from everwake.menu_items where tenant_id = $1 and code in ('M004', 'M005'))`;
+  await sql(db, `select everwake.branch_menu_update($1, $2, jsonb_build_object('items', ${sandwiches}, 'listed', false)) as r`, [tenant, maadi]);
+  await sql(db, `insert into everwake.menu_option_branches (tenant_id, option_id, branch_id, item_id, price_delta)
+                 select o.tenant_id, o.id, $2, g.item_id, 230 from everwake.menu_options o
+                   join everwake.menu_option_groups g on g.id = o.group_id join everwake.menu_items i on i.id = g.item_id
+                  where i.tenant_id = $1 and i.code = 'M003' and o.name_ar = 'فرخة كاملة' returning 1 as r`, [tenant, maadi]);
+
+  // before a branch: each branch's payment methods; card is not taken in Maadi
+  let t = await turn(db, evolutionPayload({ phone, pushName: 'Sara', text: 'عايزة فرخة كاملة حارة توصيل من فرع المعادي، والدفع كارت' }), async (brief) => {
+    assert.match(brief.facts_text, /PAYMENT METHODS YOU MAY PROMISE — each branch its own: الزمالك: cash, card on delivery, InstaPay · المعادي: cash/);
+    assert.match(brief.business_text, /المعادي .*NO seating — delivery and pickup only · pays: cash/);
+    assert.match(brief.business_text, /الزمالك .*seating: yes/);
+    return {
+      plan: { stage: 'ordering' },
+      tools: [
+        { tool: 'manage_cart', action: 'set_branch', branch: 'maadi' },
+        { tool: 'manage_cart', action: 'add', items: [{ menu_id: 'M003', quantity: 1, choices: [{ selected: ['فرخة كاملة', 'حار'] }] }] },
+        { tool: 'save_customer_details', details: { delivery_method: 'توصيل', payment_method: 'كارت' } }
+      ],
+      reply: quiet('تمام، فرع المعادي بياخد كاش بس — ينفع كاش عند الاستلام؟')
+    };
+  });
+  assert.equal(t.steps[1].result.cart[0].line_total, 500, 'Maadi\'s chicken 270 + its own whole-chicken price 230');
+  assert.deepEqual(t.steps[2].result.rejected, [{ field: 'payment_method', reason: 'NOT_TAKEN_AT_THIS_BRANCH', accepted: ['cash'] }]);
+
+  // Maadi's menu: no sandwiches (said to be at Zamalek), no shisha (dine-in only, no seating)
+  t = await turn(db, evolutionPayload({ phone, text: 'طب الزمالك فيه كارت؟ خليها الزمالك بالكارت… لا لا خليها المعادي' }), async (brief) => {
+    assert.match(brief.facts_text, /BRANCH: المعادي .*NO seating — delivery and pickup only/);
+    assert.match(brief.facts_text, /PAYMENT METHODS YOU MAY PROMISE at المعادي: cash \(/);
+    assert.match(brief.menu_text, /فرخة كاملة \+230ج/);
+    assert.ok(!/M004|M005|M011/.test(brief.menu_text.split('### not on this branch')[0]), 'only Maadi\'s dishes in its menu');
+    assert.match(brief.menu_text, /only at other branches:\n.*ساندوتش كفتة \(الزمالك\)/);
+    assert.ok(!/شيشة/.test(brief.menu_text), 'a dine-in only dish is never offered where there is no seating');
+    return {
+      plan: { stage: 'ordering' },
+      tools: [
+        { tool: 'manage_cart', action: 'set_branch', branch: 'zamalek' },
+        { tool: 'save_customer_details', details: { payment_method: 'card' } },
+        { tool: 'manage_cart', action: 'set_branch', branch: 'maadi' },
+        { tool: 'manage_cart', action: 'place_order' }
+      ],
+      reply: quiet('تمام رجعناها المعادي — هناك الدفع كاش بس.')
+    };
+  });
+  assert.deepEqual(t.steps[1].result.rejected || [], [], 'Zamalek takes card');
+  assert.deepEqual(t.steps[2].result.payment_not_taken_here, { method: 'card', this_branch_takes: ['cash'] });
+  assert.ok(t.steps[3].result.reasons.some(x => x.code === 'PAYMENT_NOT_TAKEN_AT_BRANCH' && x.method === 'card'), JSON.stringify(t.steps[3].result.reasons));
+
+  t = await turn(db, evolutionPayload({ phone, text: 'ماشي' }), async (brief) => {
+    assert.match(brief.facts_text, /⚠ the payment method on file \(card on delivery\) is NOT taken at المعادي/);
+    assert.match(brief.facts_text, /STILL MISSING TO PLACE AN ORDER: .*payment method/);
+    return { plan: { stage: 'details' }, reply: quiet('تمام، هيبقى كاش عند الاستلام؟') };
+  });
+
+  await sql(db, `delete from everwake.menu_option_branches where branch_id = $1 returning 1 as r`, [maadi]);
+  await sql(db, `select everwake.branch_menu_update($1, $2, jsonb_build_object('items', ${sandwiches}, 'listed', true)) as r`, [tenant, maadi]);
+  await sql(db, `update everwake.branches set dine_in = null, payment_methods = null where tenant_id = $1 returning 1 as r`, [tenant]);
+});
