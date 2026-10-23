@@ -1,0 +1,24 @@
+# Caddy: https for n8n, with a free Let's Encrypt certificate it renews by itself.
+# N8N_HOST and ACME_EMAIL come from .env (through docker-compose.yml).
+{
+	email {$ACME_EMAIL}
+}
+
+{$N8N_HOST} {
+	encode zstd gzip
+
+	# n8n's own metrics are for us, not the internet
+	respond /metrics* 404
+
+	reverse_proxy n8n:5678 {
+		# the editor's live updates
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

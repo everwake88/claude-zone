@@ -85,6 +85,10 @@ You now see every restaurant in the switcher.
 
 ## 3. The engine (n8n)
 
+Running n8n on your own server (Hostinger VPS): [`deploy/README.md`](../deploy/README.md)
+sets up the server, n8n behind https, backups and health checks; then come back
+here for the credentials and workflows.
+
 1. **Credentials** (n8n → Credentials):
    - **Postgres → name it "Everwake DB".** Supabase → Settings → Database → *Connection string*.
      - Supabase's direct host is IPv6-only, so from most VPSs use the **Session pooler**: host `aws-0-<region>.pooler.supabase.com`, port `5432`, user `postgres.<project-ref>`, your database password, SSL on.

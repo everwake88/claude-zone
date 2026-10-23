@@ -1,0 +1,176 @@
+# =====================================================================
+# Everwake Orders · the n8n server (Phase 1: one Hostinger KVM 1)
+#
+#   caddy   — HTTPS in front of n8n (free certificates, renewed by itself)
+#   n8n     — the agent's engine: the WhatsApp webhook, the tools, the outbox
+#   n8n-db  — n8n's own database (its workflows, credentials, failed runs)
+#
+# The restaurants' data stays in Supabase; the dashboard stays on Vercel.
+#
+# Phase 2 (queue mode) is already here, switched off: set
+# EXECUTIONS_MODE=queue in .env and run `docker compose --profile queue up -d`
+# to add Redis and a worker. Nothing else changes.
+#
+# Every container has a memory cap and restarts by itself, so one of them
+# misbehaving cannot take the server down with it.
+# =====================================================================
+name: everwake
+
+x-logging: &logging
+  # container logs rotate: 3 files of 10 MB each, never a full disk
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+x-n8n-env: &n8n-env
+  # n8n's own database (on this server, not Supabase)
+  DB_TYPE: postgresdb
+  DB_POSTGRESDB_HOST: n8n-db
+  DB_POSTGRESDB_PORT: "5432"
+  DB_POSTGRESDB_DATABASE: n8n
+  DB_POSTGRESDB_USER: n8n
+  DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASSWORD:?set N8N_DB_PASSWORD in .env}
+  # encrypts the credentials n8n stores; lose it and they cannot be read again
+  N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?set N8N_ENCRYPTION_KEY in .env}
+  # its public address, behind Caddy
+  N8N_HOST: ${N8N_HOST:?set N8N_HOST in .env}
+  N8N_PROTOCOL: https
+  N8N_PORT: "5678"
+  WEBHOOK_URL: https://${N8N_HOST}/
+  N8N_EDITOR_BASE_URL: https://${N8N_HOST}/
+  N8N_PROXY_HOPS: "1"
+  # listen on IPv4 inside Docker (Docker's default network has no IPv6, and n8n would fail to start)
+  N8N_LISTEN_ADDRESS: 0.0.0.0
+  N8N_WORKER_SERVER_ADDRESS: 0.0.0.0
+  GENERIC_TIMEZONE: ${TIMEZONE:-Africa/Cairo}
+  TZ: ${TIMEZONE:-Africa/Cairo}
+  # run history: keep failures (to debug) for 3 days, never every successful message
+  EXECUTIONS_DATA_SAVE_ON_SUCCESS: none
+  EXECUTIONS_DATA_SAVE_ON_ERROR: all
+  EXECUTIONS_DATA_SAVE_ON_PROGRESS: "false"
+  EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "true"
+  EXECUTIONS_DATA_PRUNE: "true"
+  EXECUTIONS_DATA_MAX_AGE: "72"
+  EXECUTIONS_DATA_PRUNE_MAX_COUNT: "5000"
+  # a run stuck for 10 minutes is stopped (a normal turn takes 10–40 s)
+  EXECUTIONS_TIMEOUT: "600"
+  # at most this many conversations at once; more wait their turn instead of crashing the server
+  N8N_CONCURRENCY_PRODUCTION_LIMIT: ${N8N_CONCURRENCY:-10}
+  # memory ceilings for n8n and for the Code nodes' runner
+  NODE_OPTIONS: --max-old-space-size=${N8N_HEAP_MB:-1536}
+  N8N_RUNNERS_MAX_OLD_SPACE_SIZE: ${N8N_RUNNER_HEAP_MB:-512}
+  N8N_DIAGNOSTICS_ENABLED: "false"
+  N8N_PERSONALIZATION_ENABLED: "false"
+  # Phase 2 (queue mode); ignored while EXECUTIONS_MODE is "regular"
+  EXECUTIONS_MODE: ${EXECUTIONS_MODE:-regular}
+  QUEUE_BULL_REDIS_HOST: redis
+  QUEUE_BULL_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  QUEUE_HEALTH_CHECK_ACTIVE: "true"
+  OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS: "true"
+
+services:
+  caddy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"          # Let's Encrypt checks and the redirect to https
+      - "443:443"        # n8n over https
+      - "443:443/udp"    # http/3
+    environment:
+      N8N_HOST: ${N8N_HOST:?set N8N_HOST in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data          # the certificates: kept, so restarts do not ask for new ones
+      - caddy_config:/config
+    depends_on: [n8n]
+    mem_limit: 128m
+    logging: *logging
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:?set N8N_VERSION in .env (the version your current n8n runs)}
+    restart: unless-stopped
+    environment: *n8n-env
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      n8n-db: { condition: service_healthy }
+    # no ports: only Caddy reaches it, over the private Docker network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5678/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    mem_limit: ${N8N_MEM_LIMIT:-2g}
+    stop_grace_period: 45s        # running conversations get time to finish on a restart
+    logging: *logging
+
+  n8n-db:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${N8N_DB_PASSWORD:?set N8N_DB_PASSWORD in .env}
+    # sized for a small server: n8n needs little from its own database
+    command: >
+      postgres -c shared_buffers=128MB -c effective_cache_size=512MB -c work_mem=4MB
+               -c maintenance_work_mem=64MB -c max_connections=40
+    volumes:
+      - n8n_db_data:/var/lib/postgresql/data
+    # no ports: never reachable from the internet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+    shm_size: 128mb
+    logging: *logging
+
+  # ---- Phase 2: queue mode (off until `--profile queue`) ---------------------
+  redis:
+    image: redis:8.6.7-alpine
+    profiles: ["queue"]
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction",
+              "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 192m
+    logging: *logging
+
+  n8n-worker:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:?set N8N_VERSION in .env}
+    profiles: ["queue"]
+    restart: unless-stopped
+    command: worker
+    environment: *n8n-env
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5678/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      n8n-db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    mem_limit: ${N8N_WORKER_MEM_LIMIT:-1536m}
+    stop_grace_period: 45s
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:
+  n8n_data:
+  n8n_db_data:
+  redis_data:
