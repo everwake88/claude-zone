@@ -93,6 +93,7 @@ Each client becomes a restaurant on the platform. A few hours each:
    | `branches` | Branches, keyed by the old ids, with hours, fees, minimum, VAT, the kitchen WhatsApp |
    | `max_delivery_km` | A delivery circle per branch, so delivery works as before until real zones are drawn |
    | `menu_snapshot` | The menu with the **same dish codes** (M001…), every choice level, each branch's own prices, what a branch does not sell |
+| Each branch's copy of the menu | When the old engine kept the details per branch (Seagull does): the dish's description, tags and weights from the branches, the price most branches charge as the dish's price, each branch's own price, and one set of choices per dish with what a branch does not offer switched off there. A dish one branch sells another way (by the portion, not the kilo) is listed in the report to check |
    | `menu_media` | The menu pages (only those with a public web address) |
    | `settings` and the snapshot's settings | The agent's name, facts, contacts, payment methods, kitchen WhatsApp, the order-number prefix. Only fills what the restaurant has not set itself |
    | `customers` | Customers, by number or by WhatsApp private id (read from the old messages) |

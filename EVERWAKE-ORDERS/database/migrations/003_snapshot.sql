@@ -26,7 +26,8 @@ returns boolean language sql stable as $$
 $$;
 
 -- one dish's choices as the engine reads them, at one branch (its own
--- choice prices, without the choices it doesn't have — 012)
+-- choice prices, without the choices it doesn't have — 012; a question
+-- with no option left there is not asked there)
 create or replace function everwake.item_choices_json(p_item uuid, p_branch uuid default null)
 returns jsonb language plpgsql stable as $$
 begin
@@ -44,7 +45,10 @@ begin
                 where o.group_id = g.id and o.is_available and coalesce(x.is_available, true)), '[]'::jsonb))
            order by g.level), '[]'::jsonb)
       from everwake.menu_option_groups g
-     where g.item_id = p_item);
+     where g.item_id = p_item
+       and exists (select 1 from everwake.menu_options o
+                     left join everwake.menu_option_branches x on x.option_id = o.id and x.branch_id = p_branch
+                    where o.group_id = g.id and o.is_available and coalesce(x.is_available, true)));
 end $$;
 
 -- one dish's choices as the model reads them (one line), at one branch
@@ -72,7 +76,10 @@ begin
                    where o.group_id = g.id and o.is_available and coalesce(x.is_available, true)), '—'),
              ' · ' order by g.level)
       from everwake.menu_option_groups g
-     where g.item_id = p_item);
+     where g.item_id = p_item
+       and exists (select 1 from everwake.menu_options o
+                     left join everwake.menu_option_branches x on x.option_id = o.id and x.branch_id = p_branch
+                    where o.group_id = g.id and o.is_available and coalesce(x.is_available, true)));
 end $$;
 
 create or replace function everwake.rebuild_snapshot(p_tenant uuid, p_force boolean default true)
@@ -293,7 +300,8 @@ begin
                             then jsonb_build_object('from', to_char(e.cat_from, 'HH24:MI'), 'to', to_char(e.cat_to, 'HH24:MI'))
                        end)), '{}'::jsonb),
            coalesce(jsonb_object_agg(e.code, jsonb_build_object('levels', everwake.item_choices_json(e.item_id, b.id)))
-                      filter (where exists (select 1 from everwake.menu_option_groups g where g.item_id = e.item_id)),
+                      filter (where exists (select 1 from everwake.menu_option_groups g where g.item_id = e.item_id)
+                                and everwake.item_choices_json(e.item_id, b.id) <> '[]'::jsonb),
                     '{}'::jsonb)
       into v_items, v_choices
       from _ew_eff e

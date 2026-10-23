@@ -213,6 +213,52 @@ end $$;
 -- ---------------------------------------------------------------------
 -- the import
 -- ---------------------------------------------------------------------
+-- one tree of choices for a dish from the trees of every branch that sells it
+-- (most common first): the levels matched by their question, the options by
+-- name; what one branch lacks is switched off there by the importer
+create or replace function everwake.legacy_union_levels(p_trees jsonb)
+returns jsonb language plpgsql immutable as $$
+declare
+  v_out  jsonb := '[]'::jsonb;
+  tree   jsonb;
+  lv     jsonb;
+  o      jsonb;
+  i      int;
+  v_at   int;
+  v_lvl  int;
+  label  text;
+begin
+  for tree in select x from jsonb_array_elements(coalesce(p_trees, '[]'::jsonb)) x where jsonb_typeof(x) = 'array' loop
+    for lv in select y from jsonb_array_elements(tree) y where jsonb_typeof(y) = 'object' loop
+      label := everwake.norm(coalesce(everwake.legacy_pick(lv, array['label_ar', 'label', 'name_ar', 'name']), 'اختيار'));
+      v_at := null;
+      for i in 0 .. jsonb_array_length(v_out) - 1 loop
+        if everwake.norm(coalesce(everwake.legacy_pick(v_out -> i, array['label_ar', 'label', 'name_ar', 'name']), 'اختيار')) = label then
+          v_at := i; exit;
+        end if;
+      end loop;
+      if v_at is null then
+        v_lvl := everwake.legacy_num(lv ->> 'level')::int;
+        if v_lvl is null or exists (select 1 from jsonb_array_elements(v_out) z where (z ->> 'level')::int = v_lvl) then
+          v_lvl := coalesce((select max((z ->> 'level')::int) from jsonb_array_elements(v_out) z), 0) + 1;
+        end if;
+        v_out := v_out || jsonb_build_array(lv || jsonb_build_object('level', v_lvl, 'options', '[]'::jsonb));
+        v_at := jsonb_array_length(v_out) - 1;
+      end if;
+      for o in select case when jsonb_typeof(z) = 'string' then jsonb_build_object('name', z #>> '{}') else z end
+                 from jsonb_array_elements(case when jsonb_typeof(lv -> 'options') = 'array' then lv -> 'options' else '[]'::jsonb end) z loop
+        continue when everwake.legacy_pick(o, array['name', 'name_ar', 'name_en']) is null;
+        if not exists (select 1 from jsonb_array_elements(v_out -> v_at -> 'options') q
+                        where everwake.norm(everwake.legacy_pick(q, array['name', 'name_ar', 'name_en']))
+                            = everwake.norm(everwake.legacy_pick(o, array['name', 'name_ar', 'name_en']))) then
+          v_out := jsonb_set(v_out, array[v_at::text, 'options'], (v_out -> v_at -> 'options') || jsonb_build_array(o));
+        end if;
+      end loop;
+    end loop;
+  end loop;
+  return jsonb_build_object('levels', v_out);
+end $$;
+
 create or replace function everwake.import_legacy_schema(p_tenant uuid, p_schema text, p_options jsonb default '{}'::jsonb)
 returns jsonb language plpgsql as $$
 declare
@@ -279,6 +325,7 @@ declare
   n_branches int := 0; n_zones int := 0; n_cats int := 0; n_items int := 0; n_choice_items int := 0;
   n_overrides int := 0; n_photos int := 0; n_pages int := 0; n_page_rows int := 0; n_customers int := 0;
   n_orders int := 0; n_skipped int := 0; n_addresses int := 0; n_messages int := 0; n_no_hours int := 0;
+  n_choice_overrides int := 0;
   v_report  jsonb;
 begin
   select * into t from everwake.tenants where id = p_tenant for update;
@@ -295,12 +342,17 @@ begin
 
   -- scratch tables, gone at the end of the transaction
   if to_regclass('pg_temp._lg_branch') is not null then drop table _lg_branch, _lg_item, _lg_cust, _lg_jid; end if;
+  if to_regclass('pg_temp._lg_bord') is not null then drop table _lg_bord; end if;
   create temp table _lg_branch (legacy_id text primary key, id uuid not null, code text, name_ar text,
                                 lat double precision, lng double precision, max_km numeric) on commit drop;
   create temp table _lg_item (old_code text primary key, old_key text, code text, id uuid, base_price numeric,
                               base_available boolean) on commit drop;
   create temp table _lg_cust (wa text primary key, id bigint not null) on commit drop;
   create temp table _lg_jid (value text, kind text, primary key (value, kind)) on commit drop;
+  -- the old branches in their own order (the first one that sells a dish describes it)
+  create temp table _lg_bord on commit drop as
+    select r ->> 'id' as key, min(coalesce(everwake.legacy_num(r ->> 'sort'), 999)) as n
+      from everwake.legacy_rows(p_schema, 'branches') r where r ? 'id' group by 1;
 
   select coalesce(jsonb_object_agg(r ->> 'id', r -> 'lookup'), '{}'::jsonb) into v_snaps
     from everwake.legacy_rows(p_schema, 'menu_snapshot') r
@@ -313,16 +365,49 @@ begin
 
   v_items := case when jsonb_typeof(v_all -> 'items') = 'object' then v_all -> 'items' else '{}'::jsonb end;
   v_choices := case when jsonb_typeof(v_all -> 'choices') = 'object' then v_all -> 'choices' else '{}'::jsonb end;
-  -- a dish only some branch snapshots carry
-  for e in select s.key as scope, x.key, x.value
-             from jsonb_each(v_snaps) s, jsonb_each(case when jsonb_typeof(s.value -> 'items') = 'object'
-                                                         then s.value -> 'items' else '{}'::jsonb end) x
-            where s.key <> 'all' order by s.key loop
-    if not v_items ? e.key then
-      v_items := v_items || jsonb_build_object(e.key, e.value);
-      if v_snaps -> e.scope -> 'choices' ? e.key and not v_choices ? e.key then
-        v_choices := v_choices || jsonb_build_object(e.key, v_snaps -> e.scope -> 'choices' -> e.key);
-      end if;
+  -- every dish any snapshot carries. An old engine kept a dish's details in each
+  -- branch's copy (the "all" copy only naming it with a price range): they come
+  -- from the first branch that sells it, the "all" copy on top, and the price
+  -- most branches charge when the "all" copy has none (each branch's own below)
+  select coalesce(jsonb_object_agg(c.code, c.entry), '{}'::jsonb) into v_items
+    from (
+      select x.code,
+             coalesce((select (s.value -> 'items' -> x.code) - 'available' - 'price_egp' - 'price'
+                         from jsonb_each(v_snaps) s left join _lg_bord o on o.key = s.key
+                        where s.key <> 'all' and jsonb_typeof(s.value -> 'items' -> x.code) = 'object'
+                        -- a branch selling it the common way (by the kilo, not by the portion) describes it
+                        order by (s.value -> 'items' -> x.code ->> 'unit') is not distinct from coalesce(v_items -> x.code ->> 'unit', (
+                                   select u.unit from (select ss.value -> 'items' -> x.code ->> 'unit' as unit
+                                                         from jsonb_each(v_snaps) ss where ss.key <> 'all'
+                                                          and jsonb_typeof(ss.value -> 'items' -> x.code) = 'object') u
+                                    group by u.unit order by count(*) desc, u.unit limit 1)) desc,
+                                 coalesce(o.n, 999), s.key limit 1), '{}'::jsonb)
+             || coalesce(case when jsonb_typeof(v_items -> x.code) = 'object' then v_items -> x.code end, '{}'::jsonb)
+             || case when everwake.legacy_pick(v_items -> x.code, array['price_egp', 'price']) is null
+                     then jsonb_strip_nulls(jsonb_build_object('price_egp', (
+                            select q.p from (
+                              select everwake.legacy_num(everwake.legacy_pick(s.value -> 'items' -> x.code, array['price_egp', 'price'])) as p
+                                from jsonb_each(v_snaps) s
+                               where s.key <> 'all' and jsonb_typeof(s.value -> 'items' -> x.code) = 'object') q
+                             where q.p is not null group by q.p order by count(*) desc, q.p limit 1)))
+                     else '{}'::jsonb end as entry
+        from (select distinct k as code
+                from jsonb_each(v_snaps) s,
+                     jsonb_object_keys(case when jsonb_typeof(s.value -> 'items') = 'object' then s.value -> 'items' else '{}'::jsonb end) k) x
+    ) c;
+  -- choices an old engine kept per branch (a dish's sizes at some branches only):
+  -- one tree per dish from every branch's, what a branch lacks is switched off there
+  for e in select x.key from jsonb_each(v_items) x where not v_choices ? x.key loop
+    select jsonb_agg(tr.levels order by tr.same desc, tr.opts desc, tr.n, tr.key) into j
+      from (select s.key, coalesce(o.n, 999) as n, s.value -> 'choices' -> e.key -> 'levels' as levels,
+                   count(*) over (partition by md5((s.value -> 'choices' -> e.key -> 'levels')::text)) as same,
+                   (select count(*) from jsonb_array_elements(s.value -> 'choices' -> e.key -> 'levels') l,
+                           jsonb_array_elements(case when jsonb_typeof(l -> 'options') = 'array' then l -> 'options' else '[]'::jsonb end) op) as opts
+              from jsonb_each(v_snaps) s left join _lg_bord o on o.key = s.key
+             where s.key <> 'all' and jsonb_typeof(s.value -> 'choices' -> e.key -> 'levels') = 'array'
+               and jsonb_array_length(s.value -> 'choices' -> e.key -> 'levels') > 0) tr;
+    if j is not null then
+      v_choices := v_choices || jsonb_build_object(e.key, everwake.legacy_union_levels(j));
     end if;
   end loop;
 
@@ -373,7 +458,7 @@ begin
       (tenant_id, code, name_ar, name_en, aliases, area_ar, address_ar, address_en, lat, lng, maps_url, phone,
        ops_whatsapp, hours, hours_text_ar, accepting_orders, delivery_enabled, pickup_enabled, delivery_fee,
        min_order, max_delivery_km, vat_percent, price_note_ar, prep_minutes, delivery_eta_text, serves_hint_ar,
-       is_active, sort)
+       seasonal, is_active, sort)
     values (p_tenant, v_code,
             coalesce(everwake.legacy_pick(j, array['name_ar', 'name', 'name_en']), v_code),
             everwake.legacy_pick(j, array['name_en']),
@@ -399,6 +484,7 @@ begin
             everwake.legacy_num(everwake.legacy_pick(j, array['prep_minutes', 'prep_time_minutes']))::int,
             everwake.legacy_pick(j, array['delivery_eta_text', 'eta_text', 'delivery_time']),
             everwake.legacy_pick(j, array['serves_hint_ar', 'serves_areas', 'serves']),
+            everwake.legacy_bool(j ->> 'seasonal', false),
             everwake.legacy_bool(coalesce(j ->> 'is_active', j ->> 'active'), true),
             n * 10)
     on conflict (tenant_id, code) do update set
@@ -423,7 +509,8 @@ begin
       price_note_ar = coalesce(excluded.price_note_ar, b.price_note_ar),
       prep_minutes = coalesce(excluded.prep_minutes, b.prep_minutes),
       delivery_eta_text = coalesce(excluded.delivery_eta_text, b.delivery_eta_text),
-      serves_hint_ar = coalesce(excluded.serves_hint_ar, b.serves_hint_ar)
+      serves_hint_ar = coalesce(excluded.serves_hint_ar, b.serves_hint_ar),
+      seasonal = excluded.seasonal
     returning b.id, b.hours into v_bid, v_hours;
 
     insert into _lg_branch (legacy_id, id, code, name_ar, lat, lng, max_km)
@@ -471,8 +558,10 @@ begin
                          then jsonb_build_object('ar', everwake.legacy_pick(v_cfg, array['agent_name', 'agent_name_ar']))
                               || coalesce(jsonb_build_object('en', everwake.legacy_pick(v_cfg, array['agent_name_en'])), '{}'::jsonb)
                   end,
-    'about_ar', everwake.legacy_pick(v_cfg, array['about_ar', 'brand_about_ar', 'about', 'brand_description']),
-    'about_en', everwake.legacy_pick(v_cfg, array['about_en', 'brand_about_en']),
+    'about_ar', coalesce(everwake.legacy_pick(v_cfg, array['about_ar', 'brand_about_ar', 'about', 'brand_description']),
+                         everwake.legacy_pick(v_cfg -> 'brand', array['about_ar', 'tagline_ar'])),
+    'about_en', coalesce(everwake.legacy_pick(v_cfg, array['about_en', 'brand_about_en']),
+                         everwake.legacy_pick(v_cfg -> 'brand', array['about_en', 'tagline_en'])),
     'cuisine', everwake.legacy_pick(v_cfg, array['cuisine']),
     'tone', everwake.legacy_pick(v_cfg, array['tone', 'brand_tone']),
     'brand_facts', case when cardinality(everwake.legacy_list(coalesce(v_cfg -> 'brand_facts_ar', v_cfg -> 'brand_facts'))) > 0
@@ -489,10 +578,10 @@ begin
                         from jsonb_each(v_cfg -> 'contacts')
                        where jsonb_typeof(value) in ('string', 'number') and btrim(value #>> '{}') <> '') c
                     order by k) d) end,
-    'website', everwake.legacy_pick(v_cfg, array['website', 'website_url']),
-    'instagram', everwake.legacy_pick(v_cfg, array['instagram', 'instagram_url']),
-    'facebook', everwake.legacy_pick(v_cfg, array['facebook', 'facebook_url']),
-    'tiktok', everwake.legacy_pick(v_cfg, array['tiktok', 'tiktok_url']),
+    'website', coalesce(everwake.legacy_pick(v_cfg, array['website', 'website_url']), everwake.legacy_pick(v_cfg -> 'brand', array['website'])),
+    'instagram', coalesce(everwake.legacy_pick(v_cfg, array['instagram', 'instagram_url']), everwake.legacy_pick(v_cfg -> 'brand', array['instagram'])),
+    'facebook', coalesce(everwake.legacy_pick(v_cfg, array['facebook', 'facebook_url']), everwake.legacy_pick(v_cfg -> 'brand', array['facebook'])),
+    'tiktok', coalesce(everwake.legacy_pick(v_cfg, array['tiktok', 'tiktok_url']), everwake.legacy_pick(v_cfg -> 'brand', array['tiktok'])),
     'google_maps_url', everwake.legacy_pick(v_cfg, array['google_maps_url'])));
 
   v_set := jsonb_strip_nulls(jsonb_build_object(
@@ -503,7 +592,11 @@ begin
     'ops_whatsapp', nullif(everwake.digits(everwake.legacy_pick(v_cfg, array['ops_whatsapp'])), ''),
     'max_delivery_km', everwake.legacy_num(everwake.legacy_pick(v_cfg, array['max_delivery_km'])),
     'allowed_links', case when cardinality(everwake.legacy_list(v_cfg -> 'allowed_links')) > 0
-                          then to_jsonb(everwake.legacy_list(v_cfg -> 'allowed_links')) end));
+                          then to_jsonb(everwake.legacy_list(v_cfg -> 'allowed_links')) end,
+    'required_fields', case when jsonb_typeof(v_cfg -> 'required_fields') = 'object'
+                             and jsonb_typeof(v_cfg -> 'required_fields' -> 'delivery') = 'array'
+                             and jsonb_typeof(v_cfg -> 'required_fields' -> 'pickup') = 'array'
+                            then v_cfg -> 'required_fields' end));
 
   -- "not set" = missing, empty, or still the platform's default
   update everwake.tenants x set
@@ -532,7 +625,10 @@ begin
      where r ->> 'order_no' ~ '^[A-Za-z0-9]{1,6}-[0-9]+$'
      group by 1 order by count(*) desc limit 1;
   end if;
-  if v_prefix ~ '^[A-Z0-9]{1,6}$' and t.order_no_prefix = 'EW' then
+  -- a restaurant that has taken no order here yet carries on with the old numbers
+  if v_prefix ~ '^[A-Z0-9]{1,6}$'
+     and not exists (select 1 from everwake.orders where tenant_id = p_tenant and order_no is not null
+                        and order_no not like v_prefix || '-%') then
     update everwake.tenants set order_no_prefix = v_prefix where id = p_tenant;
   end if;
 
@@ -546,22 +642,29 @@ begin
       -- categories, in the order their first dish appears
       v_csort := 0;
       for v_cat_name in
-        select c from (select btrim(x.value ->> 'category') as c, min(x.key) as first_code
+        select c from (select btrim(x.value ->> 'category') as c, min(x.key) as first_code,
+                              min(everwake.legacy_num(x.value ->> 'sort')) as first_sort
                          from jsonb_each(v_items) x
                         where jsonb_typeof(x.value -> 'category') = 'string' and btrim(x.value ->> 'category') <> ''
                         group by 1) s
-         order by first_code
+         order by first_sort nulls last, first_code
       loop
         v_csort := v_csort + 10;
         v_cat := null;
         select id into v_cat from everwake.menu_categories
          where tenant_id = p_tenant and everwake.norm(name_ar) = everwake.norm(v_cat_name) limit 1;
         if v_cat is null then
-          insert into everwake.menu_categories (tenant_id, name_ar, sort) values (p_tenant, v_cat_name, v_csort);
+          insert into everwake.menu_categories (tenant_id, name_ar, sort) values (p_tenant, v_cat_name, v_csort) returning id into v_cat;
           n_cats := n_cats + 1;
         else
           update everwake.menu_categories set is_active = true where id = v_cat;
         end if;
+        update everwake.menu_categories c
+           set name_en = coalesce(c.name_en, x.en), description_ar = coalesce(c.description_ar, x.note)
+          from (select min(everwake.legacy_pick(i.value, array['category_en'])) as en,
+                       min(everwake.legacy_pick(i.value, array['category_note', 'category_note_ar'])) as note
+                  from jsonb_each(v_items) i where btrim(i.value ->> 'category') = v_cat_name) x
+         where c.id = v_cat;
       end loop;
 
       n := 0;
@@ -599,9 +702,9 @@ begin
                   (select coalesce(array_agg(distinct lower(x)), '{}') from unnest(everwake.legacy_list(e.it -> 'tags')) x),
                   everwake.legacy_bool(coalesce(e.it ->> 'signature', e.it ->> 'is_signature'), false),
                   everwake.legacy_bool(coalesce(e.it ->> 'featured', e.it ->> 'is_featured'), false),
-                  everwake.legacy_bool(e.it ->> 'orderable', true),
+                  everwake.legacy_bool(coalesce(e.it ->> 'orderable', (not everwake.legacy_bool(e.it ->> 'dine_in_only', false))::text), true),
                   everwake.legacy_bool(coalesce(e.it ->> 'available', e.it ->> 'is_available'), true),
-                  true, n * 10)
+                  true, coalesce(everwake.legacy_num(e.it ->> 'sort')::int * 10, n * 10))
           returning id, code into v_iid, v_icode;
         else
           update everwake.menu_items m set
@@ -615,7 +718,8 @@ begin
             qty_step = coalesce(everwake.legacy_num(e.it ->> 'qty_step'), m.qty_step),
             min_qty = coalesce(everwake.legacy_num(e.it ->> 'min_qty'), m.min_qty),
             is_signature = everwake.legacy_bool(coalesce(e.it ->> 'signature', e.it ->> 'is_signature'), m.is_signature),
-            orderable = everwake.legacy_bool(e.it ->> 'orderable', m.orderable),
+            orderable = everwake.legacy_bool(coalesce(e.it ->> 'orderable', (not everwake.legacy_bool(e.it ->> 'dine_in_only', not m.orderable))::text), m.orderable),
+            sort = coalesce(everwake.legacy_num(e.it ->> 'sort')::int * 10, m.sort),
             is_available = everwake.legacy_bool(coalesce(e.it ->> 'available', e.it ->> 'is_available'), m.is_available),
             is_active = true
           where m.id = v_iid
@@ -704,6 +808,47 @@ begin
         get diagnostics n = row_count;
         n_overrides := n_overrides + n;
       end loop;
+
+      -- each branch's own choices, when its copy lists them: its own prices, and
+      -- what it does not offer switched off there (a dish it sells with no choice
+      -- at all: none of that dish's questions are asked at that branch)
+      delete from everwake.menu_option_branches x
+       where x.item_id in (select id from _lg_item) and x.branch_id in (select id from _lg_branch);
+      insert into everwake.menu_option_branches (tenant_id, option_id, branch_id, item_id, price_delta, is_available)
+      select p_tenant, o.id, b.id, m.id,
+             case when f.price is not null then nullif(f.price, o.price_delta) end,
+             f.price is not null and f.avail
+        from _lg_branch b
+        join _lg_item m on jsonb_typeof(v_snaps -> b.legacy_id -> 'items' -> m.old_key) = 'object'
+        join everwake.menu_option_groups g on g.item_id = m.id
+        join everwake.menu_options o on o.group_id = g.id
+        left join lateral (
+          select coalesce(everwake.legacy_num(everwake.legacy_pick(bo.v, array['price_egp', 'price', 'adds_egp', 'price_delta'])), 0) as price,
+                 everwake.legacy_bool(coalesce(bo.v ->> 'available', bo.v ->> 'is_available'), true) as avail
+            from jsonb_array_elements(case when jsonb_typeof(v_snaps -> b.legacy_id -> 'choices' -> m.old_key -> 'levels') = 'array'
+                                           then v_snaps -> b.legacy_id -> 'choices' -> m.old_key -> 'levels' else '[]'::jsonb end) bl
+            cross join lateral (select case when jsonb_typeof(z) = 'string' then jsonb_build_object('name', z #>> '{}') else z end as v
+                                  from jsonb_array_elements(case when jsonb_typeof(bl -> 'options') = 'array' then bl -> 'options' else '[]'::jsonb end) z) bo
+           where everwake.norm(coalesce(everwake.legacy_pick(bl, array['label_ar', 'label', 'name_ar', 'name']), 'اختيار')) = everwake.norm(g.label_ar)
+             and everwake.norm(everwake.legacy_pick(bo.v, array['name', 'name_ar', 'name_en'])) = everwake.norm(o.name_ar)
+           limit 1) f on true
+       where jsonb_typeof(v_snaps -> b.legacy_id -> 'choices') = 'object'
+         and (f.price is null or not f.avail or f.price <> o.price_delta);
+      get diagnostics n_choice_overrides = row_count;
+
+      -- a dish one branch sells another way (by the portion where the others sell by the kilo):
+      -- the platform has one way per dish, so say which ones to check
+      select string_agg(format('%s %s at %s (%s there)', i.code, i.name_ar, b.name_ar, v_snaps -> b.legacy_id -> 'items' -> m.old_key ->> 'unit'), '; ')
+        into v_url
+        from _lg_item m
+        join everwake.menu_items i on i.id = m.id
+        join _lg_branch b on jsonb_typeof(v_snaps -> b.legacy_id -> 'items' -> m.old_key) = 'object'
+       where v_snaps -> b.legacy_id -> 'items' -> m.old_key ? 'unit'
+         and (v_snaps -> b.legacy_id -> 'items' -> m.old_key ->> 'unit') is distinct from i.unit;
+      if v_url is not null then
+        v_warn := array_append(v_warn, 'sold another way at one branch, so check its price there (the dish keeps one way of selling): ' || v_url);
+      end if;
+      v_url := null;
 
       update everwake.tenants set item_seq = greatest(item_seq, coalesce((
           select max(substr(code, 2)::int) from everwake.menu_items where tenant_id = p_tenant), 0))
@@ -981,7 +1126,7 @@ begin
     'schema', p_schema, 'run', case when v_rerun then 'refresh' else 'first' end,
     'branches', n_branches, 'delivery_circles_created', n_zones,
     'categories_created', n_cats, 'dishes', n_items, 'dishes_with_choices', n_choice_items,
-    'branch_menu_differences', n_overrides, 'dish_photos', n_photos, 'menu_pages', n_pages,
+    'branch_menu_differences', n_overrides, 'branch_choice_differences', n_choice_overrides, 'dish_photos', n_photos, 'menu_pages', n_pages,
     'customers', n_customers, 'orders_imported', n_orders, 'orders_skipped', n_skipped,
     'addresses', n_addresses, 'messages', n_messages,
     'order_no_next', (select order_no_prefix || '-' || (order_seq + 1) from everwake.tenants where id = p_tenant),
