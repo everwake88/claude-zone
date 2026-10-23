@@ -85,7 +85,7 @@ You now see every restaurant in the switcher.
 
 ## 3. The engine (n8n)
 
-Running n8n on your own server (Hostinger VPS): [`deploy/README.md`](../deploy/README.md)
+Running n8n on your own server (Hostinger VPS): with Coolify, [`deploy/COOLIFY.md`](../deploy/COOLIFY.md); without it, [`deploy/README.md`](../deploy/README.md)
 sets up the server, n8n behind https, backups and health checks; then come back
 here for the credentials and workflows.
 

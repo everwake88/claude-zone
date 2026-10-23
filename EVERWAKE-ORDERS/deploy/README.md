@@ -1,5 +1,9 @@
 # The n8n server — Phase 1 (Hostinger KVM 1)
 
+> **Running n8n through Coolify?** Follow [COOLIFY.md](COOLIFY.md) instead — it keeps
+> Coolify and everything on it, and hardens it in place. This guide is for a server
+> without Coolify.
+
 ```
 WhatsApp ── Evolution (where it runs today) ──▶ n8n.everwake.tech ── this server (KVM 1)
                                                    │  caddy  → https, certificates
