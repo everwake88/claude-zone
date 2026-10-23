@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { SavingsHero } from '@/components/growth/SavingsHero';
 import { Badge, Button, Card, PageHeader, Spinner, useAction } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
-import { money, timeAgo, displayName } from '@/lib/format';
+import { cx, money, timeAgo, displayName } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Checklist, Conversation, Order } from '@/lib/types';
@@ -26,6 +26,20 @@ function detailText(t: (k: string, v?: Record<string, string>) => string, key: s
   for (const [re, tpl] of DETAILS) { const m = re.exec(d); if (m) return t(tpl, { a: m[1], b: m[2] }); }
   return t(d);
 }
+
+// what each step gives the restaurant, so the checklist says why and not only what
+const WHY: Record<string, string> = {
+  profile: 'The agent introduces itself by this name and tells customers only these facts about you.',
+  branches: 'Every order goes to a branch; its hours decide when the agent takes orders.',
+  zones: 'A customer’s location decides which branch delivers, the fee and the minimum.',
+  menu: 'The agent offers only the dishes here, at these prices.',
+  photos: 'Customers who ask what a dish looks like get its photo.',
+  menu_pages: 'Customers who ask for the menu get these pictures.',
+  payment: 'The agent promises only the ways of paying you tick.',
+  knowledge: 'Questions that are not about food (parking, parties…) get your own answer.',
+  whatsapp: 'The number customers message — nothing reaches the agent without it.',
+  test_order: 'Order from your own phone first, so you see what customers will see.'
+};
 
 interface Stats { orders: number; revenue: number; average_order: number; conversations: number; conversion_percent: number }
 
@@ -65,6 +79,9 @@ export default function Overview() {
   if (!list) return <Spinner />;
   const required = list.items.filter(i => i.required);
   const done = required.filter(i => i.done).length;
+  // the first required step still to do, then the first recommended one
+  const next = required.find(i => !i.done) || list.items.find(i => !i.done);
+  const later = list.items.filter(i => !i.required && !i.done);
 
   return (
     <div className="space-y-6">
@@ -74,16 +91,40 @@ export default function Overview() {
       {tenant.status !== 'live' && (
         <Card title={<span className="flex items-center gap-2"><Rocket className="size-4 text-gold" /> {t('Go-live checklist — {done} of {total} required steps done', { done, total: required.length })}</span>}
           action={can.owner && <Button variant="gold" size="sm" disabled={!list.ready} busy={busy} onClick={goLive}>{t('Go live')}</Button>}>
-          <p className="mb-4 text-sm text-muted">{t('Until you go live, only the test numbers in Settings → Ordering reach the agent — your staff keep answering everyone else from the phone as usual.')}</p>
+          <p className="mb-4 text-sm text-muted">{t('Until you go live, only the test numbers in Settings → Ordering rules reach the agent — your staff keep answering everyone else from the phone as usual.')}</p>
+          <ol className="divide-y divide-hairline">
+            {list.items.map((i, n) => {
+              const isNext = next?.key === i.key;
+              return (
+                <li key={i.key} className={cx('flex items-start gap-3 py-3', isNext && '-mx-3 rounded-lg bg-gold-wash px-3')}>
+                  {i.done ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-positive" aria-label={t('Done')} />
+                    : <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-hairline text-xs text-muted" aria-hidden>{n + 1}</span>}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{t(i.label)} {!i.required && <span className="font-normal text-muted">{t('(recommended)')}</span>}
+                      {isNext && <Badge tone="gold" className="ms-2">{t('Start here')}</Badge>}</p>
+                    {WHY[i.key] && <p className="text-sm text-muted">{t(WHY[i.key])}</p>}
+                    {i.detail && i.key !== 'profile' && <p className="text-xs text-muted">{detailText(t, i.key, i.detail)}</p>}
+                  </div>
+                  {isNext
+                    ? <Link href={`${base}/${i.href}`}><Button size="sm" variant="gold">{t('Set up')}</Button></Link>
+                    : <Link href={`${base}/${i.href}`} className="shrink-0 text-sm font-medium text-gold-ink hover:underline">{i.done ? t('Edit') : t('Set up')}</Link>}
+                </li>
+              );
+            })}
+          </ol>
+        </Card>
+      )}
+
+      {tenant.status === 'live' && can.edit && later.length > 0 && (
+        <Card title={t('Worth doing next')}>
           <ul className="divide-y divide-hairline">
-            {list.items.map(i => (
-              <li key={i.key} className="flex items-center gap-3 py-2.5">
-                {i.done ? <CheckCircle2 className="size-5 text-positive" /> : <Circle className="size-5 text-hairline" />}
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{t(i.label)} {!i.required && <span className="font-normal text-muted">{t('(recommended)')}</span>}</p>
-                  <p className="text-xs text-muted">{detailText(t, i.key, i.detail)}</p>
+            {later.map(i => (
+              <li key={i.key} className="flex items-start gap-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{t(i.label)}</p>
+                  {WHY[i.key] && <p className="text-sm text-muted">{t(WHY[i.key])}</p>}
                 </div>
-                <Link href={`${base}/${i.href}`} className="text-sm font-medium text-gold-ink hover:underline">{i.done ? t('Edit') : t('Set up')}</Link>
+                <Link href={`${base}/${i.href}`} className="shrink-0 text-sm font-medium text-gold-ink hover:underline">{t('Set up')}</Link>
               </li>
             ))}
           </ul>

@@ -3,6 +3,7 @@ import { MessageCircle, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Drawer, Field, Input, PageHeader, Select, Spinner, Textarea, useAction } from '@/components/ui';
+import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
 import { dateTime, day, displayName, money, phoneLabel, statusLabel, timeAgo } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -59,6 +60,10 @@ export default function CustomersPage() {
   return (
     <div>
       <PageHeader title={t('Customers')} subtitle={t("Everyone who wrote to you on WhatsApp. The agent remembers each one's last order and addresses — by their number, or by the private id WhatsApp sometimes shows instead.")} />
+      <PageGuide id="customers" steps={[
+          t('Everyone who wrote to you, with their orders and the addresses they used.'),
+          t('Open a customer to add a note for your team or a tag, or to block someone (the agent stops answering them).')
+        ]} />
       <div className="mb-3 flex flex-wrap gap-3">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />

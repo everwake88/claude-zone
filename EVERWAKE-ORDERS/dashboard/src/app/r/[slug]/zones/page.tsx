@@ -3,6 +3,7 @@ import { Crosshair, Plus, Trash2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Card, Checkbox, Field, Input, PageHeader, Select, Spinner, useAction } from '@/components/ui';
+import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
 import type { Shape } from '@/components/zones/ZoneMap';
 import { money } from '@/lib/format';
@@ -91,6 +92,12 @@ export default function ZonesPage() {
       <PageHeader title={t('Delivery zones')} subtitle={t("Draw where each branch delivers. A customer's location pin (or the area they type) picks the zone, its fee and minimum, and the branch.")}
         actions={<Button variant={testing ? 'primary' : 'outline'} onClick={() => { setTesting(x => !x); setHits(null); setTestPoint(null); }}>
           <Crosshair className="size-4" /> {testing ? t('Stop testing') : t('Test an address')}</Button>} />
+      <PageGuide id="zones" steps={[
+          t('Draw where each branch delivers: a shape on the map, or a circle around the branch.'),
+          t('Give each zone its fee, its minimum and the area names customers type (e.g. المعادي، دجلة).'),
+          t('When a customer shares their location pin, the zone decides the branch, the fee and whether delivery is possible there.'),
+          t('Before going live, try a few real addresses with Test an address.')
+        ]} />
       {branches.some(b => b.lat == null) && <p className="mb-3 rounded-lg bg-caution-wash px-3 py-2 text-sm text-caution">{t('Some branches have no map pin yet — add their Google Maps link in Branches so distances are right.')}</p>}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">

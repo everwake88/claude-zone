@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTenantRow } from '@/components/settings/useTenantRow';
 import { Badge, Button, Card, Checkbox, Drawer, Empty, Field, Input, Modal, PageHeader, Spinner, Tabs, Textarea, useAction } from '@/components/ui';
+import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
 import { timeAgo } from '@/lib/format';
 import { useLang } from '@/lib/i18n';
@@ -93,6 +94,12 @@ export default function Reservations() {
       <PageHeader title={t('Table bookings')}
         subtitle={t('Booking requests the agent took on WhatsApp. Call the customer, then press Confirm — they get the confirmation on WhatsApp.')}
         actions={can.edit && <Button variant="outline" onClick={() => setRules(true)}><Settings2 className="size-4" /> {t('Booking rules')}</Button>} />
+      <PageGuide id="reservations" steps={[
+          t('A booking the agent took arrives here and on the branch’s WhatsApp as a request — it is not confirmed yet.'),
+          t('Call the customer if you need to, then press Confirm or Decline. They get your answer on WhatsApp.'),
+          t('On the day, mark them Arrived or Did not come.'),
+          t('Which branches take bookings, and how: Branches → a branch → Table bookings. The rules (how far ahead, group size): Booking rules, above.')
+        ]} />
 
       {taking.length === 0 && (
         <Card>

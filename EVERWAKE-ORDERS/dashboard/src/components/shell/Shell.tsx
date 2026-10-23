@@ -14,20 +14,24 @@ import { Badge, useToast } from '../ui';
 import { useTenant } from '../tenant';
 import { AgentSwitch } from './AgentSwitch';
 
-const NAV = [
-  { href: '', label: 'Overview', icon: LayoutDashboard },
-  { href: '/orders', label: 'Orders', icon: ShoppingBag, badge: 'orders' as const },
-  { href: '/inbox', label: 'Inbox', icon: MessageCircle, badge: 'inbox' as const },
-  { href: '/reservations', label: 'Table bookings', icon: CalendarDays, badge: 'bookings' as const },
-  { href: '/menu', label: 'Menu', icon: ChefHat },
-  { href: '/offers', label: 'Offers', icon: Percent },
-  { href: '/growth', label: 'Get customers', icon: Megaphone },
-  { href: '/branches', label: 'Branches', icon: Store },
-  { href: '/zones', label: 'Delivery zones', icon: Map },
-  { href: '/drivers', label: 'Drivers', icon: Bike },
-  { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/settings', label: 'Settings', icon: Settings }
+// grouped so a new owner sees what is daily work, what is setting up, and what grows the business
+const NAV: { group: string | null; items: { href: string; label: string; icon: typeof LayoutDashboard; badge?: 'orders' | 'inbox' | 'bookings' }[] }[] = [
+  { group: null, items: [{ href: '', label: 'Overview', icon: LayoutDashboard }] },
+  { group: 'Every day', items: [
+    { href: '/orders', label: 'Orders', icon: ShoppingBag, badge: 'orders' },
+    { href: '/inbox', label: 'Inbox', icon: MessageCircle, badge: 'inbox' },
+    { href: '/reservations', label: 'Table bookings', icon: CalendarDays, badge: 'bookings' },
+    { href: '/customers', label: 'Customers', icon: Users }] },
+  { group: 'Your restaurant', items: [
+    { href: '/menu', label: 'Menu', icon: ChefHat },
+    { href: '/branches', label: 'Branches', icon: Store },
+    { href: '/zones', label: 'Delivery zones', icon: Map },
+    { href: '/drivers', label: 'Drivers', icon: Bike },
+    { href: '/offers', label: 'Offers', icon: Percent }] },
+  { group: 'Grow', items: [
+    { href: '/growth', label: 'Get customers', icon: Megaphone },
+    { href: '/analytics', label: 'Analytics', icon: BarChart3 }] },
+  { group: null, items: [{ href: '/settings', label: 'Settings', icon: Settings }] }
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -92,26 +96,31 @@ export function Shell({ children }: { children: ReactNode }) {
   const signOut = async () => { await sb().auth.signOut(); router.replace('/login'); };
 
   const nav = (
-    <nav className="flex flex-col gap-0.5 px-3">
-      {NAV.filter(x => x.badge !== 'bookings' || bookings.on).map(({ href, label, icon: Icon, badge }) => {
-        const n = badge === 'orders' ? newOrders : badge === 'inbox' ? attention : badge === 'bookings' ? bookings.waiting : 0;
-        return (
-          <Link key={href} href={base + href} onClick={() => setMobileNav(false)}
-            className={cx('flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-              active(href) ? 'bg-navy-soft text-white' : 'text-on-navy-muted hover:bg-navy-raised hover:text-white')}>
-            <Icon className="size-4" />
-            <span className="flex-1">{t(label)}</span>
-            {n > 0 && <span className={cx('rounded-full px-1.5 text-xs font-semibold', badge === 'inbox' ? 'bg-critical text-white' : 'bg-gold text-navy ring-new')}>{n}</span>}
-          </Link>
-        );
-      })}
+    <nav className="flex flex-col gap-0.5 px-3" aria-label={t('Main')}>
+      {NAV.map((g, gi) => (
+        <div key={gi} className={cx(gi > 0 && 'mt-3', g.group === null && gi > 0 && 'border-t border-navy-raised pt-3')}>
+          {g.group && <p className="px-3 pb-1 text-xs font-medium text-on-navy-muted/80">{t(g.group)}</p>}
+          {g.items.filter(x => x.badge !== 'bookings' || bookings.on).map(({ href, label, icon: Icon, badge }) => {
+            const n = badge === 'orders' ? newOrders : badge === 'inbox' ? attention : badge === 'bookings' ? bookings.waiting : 0;
+            return (
+              <Link key={href} href={base + href} onClick={() => setMobileNav(false)} aria-current={active(href) ? 'page' : undefined}
+                className={cx('flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                  active(href) ? 'bg-navy-soft text-white' : 'text-on-navy-muted hover:bg-navy-raised hover:text-white')}>
+                <Icon className="size-4" aria-hidden />
+                <span className="flex-1">{t(label)}</span>
+                {n > 0 && <span className={cx('rounded-full px-1.5 text-xs font-semibold', badge === 'inbox' ? 'bg-critical text-white' : 'bg-gold text-navy ring-new')}>{n}</span>}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 
   return (
     <div className="min-h-screen lg:ps-60">
       {/* sidebar */}
-      <aside className={cx('fixed inset-y-0 start-0 z-40 flex w-60 flex-col bg-navy text-white transition-transform lg:translate-x-0',
+      <aside className={cx('fixed inset-y-0 start-0 z-40 flex w-60 flex-col overflow-y-auto bg-navy text-white transition-transform lg:translate-x-0',
         mobileNav ? 'translate-x-0' : lang === 'ar' ? 'translate-x-full' : '-translate-x-full')}>
         <div className="relative px-5 pb-4 pt-5">
           <button onClick={() => setSwitcher(s => !s)} className="flex w-full items-center gap-2 text-start">

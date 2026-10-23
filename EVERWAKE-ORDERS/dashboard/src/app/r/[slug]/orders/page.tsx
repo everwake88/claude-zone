@@ -3,6 +3,7 @@ import { Banknote, Bike, Check, ChefHat, Clock, Copy, CreditCard, MapPin, Messag
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Drawer, Field, Input, Modal, PageHeader, Select, Spinner, Textarea, useAction, useToast } from '@/components/ui';
+import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
 import { clock, cx, dateTime, displayName, money, qty, statusLabel, timeAgo } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -106,6 +107,12 @@ export default function OrdersBoard() {
             {branches.map(b => <option key={b.id} value={b.id}>{b.name_en || b.name_ar}</option>)}
           </Select>
         )} />
+      <PageGuide id="orders" steps={[
+          t('A new order rings and lands in the first column. Tap it to see everything the customer asked for.'),
+          t('Press Accept, or Reject with a reason. Every step you press is sent to the customer on WhatsApp.'),
+          t('Move it on: Preparing, then Ready for pickup or Out for delivery, then done. For delivery, choose the driver in the order.'),
+          t('Paying online: the order shows Paid, Waiting for payment or Not paid. From the order you can send a new link, switch to cash or mark it paid.')
+        ]} />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {COLUMNS.map(col => {
@@ -219,7 +226,7 @@ function OrderDrawer({ order, onClose, base, branchName, onCancel, onChanged }:
                                                 body: JSON.stringify({ order_id: order.id, amount: linkFor || null }) });
     const r = await res.json() as { ok: boolean; status?: string; reason?: string; error?: string; fact?: string };
     if (!r.ok) {
-      if (r.status === 'NOT_CONNECTED') throw new Error(t('Paymob is not connected — Settings → Payments.'));
+      if (r.status === 'NOT_CONNECTED') throw new Error(t('Paymob is not connected — Settings → Online payments.'));
       if (r.status === 'TOTAL_NOT_FINAL') throw new Error(t('The total is not final ({reason}). Type the amount to charge.', { reason: r.reason || '' }));
       throw new Error(r.error || r.fact || r.status || 'error');
     }

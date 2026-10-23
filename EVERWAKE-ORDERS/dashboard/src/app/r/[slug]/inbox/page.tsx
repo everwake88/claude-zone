@@ -92,7 +92,15 @@ function InboxInner() {
       </aside>
 
       {selectedId ? <Thread key={selectedId} id={selectedId} onBack={() => select(null)} onChanged={loadList} />
-        : <div className="hidden flex-1 items-center justify-center md:flex"><Empty title={t('Pick a conversation')}>{t("Every WhatsApp chat is here, live — the agent's replies, your team's, and the customer's.")}</Empty></div>}
+        : <div className="hidden flex-1 items-center justify-center md:flex"><Empty title={t('Pick a conversation')}>
+            <p>{t("Every WhatsApp chat is here, live — the agent's replies, your team's, and the customer's.")}</p>
+            <ol className="mt-3 list-decimal space-y-1 ps-5 text-start">
+              <li>{t('A red “needs you” mark means the chat needs a person: the agent asked for help, or the customer is unhappy.')}</li>
+              <li>{t('Take over to answer yourself — the agent stays quiet in that chat.')}</li>
+              <li>{t('Hand back to the agent when you are done: it reads what you said and carries on.')}</li>
+              <li>{t('Forgot to hand back? It goes back to the agent by itself after the time set in Settings → Ordering rules.')}</li>
+            </ol>
+          </Empty></div>}
     </div>
   );
 }

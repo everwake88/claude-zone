@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { HoursEditor } from '@/components/branches/HoursEditor';
 import { Badge, Button, Card, Checkbox, Drawer, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Switch, Textarea, useAction } from '@/components/ui';
+import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
 import { clock, money, parseLatLng } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -88,6 +89,12 @@ export default function BranchesPage() {
     <div>
       <PageHeader title={t('Branches')} subtitle={t('Where orders are made. Opening hours, fees and the switches here decide what the agent promises.')}
         actions={can.edit && <Button variant="gold" onClick={() => setEdit({ hours: { default: [{ open: '12:00', close: '00:00' }] }, accepting_orders: true, delivery_enabled: true, pickup_enabled: true, is_active: true })}><Plus className="size-4" /> {t('Add a branch')}</Button>} />
+      <PageGuide id="branches" steps={[
+          t('Add every branch with its Google Maps link and opening hours — every order goes to a branch.'),
+          t('Its delivery fee, minimum order and VAT are what the agent quotes (a delivery zone can set its own fee).'),
+          t('“Taking orders” and “Too busy” are for right now: while a branch is off, the agent offers another one.'),
+          t('Open a branch (the pencil) for what is different there: seating, payment methods and table bookings. Its own dishes and prices are in Menu.')
+        ]} />
       {list.length === 0 ? <Empty title={t('No branches yet')}>{t('Add at least one branch with its address and hours — every order goes to a branch.')}</Empty> : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {list.map(b => {
@@ -149,7 +156,7 @@ export default function BranchesPage() {
               <Input dir="ltr" value={edit.maps_url || ''} onChange={e => { const ll = parseLatLng(e.target.value); setEdit(x => ({ ...x, maps_url: e.target.value, ...(ll ? { lat: ll[0], lng: ll[1] } : {}) })); }} />
             </Field>
             <Field label={t('Branch phone')}><Input dir="ltr" value={edit.phone || ''} onChange={e => set('phone', e.target.value)} /></Field>
-            <Field label={t('WhatsApp for new-order tickets')} hint={t("The kitchen's number; empty = the restaurant's (Settings → Ordering).")}><Input dir="ltr" value={edit.ops_whatsapp || ''} onChange={e => set('ops_whatsapp', e.target.value)} /></Field>
+            <Field label={t('WhatsApp for new-order tickets')} hint={t("The kitchen's number; empty = the restaurant's (Settings → Ordering rules).")}><Input dir="ltr" value={edit.ops_whatsapp || ''} onChange={e => set('ops_whatsapp', e.target.value)} /></Field>
             <div className="sm:col-span-2"><p className="mb-2 text-sm font-medium">{t('Opening hours')}</p><HoursEditor value={edit.hours || {}} onChange={h => set('hours', h)} /></div>
             <Field label={t('Hours as the agent should say them')} hint={t('Optional — e.g.') + ' كل يوم من 12 الضهر لـ 2 بالليل'} className="sm:col-span-2"><Input dir="rtl" value={edit.hours_text_ar || ''} onChange={e => set('hours_text_ar', e.target.value)} /></Field>
             <div className="flex flex-wrap gap-5 sm:col-span-2">
@@ -194,7 +201,7 @@ export default function BranchesPage() {
                   ))}
                 </div>
               )}
-              {edit.payment_methods && !restPay.includes('online') && <p className="text-xs text-muted">{t('Online payment links can be ticked here once Paymob is on (Settings → Payments).')}</p>}
+              {edit.payment_methods && !restPay.includes('online') && <p className="text-xs text-muted">{t('Online payment links can be ticked here once Paymob is on (Settings → Online payments).')}</p>}
               <p className="text-xs text-muted">{t('Its own dishes, prices and choices: Menu, with this branch chosen at the top.')}</p>
             </div>
             <div className="space-y-3 border-t border-hairline pt-4 sm:col-span-2">

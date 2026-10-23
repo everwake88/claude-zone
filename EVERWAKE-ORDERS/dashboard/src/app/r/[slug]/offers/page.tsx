@@ -2,6 +2,7 @@
 import { Pencil, Plus, Tag } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Card, Checkbox, Drawer, Empty, Field, Input, PageHeader, Select, Spinner, Switch, Textarea, useAction } from '@/components/ui';
+import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -80,6 +81,11 @@ export default function OffersPage() {
     <div>
       <PageHeader title={t('Offers')} subtitle={t('WhatsApp-only deals. The cart applies them by itself; the agent mentions one when it genuinely helps the customer.')}
         actions={can.edit && <Button variant="gold" onClick={() => setEdit({ kind: 'percent_off', scope: 'order', value: 10, is_active: true, priority: 100, free_item_qty: 1 })}><Plus className="size-4" /> {t('New offer')}</Button>} />
+      <PageGuide id="offers" steps={[
+          t('Make a deal: a percent or an amount off, a special price, free delivery or a free item.'),
+          t('Limit it if you like: some dishes or categories, some branches, days and hours, a minimum order, first orders only, or a promo code.'),
+          t('The cart applies it by itself and the customer sees it in the order summary. A promo-code offer counts only once the customer gives the code.')
+        ]} />
       {offers.length === 0 ? <Empty title={t('No offers yet')}>{t('A WhatsApp-only offer (a free side, free delivery, 10% off) is the easiest way to move customers from the delivery apps to your own line.')}</Empty> : (
         <div className="grid gap-3 md:grid-cols-2">
           {offers.map(o => (

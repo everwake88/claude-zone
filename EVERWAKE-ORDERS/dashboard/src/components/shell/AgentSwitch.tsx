@@ -70,7 +70,7 @@ export function AgentSwitch() {
         </>}>
         {on ? (
           <div className="space-y-4 text-sm">
-            <p className="text-muted">{t('Use this when you are too busy to take more WhatsApp orders. While it is off, everyone who writes gets one warm apology (Settings → Messages) and is remembered. Conversations a person already took over are not affected.')}</p>
+            <p className="text-muted">{t('Use this when you are too busy to take more WhatsApp orders. While it is off, everyone who writes gets one warm apology (Settings → Automatic messages) and is remembered. Conversations a person already took over are not affected.')}</p>
             <Field label={t('Why (only your team sees this)')}>
               <Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder={t('Kitchen full, Friday rush…')} />
             </Field>

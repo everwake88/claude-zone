@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SavingsHero } from '@/components/growth/SavingsHero';
 import { Button, Card, Field, Input, PageHeader, Select, Spinner, useAction, useToast } from '@/components/ui';
+import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
 import { cairo } from '@/lib/fonts';
 import { money } from '@/lib/format';
@@ -97,6 +98,11 @@ export default function Growth() {
   return (
     <div className={`space-y-5 ${cairo.className}`}>
       <PageHeader title={t('Get customers')} subtitle={t('Move your customers from the delivery apps to your own WhatsApp: a link and a QR code for each branch and each place you advertise, and what each one brought.')} />
+      <PageGuide id="growth" steps={[
+          t('Each link opens a WhatsApp chat with your number, and tells you where that customer came from.'),
+          t('Print the QR code for the branch, the bags and the flyers; put the links in your ads, on Instagram and on Google Maps.'),
+          t('“What each place brought” shows the chats and orders from each one, so you know what works.')
+        ]} />
       <SavingsHero />
 
       {!number && (

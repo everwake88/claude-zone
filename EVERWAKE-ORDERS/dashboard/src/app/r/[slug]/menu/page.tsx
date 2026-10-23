@@ -7,6 +7,7 @@ import { ItemEditor } from '@/components/menu/ItemEditor';
 import { BranchPriceModal, CopyBranchModal } from '@/components/menu/BranchMenuTools';
 import { StockButton } from '@/components/menu/StockButton';
 import { Badge, Button, Checkbox, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Switch, Textarea, useAction } from '@/components/ui';
+import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
 import { cx, money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -129,6 +130,12 @@ export default function MenuPage() {
           <Link href={`${base}/menu/import${branch ? `?branch=${branch.id}` : ''}`}><Button variant="outline"><Sparkles className="size-4" /> {branch ? t('Import this branch’s menu') : t('Import a menu with AI')}</Button></Link>
           <Button variant="gold" onClick={() => setEditing('new')}><Plus className="size-4" /> {t('Add a dish')}</Button>
         </>} />
+      <PageGuide id="menu" steps={[
+          t('The agent offers only what is here, at these prices. The quickest start: Import a menu with AI (a PDF, photos, a link or a spreadsheet), then check it.'),
+          t('Open a dish (the pencil) for its choices — sizes and add-ons — its photos and what is different at each branch.'),
+          t('Sold out? Press its stock button: for today, for a while, or until you switch it back on.'),
+          t('Branches that sell differently: choose the branch under “Menu of”, then switch its dishes on or off and change its prices — many at once if you tick them.')
+        ]} />
 
       {branches.length > 1 && items.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-hairline bg-white px-4 py-3">

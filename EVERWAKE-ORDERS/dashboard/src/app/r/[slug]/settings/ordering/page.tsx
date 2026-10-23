@@ -60,7 +60,7 @@ export default function OrderingSettings() {
         </div>
         <p className="mt-3 text-sm">
           {(s.payment_methods || []).includes('online') ? t('Online by card or wallet: on (a Paymob link after the order is placed).') : t('Online by card or wallet: off.')}{' '}
-          <Link href={`${base}/settings/payments`} className="text-gold-ink underline">{t('Settings → Payments')}</Link>
+          <Link href={`${base}/settings/payments`} className="text-gold-ink underline">{t('Settings → Online payments')}</Link>
         </p>
       </Card>
 
