@@ -1021,3 +1021,10 @@ test('offering one dish to add carries its price; "anything else?" does not need
     plan: { read: 'x', stage: 'ordering', objective: 'x', actions: [] }, reply: quiet('تمام 👌 تحب أضيف حاجة تانية؟') }));
   assert.ok(!t2.nodes['Check Reply'].violations.some(v => /without its price/.test(v)));
 });
+
+test('dropping "تمام يا نور" never leaves a reply starting with a loose "و"', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990311', text: 'هدفع اونلاين' }), async () => ({
+    plan: { read: 'x', stage: 'details', objective: 'x', actions: [] },
+    reply: quiet('تمام يا نور، ورابط الدفع هيوصلك بعد ما أأكد الأوردر. نكلمك على نفس الرقم ده؟') }));
+  assert.deepEqual(t.checked.decision.reply_messages, ['تمام، ورابط الدفع هيوصلك بعد ما أأكد الأوردر. نكلمك على نفس الرقم ده؟']);
+});
