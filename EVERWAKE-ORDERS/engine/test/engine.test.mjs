@@ -906,3 +906,24 @@ test('a delivery area that settles a zone sets its branch, so the next turn has 
   const st2 = (await sql(db, `select state as r from everwake.conversations where wa_id = $1`, [i2.wa_id])).r;
   assert.ok(!st2.branch || !st2.branch.id, 'no branch forced on a pickup');
 });
+
+test('their order plus a dish she quotes beside it is a true total; the branch line says when a pickup is ready', async () => {
+  const phone = '201099990399';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  const had = await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  let total = null;
+  const t = await turn(db, evolutionPayload({ phone, text: 'and with a kilo of kofta, how much is it all?' }), async () => ({
+    plan: { read: 'x', stage: 'building_cart', objective: 'x', actions: [{ tool: 'manage_cart', do: 'quote M001 1' }] },
+    tools: [{ tool: 'manage_cart', action: 'quote', items: [{ menu_id: 'M001', quantity: 1 }] }],
+    reply: (steps) => {
+      const q = steps[0].result;
+      total = Math.round((Number(had.subtotal) + Number(q.subtotal)) * 1.14 * 100) / 100;
+      return quiet(`With a kilo of kofta it all comes to about EGP ${total}.`);
+    },
+  }));
+  assert.ok(total > 0);
+  assert.ok(!t.nodes['Check Reply'].violations.some(v => /not prices, totals/.test(v)), t.nodes['Check Reply'].violations.join('\n'));
+  assert.match(t.brief.facts_text, /pickup yes \((usually ready about \d+ min|no set ready time)/);
+});

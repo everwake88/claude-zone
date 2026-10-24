@@ -60,6 +60,7 @@ const toolCalls = [];   // for the log: what each call asked and what came back
 const agentError = agent.error ? str(obj(agent.error).message || agent.error).slice(0, 300) : null;
 let placedNo = null, placedTotal = null;
 const toolNumbers = [];
+const quoteSubs = [], orderSubs = [];   // a quote priced next to their order: the two together are a true total
 const toolProblems = [];
 const bookingTexts = [];
 let bookingRef = null;
@@ -97,6 +98,7 @@ for (const st of steps) {
   }
   for (const k of ['subtotal', 'discount_total', 'vat', 'vat_percent', 'delivery_fee', 'total', 'minimum', 'short_by'])
     if (o[k] != null) toolNumbers.push(num(o[k]));
+  if (tool === 'manage_cart' && o.subtotal != null) (str(o.status) === 'QUOTE' ? quoteSubs : orderSubs).push(num(o.subtotal));
   for (const l of arr(o.cart)) if (l && l.line_total != null) toolNumbers.push(num(l.line_total));
   for (const a of arr(o.offers_applied)) if (a && a.amount != null) toolNumbers.push(num(a.amount));
   for (const a of arr(o.offers_almost)) if (a && a.short_by != null) toolNumbers.push(num(a.short_by));
@@ -265,6 +267,15 @@ const scan = toWesternDigits(joined.replace(/https?:\/\/[^\s)]+/gi, ' ')).replac
                   ...arr(allLookup.branches).map(b => num(b.delivery_fee, NaN))].filter(Number.isFinite);
     const bases = [sum, ...vats.map(v => sum * (1 + v / 100))];
     for (const b of bases) { add(b); fees.forEach(f => add(b + f)); }
+  }
+}
+// their order plus a dish she just quoted beside it ("with the shrimp it comes to …")
+{
+  const vats = arr(allLookup.branches).map(b => num(b.vat_percent, NaN)).filter(Number.isFinite);
+  const fees = [num(zone.delivery_fee, NaN), ...arr(allLookup.zones).map(z => num(z.delivery_fee, NaN))].filter(Number.isFinite);
+  for (const q of quoteSubs) for (const c of [num(order.subtotal, NaN), ...orderSubs].filter(Number.isFinite)) {
+    const sum = c + q;
+    for (const b of [sum, ...vats.map(v => sum * (1 + v / 100))]) { add(b); fees.forEach(f => add(b + f)); }
   }
 }
 const bad = [];

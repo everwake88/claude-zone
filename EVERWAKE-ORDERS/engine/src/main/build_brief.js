@@ -355,7 +355,8 @@ const facts = [
   '',
   `BRANCH: ${branch
     ? `${branch.name_ar} (code ${branch.code}) — chosen ${SOURCE_TEXT[branchSource] || 'earlier'} · ${bStatus.text}`
-      + ` · delivery ${branch.delivery_enabled === false ? 'NOT offered' : 'yes'} · pickup ${branch.pickup_enabled === false ? 'NOT offered' : 'yes'}`
+      + ` · delivery ${branch.delivery_enabled === false ? 'NOT offered' : 'yes'} · pickup ${branch.pickup_enabled === false ? 'NOT offered' : 'yes'
+        + (num(branch.prep_minutes) ? ` (usually ready about ${num(branch.prep_minutes)} min after it is placed)` : ' (no set ready time — it goes to the kitchen the moment it is placed, and they get a WhatsApp message when it is ready)')}`
       + (seating(branch) ? ' · ' + seating(branch) : '')
       + ` · delivery fee: ${fee == null ? 'not set — the branch confirms it' : money$(fee)}${minOrder ? ' · minimum order ' + money$(minOrder) : ''}`
       + (bStatus.state === 'closed' && settings.accept_orders_when_closed ? ' · orders taken now are prepared when it opens' : '')
