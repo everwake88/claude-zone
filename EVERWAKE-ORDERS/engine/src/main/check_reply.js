@@ -281,6 +281,11 @@ const ASKS_DETAILS = /(?<!\p{L})(اسمك|اسم حضرتك|اسمه حضرتك|
 const booking = toolsUsed.includes('manage_reservation') || pre.reservation_in_progress === true || /reservation/i.test(str(obj(pre.brain).stage));
 if (!items.length && !pending.length && !booking && !placedNo && ASKS_DETAILS.test(joined))
   violations.push('The order is still empty: do not ask for their name, number, address details or payment yet. Help them choose what to eat first (the branch or delivery area first if it is not known). Details come once the order has dishes and they are done choosing.');
+// dishes in, but they haven't said they're done choosing: "anything else?" comes before their details
+// (unless they gave a detail themselves this turn)
+if (items.length && !booking && !placedNo && pre.done_choosing === false && !toolsUsed.includes('save_customer_details')
+    && ASKS_DETAILS.test(joined))
+  violations.push('They have not said they are done choosing. Do not ask for their name, number, address details or payment yet: after what was added, ask lightly whether they would like anything else.');
 const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
 if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
 const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);

@@ -313,6 +313,21 @@ const isFirstReply = !spokeBefore || (gapH !== null && gapH >= 12);
 const ownWords = customerText.replace(/\[[a-z ]+\]/gi, ' ');
 const earlierWords = ownWords.trim() ? '' : recent.filter(m => m.direction === 'inbound').map(m => str(m.text || m.body)).join(' ').replace(/\[[a-z ]+\]/gi, ' ');
 const langText = ownWords.trim() ? ownWords : earlierWords;
+// done choosing: they said so ("بس كده"، "كده تمام"، "that's all"), or said no to "anything else?";
+// until then their name, number, address and payment wait — a detail they give on their own is still taken
+const DONE_RE = /(?<!\p{L})(بس كده|بس كدا|كده بس|كدا بس|وبس|كده تمام|كدا تمام|كده كفاية|كفاية كده|كفايه كده|خلاص كده|كده خلاص|مش عايز حاجة تانية|مش عايز حاجه تانيه|مش عاوز حاجة تانية|مفيش حاجة تانية|مفيش حاجه تانيه|لا كده|لأ كده|bas keda|bas kda|keda bas|kda bas|keda tamam|kda tmam|that'?s all|that'?s it|nothing else)(?!\p{L})/iu;
+const ASKED_MORE_RE = /(حاجة تانية|حاجه تانيه|حاجة كمان|تزود|تضيف|أزودلك|اضيفلك|أضيفلك|anything else|something else)/iu;
+const NO_RE = /^\s*(لا|لأ|لاء|لا شكرا|لا شكراً|لا متشكر|لا ميرسي|no|nope|la2|la|no thanks)(?!\p{L})/iu;
+const chatMsgs = [...recent];
+if (customerText && !chatMsgs.some(m => m.direction === 'inbound' && str(m.text || m.body) === customerText))
+  chatMsgs.push({ direction: 'inbound', text: customerText });
+let doneChoosing = false;
+chatMsgs.forEach((m, i) => {
+  if (m.direction !== 'inbound') return;
+  const t = str(m.text || m.body);
+  const before = chatMsgs.slice(0, i).reverse().find(x => x.direction === 'outbound');
+  if (DONE_RE.test(t) || (NO_RE.test(t) && t.trim().length <= 24 && before && ASKED_MORE_RE.test(str(before.text || before.body)))) doneChoosing = true;
+});
 const ar = (langText.match(/[؀-ۿ]/g) || []).length;
 const la = (langText.match(/[A-Za-z]/g) || []).length;
 // Franco: Egyptian Arabic typed in Latin letters ("3ayez", "a7la", "ezayak") — an Egyptian, answered in Egyptian Arabic
@@ -400,7 +415,10 @@ const facts = [
   // an empty order: the branch and the food come first — their name, number, address details and
   // payment are not on the list yet (anything they volunteer is still saved)
   (cartItems.length || pending.length)
-    ? `STILL MISSING TO PLACE AN ORDER: ${missing.length ? missing.map(f => LABEL[f] || f).join(' · ') : 'nothing — details complete'}`
+    ? (doneChoosing
+        ? 'CHOOSING: done — they said that\'s all.'
+        : 'CHOOSING: they have NOT said they are done choosing — after what you add or change, ask lightly, in your own words, whether they\'d like anything else. Their name, number, building/floor and payment wait until they say that\'s all (or move on to their details themselves).')
+      + `\nSTILL MISSING TO PLACE AN ORDER: ${missing.length ? missing.map(f => LABEL[f] || f).join(' · ') : 'nothing — details complete'}`
     : `THE ORDER IS STILL EMPTY — first: ${missing.filter(f => ['delivery_method', 'branch', 'delivery_area'].includes(f)).map(f => LABEL[f] || f).join(' · ') || 'nothing — help them choose what to eat'}`
       + ' · then help them choose their food. Their name, number, building/floor and payment are NOT asked until the order has dishes and they are done choosing (save any they give on their own).',
   `ORDER SUMMARY: ${cartItems.length ? summaryStatus : 'n/a (cart empty)'}`,
@@ -489,6 +507,7 @@ return [{
     branch_id: branchId || null,
     branch_name: branch ? branch.name_ar : null,
     is_first_reply: isFirstReply,
+    done_choosing: doneChoosing,
     language_hint: lang,
     cart_has_items: cartItems.length > 0,
     pending_count: pending.length,

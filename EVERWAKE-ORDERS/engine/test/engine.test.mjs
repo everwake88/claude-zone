@@ -867,3 +867,22 @@ test('the agent writes its own JSON: slips are repaired, raw JSON never reaches 
   const r = await say('ازيك', '{"reply_messages": ["الحمد لله 😊 تحب تطلب؟"], "handoff": {"needed": false "reason": ""}');
   assert.deepEqual(r, ['الحمد لله 😊 تحب تطلب؟']);
 });
+
+test('food first, then details: "anything else?" until they say that\'s all', async () => {
+  const phone = '201099990133';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  const t = await turn(db, evolutionPayload({ phone, text: 'لا خليهم اتنين' }), async (brief) => {
+    assert.match(brief.brief, /have NOT said they are done choosing/);
+    return { plan: { read: 'x', stage: 'ordering', objective: 'x', actions: [] }, reply: quiet('تمام، اتنين 👌 اسم حضرتك إيه؟'),
+             rewrite: ['تمام، خليتهم اتنين 👌 تحب حاجة تانية معاهم؟'] };
+  });
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /not said they are done choosing/);
+  const t2 = await turn(db, evolutionPayload({ phone, text: 'لا شكرا' }), async (brief) => {
+    assert.match(brief.brief, /CHOOSING: done/);
+    return { plan: { read: 'x', stage: 'details', objective: 'x', actions: [] }, reply: quiet('تمام 👌 اسم حضرتك إيه؟') };
+  });
+  assert.ok(!t2.nodes['Check Reply'].violations.some(v => /done choosing/.test(v)));
+});
