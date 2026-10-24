@@ -259,7 +259,7 @@ function buildMain() {
   w.add(tool('manage_reservation', 'Everwake — Tool: manage_reservation', prompt('tool_manage_reservation.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    request: "={{ $fromAI('request', 'One JSON object. action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4}} · {\"action\":\"summary\"}', 'json') }}"
+    request: "={{ $fromAI('request', 'One JSON object. action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4} } · {\"action\":\"summary\"}', 'json') }}"
   }, [1880, 900]));
 
   w.add(pg('Read Back State', 'select everwake.read_back($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [1840, 460]));
@@ -515,6 +515,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       for (const outs of Object.values(types)) for (const out of outs) for (const c of out)
         if (!names.has(c.node)) throw new Error(`${w.name}: ${from} → unknown node ${c.node}`);
     }
+    // an n8n expression is "={{ … }}": a "}}" inside one ends it early (invalid syntax in n8n)
+    for (const n of w.nodes) JSON.stringify(n.parameters || {}, (key, v) => {
+      if (typeof v === 'string' && v.includes('$fromAI(') && v.slice(v.indexOf('$fromAI('), v.trimEnd().length - 2).includes('}}'))
+        throw new Error(`${w.name} · ${n.name} · ${key}: "}}" inside an expression`);
+      return v;
+    });
     writeFileSync(join(ROOT, 'dist', files[k]), JSON.stringify(w.json(), null, 2) + '\n');
     console.log(`${files[k].padEnd(44)} ${w.nodes.length} nodes`);
   }

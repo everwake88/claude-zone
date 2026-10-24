@@ -1097,7 +1097,7 @@
           "value": {
             "tenant_id": "={{ $('Intake').first().json.r.tenant_id }}",
             "wa_id": "={{ $('Intake').first().json.r.wa_id }}",
-            "request": "={{ $fromAI('request', 'One JSON object. action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4}} · {\"action\":\"summary\"}', 'json') }}"
+            "request": "={{ $fromAI('request', 'One JSON object. action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4} } · {\"action\":\"summary\"}', 'json') }}"
           },
           "matchingColumns": [],
           "schema": [
