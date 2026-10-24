@@ -1011,3 +1011,13 @@ test('Franco "3ayza" is a woman speaking: "تحبي" is fine', async () => {
     plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] }, reply: quiet('الحمد لله تمام 😊 تحبي دليفري ولا استلام؟') }));
   assert.ok(!t.nodes['Check Reply'].violations.some(v => /feminine/.test(v)), t.nodes['Check Reply'].violations.join('\n'));
 });
+
+test('offering one dish to add carries its price; "anything else?" does not need one', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990288', text: 'ايه احسن رز عندكو؟' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
+    reply: quiet('أحسن حاجة عندنا الرز البسمتي، تحب أضيف رز بسمتي؟'), rewrite: ['الرز البسمتي 60ج، تحب أضيفه؟'] }));
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /without its price/);
+  const t2 = await turn(db, evolutionPayload({ phone: '201099990299', text: 'كيلو كفتة' }), async () => ({
+    plan: { read: 'x', stage: 'ordering', objective: 'x', actions: [] }, reply: quiet('تمام 👌 تحب أضيف حاجة تانية؟') }));
+  assert.ok(!t2.nodes['Check Reply'].violations.some(v => /without its price/.test(v)));
+});

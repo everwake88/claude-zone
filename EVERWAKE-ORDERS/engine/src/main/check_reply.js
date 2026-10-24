@@ -306,6 +306,12 @@ const dishNames = (joined.match(/\*[^*\n]{2,40}\*/g) || []).length;
 const priceCount = (toWesternDigits(joined).match(/\d+(?:\.\d+)?\s*(?:ج|EGP)|EGP\s*\d+/g) || []).length;
 if (!showedSummaryAsked() && !placedNo && dishNames > 6)
   violations.push(`The reply lists ${dishNames} dishes at once. Give a few highlights (3–5) with their prices, and ask what they feel like — the rest when they ask.`);
+// offering one dish to add ("تحب أضيف أرز سي جل؟"): its price goes with it
+const OFFER_ADD = /(تحب|تحبي|أضيف|اضيف|أضيفلك|أضيفهولك|أضيفهالك|نزود|أزودلك)\s+(?!حاجة|حاجه|حاجات|أي|اي|كمان|تاني)[\p{L}]+|(shall i|should i|would you like me to|want me to)\s+add\s+(?!anything|something|more)\w+/iu;
+const OFFER_DISH_ADD = /(أضيف|اضيف|أضيفلك|أضيفهولك|أضيفهالك|أزودلك|\badd\b)/iu;
+if (!showedSummaryAsked() && !placedNo && priceCount === 0 && OFFER_DISH_ADD.test(joined) && OFFER_ADD.test(joined)
+    && !/(حاجة|حاجه) (تانية|تانيه|كمان)|anything else|something else/i.test(joined))
+  violations.push('You offer a dish to add without its price. Say the price with it (as the MENU shows), in a few words.');
 else if (!showedSummaryAsked() && !placedNo && dishNames >= 2 && priceCount === 0 && !items.length)
   violations.push('Dishes are named without their prices. Say each highlight with its price (as the MENU shows), briefly.');
 // "ازيك؟" / "عامل إيه؟" is a question: the first reply answers it
