@@ -1028,3 +1028,20 @@ test('dropping "تمام يا نور" never leaves a reply starting with a loose
     reply: quiet('تمام يا نور، ورابط الدفع هيوصلك بعد ما أأكد الأوردر. نكلمك على نفس الرقم ده؟') }));
   assert.deepEqual(t.checked.decision.reply_messages, ['تمام، ورابط الدفع هيوصلك بعد ما أأكد الأوردر. نكلمك على نفس الرقم ده؟']);
 });
+
+test('a short Latin message keeps the chat\'s language: "tamam akkedi" after Franco is still Arabic', async () => {
+  const phone = '201099990322';
+  await turn(db, evolutionPayload({ phone, text: 'ezayko, 3ayza a3mel order' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] }, reply: quiet('الحمد لله تمام 😊 تحبي تطلبي إيه؟') }));
+  await turn(db, evolutionPayload({ phone, text: 'tamam akkedi' }), async (b) => {
+    assert.match(b.brief, /latest message is in: Franco/);
+    return { plan: { read: 'x', stage: 'x', objective: 'x', actions: [] }, reply: quiet('تمام 👌') };
+  });
+  const en = '201099990333';
+  await turn(db, evolutionPayload({ phone: en, text: 'Hi, I would like to order please' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] }, reply: quiet('Hi! What would you like?') }));
+  await turn(db, evolutionPayload({ phone: en, text: 'ok thanks' }), async (b) => {
+    assert.match(b.brief, /latest message is in: English/);
+    return { plan: { read: 'x', stage: 'x', objective: 'x', actions: [] }, reply: quiet('You are welcome!') };
+  });
+});

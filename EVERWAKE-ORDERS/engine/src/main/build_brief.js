@@ -333,8 +333,15 @@ const la = (langText.match(/[A-Za-z]/g) || []).length;
 // Franco: Egyptian Arabic typed in Latin letters ("3ayez", "a7la", "ezayak") — an Egyptian, answered in Egyptian Arabic
 const FRANCO = /[a-z][2357689]|[2357689][a-z]|\b(ana|enta|enty|ezay|ezayak|3ayez|3ayza|3awz|3awza|keda|kda|leh|eh|feen|fen|emta|bekam|b kam|kam|el|fe|mesh|msh|momken|tab|ya3ni|yaany|ba2a|delwa2ty|dlw2ty|lazem|3ala|3and|3ando|3andko|ma3a|wala|aw|ah|aywa|la2|shokran|7aga|7elw|tamam)\b/gi;
 const francoHits = (langText.match(FRANCO) || []).length;
-const franco = !ar && la && francoHits >= 2;
-const lang = franco ? 'Franco-Arabic — Egyptian Arabic typed in Latin letters: answer in Egyptian Arabic (Arabic letters), never in English'
+// a short Latin message ("tamam akkedi", "ok") says too little on its own: the chat's language so far decides
+const shortLatin = !ar && la && langText.trim().split(/\s+/).length <= 5 && francoHits < 2;
+const pastText = recent.filter(m => m.direction === 'inbound' && str(m.text || m.body) !== customerText)
+  .map(m => str(m.text || m.body)).join(' ').replace(/\[[a-z ]+\]/gi, ' ');
+const pastAr = (pastText.match(/[؀-ۿ]/g) || []).length, pastLa = (pastText.match(/[A-Za-z]/g) || []).length;
+const pastFranco = !pastAr && pastLa && (pastText.match(FRANCO) || []).length >= 2;
+const franco = (!ar && la && francoHits >= 2) || (shortLatin && (pastFranco || francoHits >= 1 && pastAr > pastLa));
+const lang = shortLatin && !franco && pastAr > pastLa ? 'Arabic'
+  : franco ? 'Franco-Arabic — Egyptian Arabic typed in Latin letters: answer in Egyptian Arabic (Arabic letters), never in English'
   : ar && la ? (ar >= la ? 'Arabic (some English words)' : 'English (some Arabic words)') : (la ? 'English' : 'Arabic');
 // nothing in words at all (a first message that is only a pin) → Egyptian Arabic, the default here
 
