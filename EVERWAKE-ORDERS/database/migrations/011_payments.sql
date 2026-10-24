@@ -136,12 +136,11 @@ returns text language sql immutable as $$
   select trim_scale(round(coalesce(n, 0), 2))::text || coalesce(sym, '')
 $$;
 
--- "9:30 مساءً" / "9:30 PM" in the restaurant's clock
+-- a time the way people say it: "3:34 بالليل", "10 الصبح", "2 الضهر" (not the formal صباحاً / مساءً)
 create or replace function everwake.local_clock(p timestamptz, p_tz text, p_lang text default 'ar')
 returns text language sql stable as $$
   select case when p_lang = 'en' then to_char(p at time zone p_tz, 'FMHH12:MI AM')
-              else to_char(p at time zone p_tz, 'FMHH12:MI')
-                   || case when (p at time zone p_tz)::time < '12:00' then ' صباحاً' else ' مساءً' end end
+              else to_char(p at time zone p_tz, 'FMHH12:MI') || ' ' || everwake.day_part_ar((p at time zone p_tz)::time) end
 $$;
 
 -- a message to the branch's operations WhatsApp (or the restaurant's)

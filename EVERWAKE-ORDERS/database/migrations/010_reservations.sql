@@ -81,6 +81,15 @@ returns text language sql immutable as $$
   select case when p is null then null when p ~ '^20[0-9]{10}$' then '0' || substr(p, 3) else p end
 $$;
 
+-- the part of the day as people say it after a time: الصبح، الضهر، العصر، بالليل (till dawn it's still بالليل)
+create or replace function everwake.day_part_ar(t time)
+returns text language sql immutable as $$
+  select case when t >= '05:00' and t < '12:00' then 'الصبح'
+              when t >= '12:00' and t < '15:00' then 'الضهر'
+              when t >= '15:00' and t < '18:00' then 'العصر'
+              else 'بالليل' end
+$$;
+
 -- a booking as people read it
 create or replace function everwake.reservation_view(r everwake.reservations)
 returns jsonb language sql stable as $$
@@ -94,7 +103,7 @@ returns jsonb language sql stable as $$
              || ' ' || to_char(r.reserve_date, 'DD/MM') end,
     'time', to_char(r.reserve_time, 'HH24:MI'),
     'time_ar', case when r.reserve_time is not null then
-                 to_char(r.reserve_time, 'FMHH12:MI') || case when r.reserve_time < '12:00' then ' صباحاً' else ' مساءً' end end,
+                 to_char(r.reserve_time, 'FMHH12:MI') || ' ' || everwake.day_part_ar(r.reserve_time) end,
     'guests', r.guests, 'occasion', r.occasion, 'full_name', r.full_name, 'phone', everwake.local_phone(r.phone),
     'requests', r.requests,
     'summary', case when r.summary_at is null then 'not shown yet'
