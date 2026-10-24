@@ -540,7 +540,8 @@ if (effective === 'clear') {
         cartErrors.push({ code: 'NOT_ON_THIS_BRANCH_MENU', requested: dishName, branch: branchName(targetBranchId),
           available_at: availableAt, suggestions: suggestAlternatives(dishName, 4),
           note: 'offer the suggestions (this branch\'s closest dishes) by name and price'
-            + (availableAt.length ? ', or the branches in available_at (they can take this order)' : '; no other branch can take this order, so don\'t offer one') });
+            + (availableAt.length ? ', or the branches in available_at (they can take this order)' : '; no other branch can take this order, so don\'t offer one')
+            + (isQuote ? '. This was a quote — your own checking. If the customer asked for this very dish, tell them simply what this branch has instead; if it was only your pick to check, leave it out: they never hear about a dish they didn\'t ask for' : '') });
       } else {
         cartErrors.push({ code: 'ITEM_NOT_FOUND', requested, suggestions: suggestAlternatives(requested, 3) });
       }
