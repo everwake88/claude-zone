@@ -994,3 +994,14 @@ test('"one more of the same" in a new message still adds', async () => {
   const r = await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
   assert.equal(r.cart.find(l => l.menu_id === 'M007').quantity, 2, JSON.stringify(r.cart));
 });
+
+test('"ازيكو" gets answered; order status in plain words, not "متعلم إنه جاهز"', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990255', text: 'ازيكو، عايز أحجز ترابيزة' }), async () => ({
+    plan: { read: 'x', stage: 'reservation', objective: 'x', actions: [] },
+    reply: quiet('أهلاً 😊 تحب تحجز في أي فرع؟'), rewrite: ['الحمد لله تمام 😊 تحب تحجز في أي فرع؟'] }));
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /asked how you are/);
+  const t2 = await turn(db, evolutionPayload({ phone: '201099990266', text: 'الاوردر جهز؟' }), async () => ({
+    plan: { read: 'x', stage: 'support', objective: 'x', actions: [] },
+    reply: quiet('الأوردر لسه مش متعلم إنه جاهز.'), rewrite: ['لسه الفرع بيحضّره 🙏 هتابع معاهم وأقولك.'] }));
+  assert.match(t2.nodes['Check Reply'].violations.join('\n'), /متعلم إنه/);
+});

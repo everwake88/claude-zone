@@ -251,7 +251,7 @@ const leak = joined.match(LEAK);
 if (leak) violations.push(`The reply shows an internal code or word ("${leak[0]}") — say it in plain words for the customer.`);
 
 // sounding like a system, not a person (Arabic words have no \b: letters on either side end the match)
-const SYSTEM_TALK = /(?<!\p{L})(لو وُجدت|لو وجدت|إن وجدت|ان وجدت|إن وُجدت|الرسوم المقررة|الخطوة الجاية|الخطوة التالية|بيانات السواق|بيانات الطيار|ظاهر عندي|ظاهرين عندي|ظاهرة عندي|مش ظاهر|مش ظاهرة|مش ظاهر له|مش ظاهر في المنيو|ظاهر في المنيو|ظاهر في منيو|ظاهرة في المنيو|ظاهرة في منيو|أضمن التسوية|بيانات سواق|بيانات تتبع|الفريق المختص|طلب نشط|المساعدة الافتراضية|الأسعار الإرشادية|التلامس العرضي|العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
+const SYSTEM_TALK = /(?<!\p{L})(لو وُجدت|لو وجدت|إن وجدت|ان وجدت|إن وُجدت|الرسوم المقررة|الخطوة الجاية|الخطوة التالية|بيانات السواق|بيانات الطيار|ظاهر عندي|متعلم إنه|متعلّم إنه|متعلم انه|حالته إنه|حالته انه|بتأكيد الجاهزية|حالة الطلب|حالة الأوردر|ظاهرين عندي|ظاهرة عندي|مش ظاهر|مش ظاهرة|مش ظاهر له|مش ظاهر في المنيو|ظاهر في المنيو|ظاهر في منيو|ظاهرة في المنيو|ظاهرة في منيو|أضمن التسوية|بيانات سواق|بيانات تتبع|الفريق المختص|طلب نشط|المساعدة الافتراضية|الأسعار الإرشادية|التلامس العرضي|العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
 const sys = joined.match(SYSTEM_TALK);
 if (sys) violations.push(`The reply sounds like a system ("${sys[1]}"). Say it the way a person at the restaurant would on WhatsApp ("الأوردر"، "طلبك"، "كده عندك…"، "أأكدلك الأوردر؟").`);
 // a tool whose last call failed did nothing: the reply must not say it did
@@ -308,6 +308,11 @@ if (!showedSummaryAsked() && !placedNo && dishNames > 6)
   violations.push(`The reply lists ${dishNames} dishes at once. Give a few highlights (3–5) with their prices, and ask what they feel like — the rest when they ask.`);
 else if (!showedSummaryAsked() && !placedNo && dishNames >= 2 && priceCount === 0 && !items.length)
   violations.push('Dishes are named without their prices. Say each highlight with its price (as the MENU shows), briefly.');
+// "ازيك؟" / "عامل إيه؟" is a question: the first reply answers it
+const HOW_ARE_YOU = /(?<!\p{L})(ازيك|ازيكو|ازيكم|إزيك|إزيكو|عامل ايه|عامل إيه|عاملين ايه|عاملين إيه|ezayak|ezayko|how are you)(?!\p{L})/iu;
+if (pre.is_first_reply === true && HOW_ARE_YOU.test(str(pre.customer_message))
+    && !/الحمد لله|الحمدلله|تمام|كويس|بخير|fine|good|great|well/i.test(joined))
+  violations.push('They asked how you are ("ازيك"). Answer it first in a word or two ("الحمد لله تمام 😊"), then the rest.');
 const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
 if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
 const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);
