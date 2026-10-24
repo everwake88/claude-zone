@@ -37,15 +37,6 @@
             {
               "name": "request",
               "type": "any"
-            },
-            {
-              "name": "action"
-            },
-            {
-              "name": "items_json"
-            },
-            {
-              "name": "branch_id"
             }
           ]
         }

@@ -37,9 +37,6 @@
             {
               "name": "details",
               "type": "any"
-            },
-            {
-              "name": "details_json"
             }
           ]
         }

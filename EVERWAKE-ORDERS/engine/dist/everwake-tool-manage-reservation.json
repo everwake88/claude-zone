@@ -37,12 +37,6 @@
             {
               "name": "request",
               "type": "any"
-            },
-            {
-              "name": "action"
-            },
-            {
-              "name": "details_json"
             }
           ]
         }

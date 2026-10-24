@@ -347,7 +347,7 @@ function buildCart() {
     'A placed order the customer pays **online** gets its Paymob payment link from the dashboard (**Create Payment Link**, header auth *Everwake Outbox Secret*), so the agent sends it in the same reply.',
     'Every call first re-checks the cart against the live menu, so a dish switched off in the dashboard is never sold.'
   ].join('\n'), [0, 0], 1200, 220, 5));
-  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'request', 'action', 'items_json', 'branch_id'], [0, 320]));
+  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'request'], [0, 320]));
   w.add(code('Read Args', 'cart/read_args.js', [220, 320]));
   w.add(pg('Load Cart + Menu', 'select everwake.cart_context($1::uuid, $2::text, $3::text) as r;',
            "={{ [ $json.tenant_id, $json.wa_id, $json.branch_id || '' ] }}", [440, 320]));
@@ -386,7 +386,7 @@ function buildDetails() {
     '## Everwake · save_customer_details',
     'Called BY THE AGENT the same turn the customer gives any detail. Whitelists fields, normalises enums, keeps the ledger so nothing is asked twice. `reset_address` wipes the old address + pin; `use_saved_address` reuses one from a previous order. A typed area is matched to a delivery zone; a typed phone is remembered for customers WhatsApp hides.'
   ].join('\n'), [0, 0], 1000, 200, 5));
-  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'details', 'details_json'], [0, 320]));
+  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'details'], [0, 320]));
   w.add(pg('Load Customer State', 'select everwake.details_context($1::uuid, $2::text) as r;', '={{ [ $json.tenant_id, $json.wa_id ] }}', [220, 320]));
   w.add(code('Validate + Patch', 'details/validate_patch.js', [440, 320]));
   w.add(iff('Valid?', '$json.ok', [660, 320]));
@@ -410,7 +410,7 @@ function buildReservation() {
     '**actions** **update** (any of branch, date, time, guests, name, phone, occasion, special requests — every value is checked: in the future, not too far ahead, while the branch is open, not more guests than it seats) · **summary** (the text the customer confirms) · **submit** (only a summary they agreed to, unchanged since: the branch\'s operations WhatsApp gets the ticket with the customer\'s details, and the dashboard\'s Reservations page shows it) · **cancel** · **status**.',
     'The team calls the customer and presses Confirm on the dashboard — that is when the customer hears it is confirmed.'
   ].join('\n'), [0, 0], 1200, 240, 5));
-  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'request', 'action', 'details_json'], [0, 320]));
+  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'request'], [0, 320]));
   w.add(code('Read Args', 'reservation/read_args.js', [220, 320]));
   w.add(pg('Booking', "select everwake.reservation_tool($1::uuid, $2::text, $3::text, convert_from(decode($4::text, 'base64'), 'UTF8')) as r;",
            '={{ [ $json.tenant_id, $json.wa_id, $json.action, $json.details_b64 ] }}', [440, 320]));
