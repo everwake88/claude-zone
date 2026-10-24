@@ -1118,6 +1118,15 @@ begin
     end if;
   end if;
 
+  -- the zone of a delivery decides its branch: with none chosen yet, that is the branch now, so
+  -- the next turn already shows its own menu and prices (a pickup chooses its branch itself)
+  if v_zone is not null and nullif(st -> 'branch' ->> 'id', '') is null
+     and coalesce(v_patch -> 'customer' ->> 'delivery_method', st -> 'customer' ->> 'delivery_method', '') <> 'pickup' then
+    v_patch := v_patch || jsonb_build_object('branch', jsonb_build_object(
+      'id', v_zone ->> 'branch_id', 'code', v_zone ->> 'branch_code', 'name_ar', v_zone ->> 'branch_name',
+      'source', 'delivery_zone', 'set_at', now()));
+  end if;
+
   -- a number typed for the order: remember it as theirs (so a customer
   -- hidden behind a WhatsApp private id is found by it next time)
   if v_phone is not null and v_cust is not null then

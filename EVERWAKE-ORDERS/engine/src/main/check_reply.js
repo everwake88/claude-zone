@@ -115,7 +115,8 @@ messages = messages.map(m => m
 if (messages.length > 2) messages = [messages[0], messages.slice(1).join('\n\n')];
 // an English reply shows money as EGP 30, not 30ج (the currency's format, not the host's words)
 messages = messages.map(m => /[\u0600-\u06FF]/.test(m.replace(/(\d)\s*ج(?![\u0600-\u06FF])/g, '$1'))
-  ? m : m.replace(/(\d[\d,.]*)\s*ج(?![\u0600-\u06FF])/g, 'EGP $1'));
+  ? m : m.replace(/(\d[\d,.]*)\s*[–-]\s*(\d[\d,.]*)\s*ج(?![\u0600-\u06FF])/g, 'EGP $1–$2')   // a range: EGP 680–730
+          .replace(/(\d[\d,.]*)\s*ج(?![\u0600-\u06FF])/g, 'EGP $1'));
 
 // ---- facts after the tools ---------------------------------------------------------------
 const state = obj(db.state);

@@ -641,9 +641,9 @@ test('an English reply shows EGP; a rewrite knows that no tool ran this turn', a
   const phone = '201099995555';
   let t = await turn(db, evolutionPayload({ phone, text: 'what do you have and how much' }), async () => ({
     plan: { read: 'prices', stage: 'discovery', objective: 'answer', actions: [] },
-    reply: quiet('Our grilled chicken is 260ج, delivery is 20ج.', { language: 'en' })
+    reply: quiet('Our grilled chicken is 260ج, delivery is 20ج, kofta 260–480ج.', { language: 'en' })
   }));
-  assert.deepEqual(t.checked.decision.reply_messages, ['Our grilled chicken is EGP 260, delivery is EGP 20.']);
+  assert.deepEqual(t.checked.decision.reply_messages, ['Our grilled chicken is EGP 260, delivery is EGP 20, kofta EGP 260–480.']);
 
   t = await turn(db, evolutionPayload({ phone, text: 'عايز رز' }), async () => ({
     plan: { read: 'rice', stage: 'ordering', objective: 'ask', actions: [] },
@@ -887,4 +887,22 @@ test('a quote prices dishes for "how much would that come to?" without touching 
   assert.ok(!q.priced.some(l => l.menu_id === 'M007'), 'only the dishes asked about');
   const after = (await sql(db, `select cart as r from everwake.orders where wa_id = $1 and status = 'draft'`, [intake.wa_id])).r;
   assert.deepEqual(after, before, 'their order is unchanged');
+});
+
+test('a delivery area that settles a zone sets its branch, so the next turn has that branch\'s menu', async () => {
+  const phone = '201099990377';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  const h = await import('./harness.mjs');
+  await h.saveDetails(db, intake, { delivery_method: 'delivery', address_area: 'دجلة' });
+  const st = (await sql(db, `select state as r from everwake.conversations where wa_id = $1`, [intake.wa_id])).r;
+  assert.equal(st.branch && st.branch.name_ar, 'المعادي', JSON.stringify(st.branch));
+  assert.equal(st.branch.source, 'delivery_zone');
+  // pickup chooses its own branch
+  const p2 = '201099990388';
+  const i2 = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone: p2, text: 'hi' }) }))[0].b64_intake)).r;
+  await h.saveDetails(db, i2, { delivery_method: 'pickup', address_area: 'دجلة' });
+  const st2 = (await sql(db, `select state as r from everwake.conversations where wa_id = $1`, [i2.wa_id])).r;
+  assert.ok(!st2.branch || !st2.branch.id, 'no branch forced on a pickup');
 });
