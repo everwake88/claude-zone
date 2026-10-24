@@ -963,6 +963,7 @@
         1560,
         720
       ],
+      "onError": "continueRegularOutput",
       "parameters": {
         "description": "The cart, the branch, offers and placing the order. The tool prices everything from the chosen branch's menu and applies the restaurant's offers — never send a price.\n\nOne JSON object per call: {\"action\": \"…\", \"items\": [ … ], \"branch\": \"…\"} — items only when the action touches dishes, branch only for set_branch.\n\nactions:\n- add / update / remove / replace / clear — dishes in items\n- set_branch — branch = the branch code or name. Required before the first dish (unless the restaurant has one branch). Changing it re-checks and re-prices the whole cart.\n- reorder_last — the customer's latest order back in the cart, priced from today's menu (no items).\n- apply_code — a promo code the customer gave: items = [{\"promo_code\":\"CODE\"}].\n- place_order — only after the customer confirmed the order summary you showed. Returns PLACED with order_no, or NOT_PLACED with reasons. When they pay online, PLACED carries payment: LINK_READY with the link to send (or why there is no link yet).\n\nitems shape (a list):\n[{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":\"من غير بصل\"}]\n- menu_id exactly as in the MENU. quantity = kilos for dishes sold per kilo (0.5, 0.75, 1 …), otherwise a count.\n- choices: option names from the MENU or the tool; the level number may be left out.\n- line_id: change/remove one specific cart line. pending_id: answer for a dish that is waiting on a choice. force_new: true for a second, differently made portion of the same dish.\n- update/replace may carry only what changed; the rest of the line is kept.\n\nResults: DONE (saved) · NEEDS_CHOICES (dish waiting — ask about ask_about) · BRANCH_SET · REORDERED · CODE_APPLIED / CODE_NOT_VALID · BRANCH_NEEDED · BRANCH_NOT_FOUND · BRANCH_NOT_ACCEPTING · PLACED · NOT_PLACED. menu_changes lists dishes the restaurant switched off or re-priced since they went in the cart. The result is the truth; do not repeat the same call.",
         "workflowId": {
@@ -977,7 +978,7 @@
           "value": {
             "tenant_id": "={{ $('Intake').first().json.r.tenant_id }}",
             "wa_id": "={{ $('Intake').first().json.r.wa_id }}",
-            "request": "={{ $fromAI('request', 'One JSON object. action: exactly one of add, update, remove, replace, clear, set_branch, reorder_last, apply_code, place_order. items: the dishes this action touches, e.g. [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]; for apply_code [{\"promo_code\":\"THE CODE\"}]; left out for clear, set_branch, reorder_last and place_order. branch: only for set_branch, the branch code or name. Never include prices. Examples: {\"action\":\"set_branch\",\"branch\":\"gleem\"} · {\"action\":\"add\",\"items\":[{\"menu_id\":\"M013\",\"quantity\":1}]} · {\"action\":\"place_order\"}', 'json') }}"
+            "request": "={{ $fromAI('request', 'An object (not text in quotes). action: exactly one of add, update, remove, replace, clear, set_branch, reorder_last, apply_code, place_order. items: the dishes this action touches, e.g. [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]; for apply_code [{\"promo_code\":\"THE CODE\"}]; left out for clear, set_branch, reorder_last and place_order. branch: only for set_branch, the branch code or name. Never include prices. Examples: {\"action\":\"set_branch\",\"branch\":\"gleem\"} · {\"action\":\"add\",\"items\":[{\"menu_id\":\"M013\",\"quantity\":1}]} · {\"action\":\"place_order\"}', 'json') }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -1023,6 +1024,7 @@
         1720,
         720
       ],
+      "onError": "continueRegularOutput",
       "parameters": {
         "description": "Save the customer's details the SAME turn they give them, before replying — even if early or unasked. details = a JSON object with only what is new or changed.\n\nFields: full_name, phone, phone_confirmed (\"yes\" = their WhatsApp number is the order number), alt_phone, delivery_method (delivery | pickup), payment_method (cash | card | wallet | instapay | online — only what the customer's branch takes; online = a payment link after the order is placed), address_governorate, address_city, address_area, address_street, address_building, address_floor, address_apartment, address_landmark, address_notes, address_confirmed (\"yes\" = they confirmed the address that came from their location pin), order_notes, food_prefs (what they ruled out, in their words; \"\" clears it).\nAdd \"reset_address\": true when they give a DIFFERENT address — the old one and the old pin are cleared first.\nAdd \"use_saved_address\": <the saved address number from FACTS> (or \"last\") when they want an address from a previous order.\nExamples: {\"full_name\":\"أحمد\"} · {\"phone_confirmed\":\"yes\"} · {\"delivery_method\":\"pickup\"} · {\"use_saved_address\":\"12\"} · {\"address_area\":\"المعادي\",\"address_street\":\"شارع 9\",\"address_building\":\"8\",\"address_floor\":\"3\",\"address_apartment\":\"6\"}\nThe result says whether the address is inside a delivery zone (delivery_area). The branch is NOT a field here — use manage_cart set_branch.",
         "workflowId": {
@@ -1037,7 +1039,7 @@
           "value": {
             "tenant_id": "={{ $('Intake').first().json.r.tenant_id }}",
             "wa_id": "={{ $('Intake').first().json.r.wa_id }}",
-            "details": "={{ $fromAI('details', 'A JSON object with only the customer details that are new or changed in this turn, e.g. {\"full_name\":\"أحمد\",\"address_area\":\"المعادي\"}. Add \"reset_address\":true when they give a different address; \"use_saved_address\":\"<number>\" to reuse a saved one.', 'json') }}"
+            "details": "={{ $fromAI('details', 'An object (not text in quotes) with only the customer details that are new or changed in this turn, e.g. {\"full_name\":\"أحمد\",\"address_area\":\"المعادي\"}. Add \"reset_address\":true when they give a different address; \"use_saved_address\":\"<number>\" to reuse a saved one.', 'json') }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -1083,6 +1085,7 @@
         1880,
         900
       ],
+      "onError": "continueRegularOutput",
       "parameters": {
         "description": "Table bookings (dine-in) — only at branches FACTS lists under TABLE BOOKINGS as taking bookings on WhatsApp. A booking is not an order: no cart, no prices.\n\nOne JSON object per call: {\"action\": \"update\", \"details\": { … }} · {\"action\": \"summary\"}.\n\nactions:\n- update — details with only what is new or changed: branch (code or name), date (YYYY-MM-DD, from the dates in TABLE BOOKINGS), time (HH:MM, 24-hour: 9 at night = 21:00), guests (a number), full_name, phone (only when they give a number other than their WhatsApp one), occasion, requests (special requests in their words; \"\" clears). Save every piece the same turn they give it.\n- summary — when nothing is missing: returns summary_text. Show it as it is and ask them to confirm.\n- submit — only after a clear yes to that summary. Returns REQUESTED with ref_no: it went to the branch team, who contact the customer to confirm. It is NOT confirmed yet.\n- cancel — drops the booking in progress, or cancels their upcoming booking (details {\"ref_no\":\"…\"} when they have several); the branch is told.\n- status — the booking in progress and their upcoming bookings.\n\nResults: SAVED / UNCHANGED (with missing, problems, ready_for_summary) · SUMMARY_READY · REQUESTED · CANCELLED · DRAFT_DISCARDED · NOT_READY (what is missing) · SUMMARY_NOT_CONFIRMED (show the summary first) · NOT_TAKEN_ON_WHATSAPP (by_phone lists the numbers).\nproblems: BOOKED_BY_PHONE_ONLY (give that branch's number and note) · NO_BOOKINGS_AT_THIS_BRANCH · BRANCH_UNKNOWN · BRANCH_CLOSED_AT_THAT_TIME (suggest a time within its hours) · TOO_SOON (earliest says when) · TOO_FAR_AHEAD · GROUP_TOO_LARGE (take the details, mark a handoff) · DATE_FORMAT / TIME_FORMAT / GUESTS_FORMAT / PHONE_FORMAT (resend the value in the right shape, or ask). The result is the truth; do not repeat the same call.",
         "workflowId": {
@@ -1097,7 +1100,7 @@
           "value": {
             "tenant_id": "={{ $('Intake').first().json.r.tenant_id }}",
             "wa_id": "={{ $('Intake').first().json.r.wa_id }}",
-            "request": "={{ $fromAI('request', 'One JSON object. action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4} } · {\"action\":\"summary\"}', 'json') }}"
+            "request": "={{ $fromAI('request', 'An object (not text in quotes). action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4} } · {\"action\":\"summary\"}', 'json') }}"
           },
           "matchingColumns": [],
           "schema": [

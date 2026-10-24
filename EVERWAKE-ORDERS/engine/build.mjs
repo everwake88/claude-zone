@@ -126,8 +126,11 @@ const chain = (name, textExpr, system, pos) => ({
 const ANY = ['request', 'details'];
 const toolInputSchema = (ids) => ids.map(id => ({ id, displayName: id, required: false, defaultMatch: false, display: true,
                                                   canBeUsedToMatch: true, type: ANY.includes(id) ? 'any' : 'string' }));
+// onError: a call the tool can't take (the wrong shape, a timeout) goes back to the
+// agent as {"error": …} so it corrects itself — without it the whole turn stops
+// and the customer gets no answer
 const tool = (name, workflowName, description, values, pos) => ({
-  name, type: '@n8n/n8n-nodes-langchain.toolWorkflow', typeVersion: 2.2, position: pos,
+  name, type: '@n8n/n8n-nodes-langchain.toolWorkflow', typeVersion: 2.2, position: pos, onError: 'continueRegularOutput',
   parameters: {
     description,
     workflowId: wfRef(workflowName),
@@ -249,17 +252,17 @@ function buildMain() {
   w.add(tool('manage_cart', 'Everwake — Tool: manage_cart', prompt('tool_manage_cart.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    request: "={{ $fromAI('request', 'One JSON object. action: exactly one of add, update, remove, replace, clear, set_branch, reorder_last, apply_code, place_order. items: the dishes this action touches, e.g. [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]; for apply_code [{\"promo_code\":\"THE CODE\"}]; left out for clear, set_branch, reorder_last and place_order. branch: only for set_branch, the branch code or name. Never include prices. Examples: {\"action\":\"set_branch\",\"branch\":\"gleem\"} · {\"action\":\"add\",\"items\":[{\"menu_id\":\"M013\",\"quantity\":1}]} · {\"action\":\"place_order\"}', 'json') }}"
+    request: "={{ $fromAI('request', 'An object (not text in quotes). action: exactly one of add, update, remove, replace, clear, set_branch, reorder_last, apply_code, place_order. items: the dishes this action touches, e.g. [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]; for apply_code [{\"promo_code\":\"THE CODE\"}]; left out for clear, set_branch, reorder_last and place_order. branch: only for set_branch, the branch code or name. Never include prices. Examples: {\"action\":\"set_branch\",\"branch\":\"gleem\"} · {\"action\":\"add\",\"items\":[{\"menu_id\":\"M013\",\"quantity\":1}]} · {\"action\":\"place_order\"}', 'json') }}"
   }, [1560, 720]));
   w.add(tool('save_customer_details', 'Everwake — Tool: save_customer_details', prompt('tool_save_details.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    details: "={{ $fromAI('details', 'A JSON object with only the customer details that are new or changed in this turn, e.g. {\"full_name\":\"أحمد\",\"address_area\":\"المعادي\"}. Add \"reset_address\":true when they give a different address; \"use_saved_address\":\"<number>\" to reuse a saved one.', 'json') }}"
+    details: "={{ $fromAI('details', 'An object (not text in quotes) with only the customer details that are new or changed in this turn, e.g. {\"full_name\":\"أحمد\",\"address_area\":\"المعادي\"}. Add \"reset_address\":true when they give a different address; \"use_saved_address\":\"<number>\" to reuse a saved one.', 'json') }}"
   }, [1720, 720]));
   w.add(tool('manage_reservation', 'Everwake — Tool: manage_reservation', prompt('tool_manage_reservation.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    request: "={{ $fromAI('request', 'One JSON object. action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4} } · {\"action\":\"summary\"}', 'json') }}"
+    request: "={{ $fromAI('request', 'An object (not text in quotes). action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4} } · {\"action\":\"summary\"}', 'json') }}"
   }, [1880, 900]));
 
   w.add(pg('Read Back State', 'select everwake.read_back($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [1840, 460]));
