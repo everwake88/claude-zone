@@ -853,3 +853,17 @@ test('no script: the same filler opening two replies in a row is dropped the sec
     plan: { read: 'x', stage: 'details', objective: 'x', actions: [] }, reply: quiet('حلو، نكلمك على نفس الرقم ده؟') }));
   assert.deepEqual(t.checked.decision.reply_messages, ['نكلمك على نفس الرقم ده؟']);
 });
+
+test('the agent writes its own JSON: slips are repaired, raw JSON never reaches the customer', async () => {
+  const phone = '201099990122';
+  const say = async (text, reply) => (await turn(db, evolutionPayload({ phone, text }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'greet', actions: [] }, reply }))).checked.decision.reply_messages;
+  // a line break typed inside the string, and a trailing comma
+  assert.deepEqual(await say('اهلا', '{"reply_messages": ["أهلاً بيك 😊\nتحب تطلب حاجة؟",], "send_menu_images": false}'),
+                   ['أهلاً بيك 😊\nتحب تطلب حاجة؟']);
+  // in a code fence
+  assert.deepEqual(await say('مساء الخير', '```json\n{"reply_messages": ["مساء النور 😊"], "language": "ar"}\n```'), ['مساء النور 😊']);
+  // broken beyond repair: the messages are rescued, never the JSON itself
+  const r = await say('ازيك', '{"reply_messages": ["الحمد لله 😊 تحب تطلب؟"], "handoff": {"needed": false "reason": ""}');
+  assert.deepEqual(r, ['الحمد لله 😊 تحب تطلب؟']);
+});

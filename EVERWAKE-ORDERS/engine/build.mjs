@@ -231,24 +231,11 @@ function buildMain() {
   w.add(model('Brain Model', 16000, 'high', 90000, [1060, 700]));
   w.add(code('Attach Plan', 'main/attach_plan.js', [1300, 460]));
   w.add({ name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent', typeVersion: 3.1, position: [1520, 460], onError: 'continueRegularOutput',
-          parameters: { promptType: 'define', text: '={{ $json.agent_prompt }}', hasOutputParser: true,
+          parameters: { promptType: 'define', text: '={{ $json.agent_prompt }}', hasOutputParser: false,
                         options: { systemMessage: prompt('agent.md'), maxIterations: 10, returnIntermediateSteps: true, enableStreaming: false } } });
   w.add(model('Agent Model', 6000, 'low', 90000, [1400, 720]));
-  w.add({ name: 'Agent Output Parser', type: '@n8n/n8n-nodes-langchain.outputParserStructured', typeVersion: 1.3, position: [1880, 720],
-          parameters: { schemaType: 'manual', inputSchema: JSON.stringify({
-            type: 'object',
-            properties: {
-              reply_messages: { type: 'array', items: { type: 'string' }, description: '1 or 2 WhatsApp messages, exactly what the customer receives' },
-              send_menu_images: { type: 'boolean', description: 'true only when sending the menu pictures with this reply' },
-              send_item_photos: { type: 'array', items: { type: 'string' }, description: 'codes of up to 3 dishes whose photos go with this reply, or []' },
-              showed_order_summary: { type: 'boolean', description: 'true only when this reply contains the full order summary to confirm' },
-              handoff: { type: 'object', properties: { needed: { type: 'boolean' }, reason: { type: 'string', description: 'Arabic, for the team; empty when not needed' } },
-                         required: ['needed', 'reason'] },
-              language: { type: 'string', description: 'ar or en' },
-              memory_note: { type: 'string', description: 'one short English line worth remembering later in this conversation, or empty' }
-            },
-            required: ['reply_messages', 'send_menu_images', 'send_item_photos', 'showed_order_summary', 'handoff', 'language', 'memory_note']
-          }, null, 2) } });
+  // no strict output parser: one formatting slip threw a good reply away ("Model output doesn't fit
+  // required format"); Check Reply reads the JSON and repairs the usual slips itself
   w.add(tool('manage_cart', 'Everwake — Tool: manage_cart', prompt('tool_manage_cart.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
@@ -321,7 +308,6 @@ function buildMain() {
   w.chain('Load Turn Context', 'Build Brief', 'Brain', 'Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Rewrite?');
   w.link('Brain Model', 'Brain', 0, 'ai_languageModel');
   w.link('Agent Model', 'Agent', 0, 'ai_languageModel');
-  w.link('Agent Output Parser', 'Agent', 0, 'ai_outputParser');
   w.link('manage_cart', 'Agent', 0, 'ai_tool');
   w.link('save_customer_details', 'Agent', 0, 'ai_tool');
   w.link('manage_reservation', 'Agent', 0, 'ai_tool');

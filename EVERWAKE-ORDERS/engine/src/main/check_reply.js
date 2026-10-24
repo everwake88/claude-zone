@@ -29,12 +29,25 @@ const r2 = (n) => Math.round(num(n) * 100) / 100;
 // ---- the decision ------------------------------------------------------------
 let decision = agent.output ?? agent.response ?? agent.text ?? null;
 if (decision && typeof decision === 'object' && decision.output && typeof decision.output === 'object') decision = decision.output;
-if (typeof decision === 'string') {
-  const s = decision.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+// the agent writes its JSON itself (no strict parser to throw a good reply away): read it, and
+// repair the usual slips — a code fence, raw line breaks inside a string, a trailing comma
+function readDecision(raw) {
+  const s = raw.replace(/^\s*```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
   const a = s.indexOf('{'), z = s.lastIndexOf('}');
-  try { decision = a !== -1 && z > a ? JSON.parse(s.slice(a, z + 1)) : { reply_messages: [decision] }; }
-  catch (e) { decision = { reply_messages: [decision] }; }
+  if (a === -1 || z <= a) return { reply_messages: [raw] };            // plain words: that is the reply
+  const body = s.slice(a, z + 1);
+  const tries = [body,
+    body.replace(/,\s*([}\]])/g, '$1'),
+    body.replace(/"(?:[^"\\]|\\.)*"/g, m => m.replace(/\r?\n/g, '\\n')).replace(/,\s*([}\]])/g, '$1')];
+  for (const t of tries) { try { return JSON.parse(t); } catch (e) { /* next */ } }
+  // last resort: the messages themselves, never the raw JSON
+  const list = body.match(/"reply_messages"\s*:\s*\[([\s\S]*?)\]\s*(?:,|})/);
+  const msgs = list ? (list[1].match(/"((?:[^"\\]|\\.)*)"/g) || []).map(q => q.slice(1, -1).replace(/\\n/g, '\n').replace(/\\"/g, '"')) : [];
+  const flag = (k) => new RegExp(`"${k}"\\s*:\\s*true`).test(body);
+  return { reply_messages: msgs, send_menu_images: flag('send_menu_images'), showed_order_summary: flag('showed_order_summary'),
+           send_item_photos: [], handoff: { needed: /"needed"\s*:\s*true/.test(body), reason: '' }, language: null, memory_note: '' };
 }
+if (typeof decision === 'string') decision = readDecision(decision);
 decision = obj(decision);
 
 // ---- what the tools did ----------------------------------------------------------
