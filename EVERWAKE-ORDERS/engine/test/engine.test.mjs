@@ -860,3 +860,16 @@ test('"one more of the same" in a new message still adds', async () => {
   const r = await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
   assert.equal(r.cart.find(l => l.menu_id === 'M007').quantity, 2, JSON.stringify(r.cart));
 });
+
+test('a rough total of prices she just stated is true arithmetic, not an invented number', async () => {
+  const phone = '201099990355';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  const t = await turn(db, evolutionPayload({ phone, text: 'how much roughly for half a kilo of kofta and a sandwich?' }), async (b) => {
+    // the demo menu: half a kilo of kofta 240, a kofta sandwich 95 → 335, and 381.9 with Maadi's 14% VAT
+    return { plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
+             reply: quiet('Half a kilo of kofta is EGP 240 and a kofta sandwich EGP 95, so EGP 335, about EGP 381.9 with VAT.') };
+  });
+  assert.ok(!t.nodes['Check Reply'].violations.some(v => /not prices, totals/.test(v)), t.nodes['Check Reply'].violations.join('\n'));
+});

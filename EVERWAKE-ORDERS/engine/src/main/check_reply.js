@@ -253,6 +253,19 @@ for (const l of links) {
 
 // numbers
 const scan = toWesternDigits(joined.replace(/https?:\/\/[^\s)]+/gi, ' ')).replace(/(\d),(\d{3})/g, '$1$2');
+// arithmetic on prices she states in this same reply is true too ("about 895 for the three"):
+// their sum, with the branch's VAT, with a delivery fee on file
+{
+  const stated = (scan.match(/\d+(?:\.\d+)?/g) || []).map(Number).filter(n => n >= 20 && (allowed.has(r2(n)) || allowed.has(Math.round(n))));
+  if (stated.length >= 2) {
+    const sum = stated.reduce((x, y) => x + y, 0);
+    const vats = arr(allLookup.branches).map(b => num(b.vat_percent, NaN)).filter(Number.isFinite);
+    const fees = [num(zone.delivery_fee, NaN), ...arr(allLookup.zones).map(z => num(z.delivery_fee, NaN)),
+                  ...arr(allLookup.branches).map(b => num(b.delivery_fee, NaN))].filter(Number.isFinite);
+    const bases = [sum, ...vats.map(v => sum * (1 + v / 100))];
+    for (const b of bases) { add(b); fees.forEach(f => add(b + f)); }
+  }
+}
 const bad = [];
 for (const m of scan.match(/\d+(?:\.\d+)?/g) || []) {
   const n = Number(m);
