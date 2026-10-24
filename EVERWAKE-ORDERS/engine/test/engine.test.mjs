@@ -927,3 +927,12 @@ test('their order plus a dish she quotes beside it is a true total; the branch l
   assert.ok(!t.nodes['Check Reply'].violations.some(v => /not prices, totals/.test(v)), t.nodes['Check Reply'].violations.join('\n'));
   assert.match(t.brief.facts_text, /pickup yes \((usually ready about \d+ min|no set ready time)/);
 });
+
+test('"Pickup" and "Here\'s your order 👇" are not a promised photo', async () => {
+  const phone = '201099990411';
+  const t = await turn(db, evolutionPayload({ phone, text: 'pickup please' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
+    reply: quiet("Here's how it works 👇 Pickup is from the branch, and you'll get a message when it's ready."),
+  }));
+  assert.ok(!t.nodes['Check Reply'].violations.some(v => /photo/.test(v)), t.nodes['Check Reply'].violations.join('\n'));
+});

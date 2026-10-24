@@ -304,7 +304,7 @@ if (sendMenu && !pagesHere) {
 const photoCodes = new Set(arr(media.items_with_photos).map(str));
 let photos = arr(decision.send_item_photos).map(x => (String(x).toUpperCase().match(/\bM\d{3,5}\b/) || [])[0]).filter(Boolean);
 photos = [...new Set(photos.filter(c => photoCodes.has(c)))].slice(0, 3);
-if (!photos.length && !sendMenu && /(صور[هةت]|الصوره|الصورة|photo|picture|pic)/i.test(joined) && /(👆|👇|اهي|أهي|اهو|أهو|اتفضل|بعتلك|here)/i.test(joined)) {
+if (!photos.length && !sendMenu && /(صور[هةت]|الصوره|الصورة|\b(photos?|pictures?|pics?)\b)/i.test(joined) && /(👆|👇|اهي|أهي|اهو|أهو|اتفضل|بعتلك|\bhere\b)/i.test(joined)) {
   violations.push('The reply says a photo is attached, but no photo is being sent (there may be none for that dish). Describe the dish instead.');
 }
 
