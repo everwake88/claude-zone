@@ -372,7 +372,9 @@ const brandAr = str(tenant.name_ar), brandEn = str(tenant.name_en);
 const facts = [
   'FACTS FOR THIS TURN (from the restaurant\'s systems — true right now)',
   `- Now (${tz}): ${DAY_AR[DAYS[now.day]] || ''} ${now.date} ${now.label}`,
-  `- You are: ${str(agentName.ar) || 'ياسمين'} (${str(agentName.en) || 'Yasmin'}) from ${brandAr}${brandEn && brandEn !== brandAr ? ' (' + brandEn + ')' : ''}`,
+  `- You are: ${str(agentName.ar) || str(agentName.en)
+      ? `${str(agentName.ar) || str(agentName.en)}${str(agentName.en) && str(agentName.ar) ? ' (' + str(agentName.en) + ')' : ''}`
+      : 'the restaurant\'s host (no personal name is set — introduce yourself as from the restaurant, never invent a name)'} from ${brandAr}${brandEn && brandEn !== brandAr ? ' (' + brandEn + ')' : ''}`,
   `- Customer: WhatsApp name "${str(norm.customer_name) || str(customer.display_name) || '—'}" (often a nickname — do not assume it is their real name)`
     + (profileName ? ` · name on file from previous orders: ${profileName}` : '')
     + ` · ${phoneHidden ? 'their phone number is HIDDEN by WhatsApp privacy — you cannot see it; ask them to type a number for the order, and never quote the internal ID' : 'their WhatsApp number: ' + localPhone(customer.phone || intake.wa_id)}`,

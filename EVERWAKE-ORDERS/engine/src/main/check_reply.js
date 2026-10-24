@@ -286,6 +286,9 @@ if (!items.length && !pending.length && !booking && !placedNo && ASKS_DETAILS.te
 if (items.length && !booking && !placedNo && pre.done_choosing === false && !toolsUsed.includes('save_customer_details')
     && ASKS_DETAILS.test(joined))
   violations.push('They have not said they are done choosing. Do not ask for their name, number, address details or payment yet: after what was added, ask lightly whether they would like anything else.');
+// the prompt's examples hold placeholders ([اسمك], [المطعم] …): never words for the customer
+const placeholder = joined.match(/\[(اسمك|اسمي|المطعم|الفرع|رقم الأوردر|رقم الطلب)\]/);
+if (placeholder) violations.push(`The reply contains the placeholder "${placeholder[0]}". Write the real thing from FACTS (your name, the restaurant's, the branch, the order number), or leave it out.`);
 const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
 if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
 const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);
