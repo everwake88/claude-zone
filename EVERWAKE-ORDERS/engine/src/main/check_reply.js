@@ -1,14 +1,17 @@
 // =====================================================================
 // EVERWAKE — Main · NODE: Check Reply
 //
-// NEVER rewrites the host's words. It only checks hard rails, and a
-// broken rail sends the draft to one rewrite (no tools — nothing can be
-// added to the cart twice) with the exact reason:
+// NEVER rewrites the host's words and never polices her style: how she
+// talks is her understanding (the prompts), not fences here. It checks
+// only hard truth, the same for every restaurant, and a broken rail sends
+// the draft to one rewrite (no tools — nothing can be added to the cart
+// twice) with the exact reason:
 //   · a number that is not a real price / total / fee / detail on file
 //   · saying the order is placed when place_order did not return PLACED
+//   · saying a tool call worked when it failed
 //   · saying a table booking is confirmed (only the branch team confirms)
 //   · saying an online payment arrived before Paymob confirmed it
-//   · internal codes, ids or tool names leaking to the customer
+//   · internal codes, ids, tool names or prompt placeholders leaking
 //   · a link that is not the restaurant's or the customer's own
 //   · menu pictures or a dish photo promised when none is being sent
 //   · far too long for WhatsApp
@@ -104,40 +107,13 @@ for (const st of steps) {
 let messages = arr(decision.reply_messages ?? decision.reply_text ?? decision.messages)
   .map(x => str(x)).filter(Boolean)
   .flatMap(m => m.split(/^\s*\[\[\s*NEXT\s*\]\]\s*$/m).map(x => x.trim()).filter(Boolean));
-const HEARTS = /[❣❤♥\u{1F493}-\u{1F49F}\u{1F5A4}\u{1F90D}\u{1F90E}\u{1F60D}\u{1F970}\u{1F618}\u{1F61A}\u{1F617}\u{1F619}\u{1F63B}\u{1F48B}\u{1F491}\u{1F495}]\u{FE0F}?/gu;
-let heartsStripped = 0;
-messages = messages.map(m => {
-  heartsStripped += (m.match(HEARTS) || []).length;
-  return m.replace(HEARTS, '')
-    .replace(/\*\*(.+?)\*\*/g, '*$1*')           // WhatsApp bold is one asterisk
-    .replace(/^#{1,6}\s+/gm, '')                  // no markdown headings
-    .replace(/\[\[\s*NEXT\s*\]\]/g, '')
-    .replace(/\s*[؛;](?=\s)/g, '.')                // nobody types a semicolon on WhatsApp
-    .replace(/(^|[\s،.؟!(])هل\s+/g, '$1')           // "هل الطلب دليفري؟" is MSA: Egyptians ask "الطلب دليفري؟"
-    .replace(/(?<!\p{L})كم(?= (?:كيلو|واحد|واحدة|قطعة|طبق|شخص|فرد|نفر|علبة)(?!\p{L}))/gu, 'كام')   // "كم كيلو" is MSA: "كام كيلو"
-    .replace(/([\u0621-\u064A])ا{2,}(?=[\u0621-\u064A])/g, '$1ا')   // a doubled alef inside a word is a typo ("معااك")
-    .replace(/(?<!\p{L})(?:اسمه|اسمها) حضرتك/gu, 'اسم حضرتك')   // "اسمه حضرتك إيه؟" → "اسم حضرتك إيه؟"
-    // "كيلو *كاليماري بالكيلو*": the weight is already said, the menu's "بالكيلو" goes
-    .replace(/((?:ربع|نص|تلت|تلات|كيلو|كيلوين|\d+(?:\.\d+)?)\s*(?:كيلو)?[^\n*]{0,3}\*[^*\n]+?)\s+بالكيلو(\*)/gu, '$1$2')
-    .replace(/(?<!\p{L})(?:اسمه|اسمها)(?= (?:صوص|مشوي|مقلي|حجم|صغير|كبير|سادة|حار|بالصوص)(?!\p{L}))/gu, 'تحبه')   // "اسمه صوص أحمر ولا أبيض؟" → "تحبه صوص…"
-    // "حلو يا عبدالرحمن 😊" opening a reply sounds scripted: drop the filler + name, keep the content
-    // (when the rest goes on with "و…", the filler stays so the sentence still starts: "تمام، ورابط الدفع…")
-    .replace(/^(حلو|حلوة|تمام|ماشي|جميل|اوكي|أوكي|طيب|عظيم)\s+يا\s+(?!فندم)[^\s،,.!؟\n]+[،,!.]?\s*(?:[😊👌🙏✅]\uFE0F?\s*)?(?=(\S))/u,
-             (m, filler, next) => next === 'و' ? filler + '، ' : '')
-    .replace(/(\d{1,2}(?::\d{2})?)\s*مساءً?(?![\u0600-\u06FF])/g, '$1 بالليل')
-    .replace(/(\d{1,2}(?::\d{2})?)\s*صباحاً?(?![\u0600-\u06FF])/g, '$1 الصبح')
-    .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
-}).filter(Boolean);
+messages = messages.map(m => m
+  .replace(/\*\*(.+?)\*\*/g, '*$1*')           // WhatsApp bold is one asterisk
+  .replace(/^#{1,6}\s+/gm, '')                  // no markdown headings on WhatsApp
+  .replace(/\[\[\s*NEXT\s*\]\]/g, '')
+  .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()).filter(Boolean);
 if (messages.length > 2) messages = [messages[0], messages.slice(1).join('\n\n')];
-// the same filler opening two replies in a row reads like a script: drop it the second time
-{
-  const OPENERS = /^(حلو|تمام|ماشي|أكيد|اكيد|تحت أمرك|على عيني|جميل|طيب)(?=[\s،,!.😊👌🙏])[\s،,!.]*/u;
-  const lastOut = arr(ctx.recent_messages).filter(m => m.direction === 'outbound').map(m => str(m.text || m.body)).pop() || '';
-  const prev = (lastOut.trim().match(OPENERS) || [])[1];
-  const now = messages.length ? (messages[0].match(OPENERS) || [])[1] : null;
-  if (prev && now && prev === now && messages[0].replace(OPENERS, '').trim()) messages[0] = messages[0].replace(OPENERS, '').trim();
-}
-// an English reply says EGP 30, not 30ج
+// an English reply shows money as EGP 30, not 30ج (the currency's format, not the host's words)
 messages = messages.map(m => /[\u0600-\u06FF]/.test(m.replace(/(\d)\s*ج(?![\u0600-\u06FF])/g, '$1'))
   ? m : m.replace(/(\d[\d,.]*)\s*ج(?![\u0600-\u06FF])/g, 'EGP $1'));
 
@@ -253,10 +229,6 @@ const LEAK = /\bM\d{3,5}\b|\bP\d+-M\d{3,5}\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{
 const leak = joined.match(LEAK);
 if (leak) violations.push(`The reply shows an internal code or word ("${leak[0]}") — say it in plain words for the customer.`);
 
-// sounding like a system, not a person (Arabic words have no \b: letters on either side end the match)
-const SYSTEM_TALK = /(?<!\p{L})(لو وُجدت|لو وجدت|إن وجدت|ان وجدت|إن وُجدت|الرسوم المقررة|الخطوة الجاية|الخطوة التالية|بيانات السواق|بيانات الطيار|ظاهر عندي|متعلم إنه|متعلّم إنه|متعلم انه|حالته إنه|حالته انه|بتأكيد الجاهزية|حالة الطلب|حالة الأوردر|ظاهرين عندي|ظاهرة عندي|مش ظاهر|مش ظاهرة|مش ظاهر له|مش ظاهر في المنيو|ظاهر في المنيو|ظاهر في منيو|ظاهرة في المنيو|ظاهرة في منيو|أضمن التسوية|بيانات سواق|بيانات تتبع|الفريق المختص|طلب نشط|المساعدة الافتراضية|الأسعار الإرشادية|التلامس العرضي|العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
-const sys = joined.match(SYSTEM_TALK);
-if (sys) violations.push(`The reply sounds like a system ("${sys[1]}"). Say it the way a person at the restaurant would on WhatsApp ("الأوردر"، "طلبك"، "كده عندك…"، "أأكدلك الأوردر؟").`);
 // a tool whose last call failed did nothing: the reply must not say it did
 const lastCall = {};
 for (const c of toolCalls) lastCall[c.tool] = c;
@@ -266,68 +238,9 @@ if (failedTools.length && joined) {
     + `The order now has ${items.length} dish line(s)${branchId ? '' : ' and no branch is set'}. Do not say or imply that anything from those calls was added, set or saved, and don't repeat their order back as if it went in. `
     + 'Say warmly in one line that you are sorting one small thing out and will confirm in a moment, or ask the one thing still needed.');
 }
-// "معاكي" to Ahmed: the customer is "you" in the masculine unless their own words show a woman
-const FEM_YOU = /(?<!\p{L})(معاكي|ليكي|عليكي|عندكي|بيكي|ليكِ|تحبي|تحبّي|عايزاه|ابعتيلي|ابعتي|قوليلي|اكتبيلي|تأكدي|حضرتِك)(?!\p{L})/u;
-const SHE_SAID = /(?<![\p{L}\d])(عايزة|عاوزة|عايزه|عاوزه|جاية|جايه|محتاجة|مبسوطة|متأكدة|أنا ست|انا ست|مدام|3ayza|3ayzah|3awza|3awzah|3ayzaa|aayza|gaya|gayah|me7taga|m7taga|mabsota|mabsoota|mot2akeda|ana set)(?![\p{L}\d])/iu;   // Arabic letters or Franco
-// …or a clearly female name (WhatsApp name or the name they gave)
-const FEMALE = new Set(('منى منة منه مريم سارة ساره نور نورا نورهان هبة هبه ياسمين فاطمة فاطمه رحاب رانيا ريهام شيماء شيما سلمى سلمي ' +
-  'ندى ندي دينا داليا مي مى ميار ملك جنى جنا حبيبة حبيبه رنا هند إيمان ايمان أسماء اسماء آية ايه آيه علياء عبير نهى نها نسمة ' +
-  'نسمه سماح أمل امل منار مروة مروه نرمين نيرمين يارا لمياء ليلى ليلي هالة هاله غادة غاده ولاء وفاء رشا رضوى سهى سها شهد ' +
-  'mona menna mariam maryam sara sarah nour noura nourhan heba yasmin yasmeen fatma rehab rania reham shaimaa salma nada dina dalia ' +
-  'mai mayar malak jana habiba rana hend eman iman asmaa aya alia abeer noha nesma samah amal manar marwa nermin yara lamia laila ' +
-  'layla hala ghada walaa wafaa rasha radwa soha shahd').split(' '));
-const custNames = [state.customer && state.customer.full_name, obj(ctx.customer).full_name, obj(ctx.customer).display_name,
-                   $('Normalize Inbound').first().json.customer_name];
-const femaleName = custNames.some(n => FEMALE.has(str(n).trim().split(/\s+/)[0].toLowerCase().replace(/^ال/, '')));
-const fem = joined.match(FEM_YOU);
-if (fem && !femaleName && !SHE_SAID.test([pre.customer_message, pre.history_text].map(str).join(' ')))
-  violations.push(`The reply speaks to the customer in the feminine ("${fem[1]}") but nothing they wrote says they are a woman. Use the masculine ("معاك"، "ليك"، "تحب"، "ابعتلي").`);
-// an empty order: help them choose first — their name, number, address details and payment come after
-const ASKS_DETAILS = /(?<!\p{L})(اسمك|اسم حضرتك|اسمه حضرتك|نكلمك على نفس الرقم|نكلمك على الرقم|رقمك|رقم موبايلك|رقم تليفونك|رقم تليفون|الدور كام|الشقة كام|رقم العمارة|هتدفع|الدفع كاش|تدفع كاش)(?!\p{L})/u;
-const booking = toolsUsed.includes('manage_reservation') || pre.reservation_in_progress === true || /reservation/i.test(str(obj(pre.brain).stage));
-if (!items.length && !pending.length && !booking && !placedNo && ASKS_DETAILS.test(joined))
-  violations.push('The order is still empty: do not ask for their name, number, address details or payment yet. Help them choose what to eat first (the branch or delivery area first if it is not known). Details come once the order has dishes and they are done choosing.');
-// dishes in, but they haven't said they're done choosing: "anything else?" comes before their details
-// (unless they gave a detail themselves this turn)
-if (items.length && !booking && !placedNo && pre.done_choosing === false && !toolsUsed.includes('save_customer_details')
-    && ASKS_DETAILS.test(joined))
-  violations.push('They have not said they are done choosing. Do not ask for their name, number, address details or payment yet: after what was added, ask lightly whether they would like anything else.');
-// the prompt's examples hold placeholders ([اسمك], [المطعم] …): never words for the customer
+// the prompt's examples hold placeholders ([رقم الأوردر] …): never words for the customer
 const placeholder = joined.match(/\[(اسمك|اسمي|المطعم|الفرع|رقم الأوردر|رقم الطلب)\]/);
 if (placeholder) violations.push(`The reply contains the placeholder "${placeholder[0]}". Write the real thing from FACTS (your name, the restaurant's, the branch, the order number), or leave it out.`);
-// before it is placed nothing is "ready": that reads as if the food were done
-if (!placedNo && !showedSummaryAsked() && /(?<!\p{L})(طلبك|الطلب|الأوردر|الاوردر|أوردرك|اوردرك) (كده )?(جاهز|اتجهز|خلص)(?!\p{L})/u.test(joined))
-  violations.push('The order is not placed yet — don\'t say it is "جاهز". Say what comes next in plain words (their details, or "أأكدلك الأوردر؟").');
-function showedSummaryAsked() { return decision.showed_order_summary === true || String(decision.showed_order_summary).toLowerCase() === 'true'; }
-// the minimum order is for when they are under it, not news while the order is still empty
-const MIN_RE = /الحد الأدنى|الحد الادنى|أقل طلب|اقل طلب|أقل أوردر|اقل اوردر|minimum/i;
-if (!items.length && MIN_RE.test(joined) && !MIN_RE.test(str(pre.customer_message))
-    && !toolProblems.some(p => obj(p).code === 'BELOW_MINIMUM'))
-  violations.push('Don\'t bring up the minimum order now — it matters only once the order is under it (or when they ask). Answer what they asked and keep it short.');
-// browsing: a few highlights with their prices, not the whole section read out
-const dishNames = (joined.match(/\*[^*\n]{2,40}\*/g) || []).length;
-const priceCount = (toWesternDigits(joined).match(/\d+(?:\.\d+)?\s*(?:ج|EGP)|EGP\s*\d+/g) || []).length;
-if (!showedSummaryAsked() && !placedNo && dishNames > 6)
-  violations.push(`The reply lists ${dishNames} dishes at once. Give a few highlights (3–5) with their prices, and ask what they feel like — the rest when they ask.`);
-// offering one dish to add ("تحب أضيف أرز سي جل؟"): its price goes with it
-const OFFER_ADD = /(تحب|تحبي|أضيف|اضيف|أضيفلك|أضيفهولك|أضيفهالك|نزود|أزودلك)\s+(?!حاجة|حاجه|حاجات|أي|اي|كمان|تاني)[\p{L}]+|(shall i|should i|would you like me to|want me to)\s+add\s+(?!anything|something|more)\w+/iu;
-const OFFER_DISH_ADD = /(أضيف|اضيف|أضيفلك|أضيفهولك|أضيفهالك|أزودلك|\badd\b)/iu;
-if (!showedSummaryAsked() && !placedNo && priceCount === 0 && OFFER_DISH_ADD.test(joined) && OFFER_ADD.test(joined)
-    && !/(حاجة|حاجه) (تانية|تانيه|كمان)|anything else|something else/i.test(joined))
-  violations.push('You offer a dish to add without its price. Say the price with it (as the MENU shows), in a few words.');
-else if (!showedSummaryAsked() && !placedNo && dishNames >= 2 && priceCount === 0 && !items.length)
-  violations.push('Dishes are named without their prices. Say each highlight with its price (as the MENU shows), briefly.');
-// "ازيك؟" / "عامل إيه؟" is a question: the first reply answers it
-const HOW_ARE_YOU = /(?<!\p{L})(ازيك|ازيكو|ازيكم|إزيك|إزيكو|عامل ايه|عامل إيه|عاملين ايه|عاملين إيه|ezayak|ezayko|how are you)(?!\p{L})/iu;
-if (pre.is_first_reply === true && HOW_ARE_YOU.test(str(pre.customer_message))
-    && !/الحمد لله|الحمدلله|تمام|كويس|بخير|fine|good|great|well/i.test(joined.slice(0, 40)))   // in the opening, not "كده تمام؟" at the end
-  violations.push('They asked how you are ("ازيك"). Answer it first in a word or two ("الحمد لله تمام 😊"), then the rest.');
-const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
-if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
-const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);
-if (intlPhone) violations.push(`Write the phone number the local way: ${intlPhone[0].replace(/^\+?20/, '0')}, not ${intlPhone[0]}.`);
-const decimalKilo = joined.match(/(?<![\d.])0?\.(25|5|75)\s*(كيلو|ك)(?!\p{L})/u);
-if (decimalKilo) violations.push(`Say the weight the way people say it (ربع كيلو / نص كيلو / تلت تربع كيلو), not "${decimalKilo[0]}".`);
 
 // links
 const links = joined.match(/https?:\/\/[^\s)]+/gi) || [];
@@ -355,12 +268,6 @@ if (bad.length) violations.push(`These numbers are not prices, totals or details
 const pages = obj(media.menu_pages);
 const pagesHere = branchId ? (num(pages[branchId]) || num(pages.all)) : num(pages.all);
 let sendMenu = decision.send_menu_images === true || String(decision.send_menu_images).toLowerCase() === 'true';
-// the pictures are the menu: the text with them is a line and a question, not the menu again
-if (sendMenu && (joined.match(/\d+(?:\.\d+)?\s*ج/g) || []).length > 4)
-  violations.push('The menu pictures are going out with this reply — do not write the menu out again. One short line pointing to them (a highlight or a price range at most) and one question.');
-// VAT is for the summary, not for browsing
-if (decision.showed_order_summary !== true && !placedNo && !/الإجمالي|الاجمالي|total/i.test(joined) && /ضريبة|القيمة المضافة|VAT/i.test(joined) && !/ضريبة|ضرايب|VAT|tax/i.test(str(pre.customer_message)))
-  violations.push('Do not bring up VAT while they are choosing — it belongs in the order summary (or when they ask about it).');
 if (sendMenu && !pagesHere) {
   sendMenu = false;
   if (/(المنيو|منيو|menu)/i.test(joined) && /(👆|👇|اهو|أهو|اهي|أهي|اتفضل|بعتلك|here)/i.test(joined)) {
@@ -428,7 +335,6 @@ return [{
     branch_after: branchId || null,
     allowed_numbers: [...allowed],
     allowed_links: allowedLinks,
-    hearts_stripped: heartsStripped,
     violations,
     needs_rewrite: violations.length > 0,
     agent_tokens: obj(agent.tokenUsage)

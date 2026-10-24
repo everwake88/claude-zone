@@ -65,7 +65,7 @@ test('a new customer: pin → zone → cart with offers → details → summary 
 
   // 3. details, and an early place_order is refused until the summary is shown
   t = await turn(db, evolutionPayload({ phone, text: 'اسمي منى، عمارة 5 الدور 2 شقة 4، كاش، والعنوان صح' }), async (brief) => {
-    assert.match(brief.facts_text, /STILL MISSING TO PLACE AN ORDER: .*name/);
+    assert.match(brief.facts_text, /STILL MISSING TO PLACE AN ORDER[^:\n]*: .*name/);
     return {
       plan: { stage: 'giving_details', show_summary: true },
       tools: [
@@ -552,7 +552,7 @@ test('branches that differ: Maadi\'s own menu and choice prices, no seating ther
 
   t = await turn(db, evolutionPayload({ phone, text: 'ماشي' }), async (brief) => {
     assert.match(brief.facts_text, /⚠ the payment method on file \(card on delivery\) is NOT taken at المعادي/);
-    assert.match(brief.facts_text, /STILL MISSING TO PLACE AN ORDER: .*payment method/);
+    assert.match(brief.facts_text, /STILL MISSING TO PLACE AN ORDER[^:\n]*: .*payment method/);
     return { plan: { stage: 'details' }, reply: quiet('تمام، هيبقى كاش عند الاستلام؟') };
   });
 
@@ -561,7 +561,7 @@ test('branches that differ: Maadi\'s own menu and choice prices, no seating ther
   await sql(db, `update everwake.branches set dine_in = null, payment_methods = null where tenant_id = $1 returning 1 as r`, [tenant]);
 });
 
-test('the Egyptian voice: نص كيلو, 01… numbers, no "العربة", and a villa has no floor to ask for', async () => {
+test('the facts behind the voice: نص كيلو in the cart, 01… on file, and a villa has no floor to ask for', async () => {
   const phone = '201099991234';
   const tenant = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
   const before = (await sql(db, `select settings as r from everwake.tenants where id = $1`, [tenant])).r;
@@ -576,18 +576,13 @@ test('the Egyptian voice: نص كيلو, 01… numbers, no "العربة", and a
         { tool: 'save_customer_details', details: { full_name: 'أحمد', delivery_method: 'توصيل', address_area: 'دجلة',
                                                     address_street: 'شارع 9', address_building: 'فيلا 14' } }
       ],
-      reply: quiet('تمت إضافة 0.5 كيلو للعربة. هل رقم الواتساب المسجل +201099991234 هو رقم الطلب؟'),
-      rewrite: ['تمام يا أحمد، نص كيلو بوري 👌 أطلب على 01099991234 ولا رقم تاني؟']
+      reply: quiet('نص كيلو بوري عندك 👌 نكلمك على 01099991234 ولا رقم تاني؟')
     }));
     assert.equal(t.steps[1].result.cart[0].say, 'نص كيلو', 'the cart says the weight the way people do');
     const left = t.steps[2].result.still_missing_for_order;
     assert.ok(!left.includes('address_floor') && !left.includes('address_apartment'), 'a villa: ' + JSON.stringify(left));
     const v = t.nodes['Check Reply'].violations.join('\n');
-    assert.match(v, /sounds like a system/);
-    assert.match(v, /local way: 01099991234/);
-    assert.match(v, /نص كيلو/);
-    assert.ok(!/not prices, totals/.test(v), 'the number in its local form is theirs: ' + v);
-    assert.deepEqual(t.checked.decision.reply_messages, ['تمام يا أحمد، نص كيلو بوري 👌 أطلب على 01099991234 ولا رقم تاني؟']);
+    assert.ok(!/not prices, totals/.test(v), 'their own number is not an invented one: ' + v);
     assert.match(t.brief.facts_text, /their WhatsApp number: 01099991234/);
   } finally {
     await db.query(`update everwake.tenants set settings = $2 where id = $1`, [tenant, before]);
@@ -642,24 +637,22 @@ test('the Test Runner: a pretend customer reaches the agent while onboarding, no
   }
 });
 
-test('what the stress test caught: Franco gets Arabic, no semicolons, EGP in English, no "تحبّي/تحب", the rewrite knows nothing was added', async () => {
+test('an English reply shows EGP; a rewrite knows that no tool ran this turn', async () => {
   const phone = '201099995555';
-  let t = await turn(db, evolutionPayload({ phone, text: '3ayez a3raf el menu w el as3ar' }), async () => ({
-    plan: { read: 'franco', stage: 'discovery', objective: 'answer', actions: [] },
-    reply: quiet('Our grilled chicken is 260ج; delivery is 20ج.', { language: 'en' })
+  let t = await turn(db, evolutionPayload({ phone, text: 'what do you have and how much' }), async () => ({
+    plan: { read: 'prices', stage: 'discovery', objective: 'answer', actions: [] },
+    reply: quiet('Our grilled chicken is 260ج, delivery is 20ج.', { language: 'en' })
   }));
-  assert.match(t.brief.facts_text, /Franco-Arabic.*answer in Egyptian Arabic/);
-  assert.deepEqual(t.checked.decision.reply_messages, ['Our grilled chicken is EGP 260. delivery is EGP 20.']);
+  assert.deepEqual(t.checked.decision.reply_messages, ['Our grilled chicken is EGP 260, delivery is EGP 20.']);
 
   t = await turn(db, evolutionPayload({ phone, text: 'عايز رز' }), async () => ({
     plan: { read: 'rice', stage: 'ordering', objective: 'ask', actions: [] },
-    reply: quiet('تمام، رز سي فود 😊 تحبّي/تحب حاجة تانية؟'),
-    rewrite: ['تحب رز سي فود ولا سادة؟']
+    reply: quiet('تمام، رز بالخلطة 😊 بـ 999ج'),
+    rewrite: ['تحب رز بسمتي ولا بالخلطة؟']
   }));
-  const v = t.nodes['Check Reply'].violations.join('\n');
-  assert.match(v, /two forms with a slash/);
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /not prices, totals/);
   assert.match(t.nodes['Build Rewrite Request'].rewrite_prompt, /no tool ran this turn, so nothing was added/);
-  assert.deepEqual(t.checked.decision.reply_messages, ['تحب رز سي فود ولا سادة؟']);
+  assert.deepEqual(t.checked.decision.reply_messages, ['تحب رز بسمتي ولا بالخلطة؟']);
 });
 
 test('tool inputs: one JSON object from the agent (a list where text was expected stopped the turn)', async () => {
@@ -695,14 +688,15 @@ test('tool inputs: one JSON object from the agent (a list where text was expecte
   assert.equal(v.ok, true, JSON.stringify(v).slice(0, 300));
 });
 
-test('a pin with no words is not English; "هل" and "مساءً" are tidied away', async () => {
+test('the host\'s words are hers: only WhatsApp formatting is touched, never her wording', async () => {
   const phone = '201099997777';
   const t = await turn(db, evolutionPayload({ phone, location: ZAMALEK_PIN }), async () => ({
     plan: { read: 'pin', stage: 'discovery', objective: 'welcome', actions: [] },
-    reply: quiet('أهلاً بيك 😊 هل الأوردر دليفري ولا استلام؟ الفرع مفتوح لحد 11 مساءً.')
+    reply: quiet('## أهلاً بيك 😊 **الأوردر** دليفري ولا استلام؟')
   }), { geo: { street: 'شارع حسن صبري', district: 'الزمالك' } });
-  assert.match(t.brief.facts_text, /Their latest message is in: Arabic$/m);
-  assert.deepEqual(t.checked.decision.reply_messages, ['أهلاً بيك 😊 الأوردر دليفري ولا استلام؟ الفرع مفتوح لحد 11 بالليل.']);
+  assert.deepEqual(t.checked.decision.reply_messages, ['أهلاً بيك 😊 *الأوردر* دليفري ولا استلام؟']);
+  assert.deepEqual(t.nodes['Check Reply'].violations, []);
+  assert.doesNotMatch(t.brief.facts_text, /latest message is in/, 'the model reads their language itself');
 });
 
 test('a tool call that failed: the reply may not say the dishes went in', async () => {
@@ -745,19 +739,6 @@ test('the cart: changing a line by its line_id alone', async () => {
   r = await manageCart(db, intake, 'update', [{ line_id: line, quantity: 1 }]);
   assert.ok(!(r.problems || []).some(p => p.code === 'ITEM_NOT_FOUND'), JSON.stringify(r.problems));
   assert.equal(r.cart.find(l => l.menu_id === 'M007').quantity, 1);
-});
-
-test('"أنا معاكي" to Ahmed is caught; to a customer who wrote "عايزة" it is fine', async () => {
-  let t = await turn(db, evolutionPayload({ phone: '201099990033', text: 'لا خلاص مش هطلب النهارده' }), async () => ({
-    plan: { read: 'bye', stage: 'other', objective: 'close', actions: [] },
-    reply: quiet('ولا يهمك، لما تحب تطلب أنا معاكي.'), rewrite: ['ولا يهمك، لما تحب تطلب أنا معاك.']
-  }));
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /feminine \("معاكي"\)/);
-  t = await turn(db, evolutionPayload({ phone: '201099990044', text: 'أنا عايزة أطلب بكرة' }), async () => ({
-    plan: { read: 'later', stage: 'other', objective: 'ok', actions: [] },
-    reply: quiet('تمام، لما تحبي أنا معاكي 😊')
-  }));
-  assert.deepEqual(t.nodes['Check Reply'].violations, []);
 });
 
 test('the cart: "summary" re-prices with the delivery area saved after the dishes', async () => {
@@ -809,51 +790,6 @@ function fieldNeededProbe(d) {
   return new Function('d', src + '\nreturn fieldNeeded("address_floor", d);')(d);
 }
 
-test('the client\'s test: "اسمه حضرتك" tidied; a vague "لو وُجدت" fee note is caught', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990077', text: 'العجمي البيطاش' }), async () => ({
-    plan: { read: 'area', stage: 'details', objective: 'name', actions: [] },
-    reply: quiet('تمام 👌 اسمه حضرتك إيه؟\nالأسعار غير شاملة الرسوم المقررة من الفرع، لو وُجدت.'),
-    rewrite: ['تمام 👌 تحب تطلب إيه؟']
-  }));
-  const c = t.nodes['Check Reply'];
-  assert.match(c.decision.reply_messages[0], /اسم حضرتك إيه؟/);
-  assert.match(c.violations.join('\n'), /sounds like a system/);
-});
-
-test('the client\'s test: an empty order is not the moment for name and number; "حلو يا عبدالرحمن" is dropped', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990088', pushName: 'Abdo', text: 'عاوز اعمل اوردر' }), async (brief) => {
-    assert.match(brief.facts_text, /THE ORDER IS STILL EMPTY — first: .*name, number, building\/floor and payment are NOT asked/);
-    assert.doesNotMatch(brief.facts_text, /STILL MISSING TO PLACE AN ORDER/);
-    return { plan: { read: 'wants to order', stage: 'discovery', objective: 'order type', actions: [] },
-             reply: quiet('تمام، تحت أمرك 😊 نكلمك على نفس الرقم ده؟ واسمك إيه؟'),
-             rewrite: ['تحت أمرك 😊 الأوردر دليفري ولا استلام من الفرع؟'] };
-  });
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /order is still empty/);
-  const t2 = await turn(db, evolutionPayload({ phone: '201099990088', text: 'دليفري' }), async () => ({
-    plan: { read: 'delivery', stage: 'discovery', objective: 'area', actions: [] },
-    reply: quiet('حلو يا عبدالرحمن 😊\nابعتلي اللوكيشن أو اسم المنطقة')
-  }));
-  assert.deepEqual(t2.checked.decision.reply_messages, ['ابعتلي اللوكيشن أو اسم المنطقة']);
-});
-
-test('browsing: the menu is not written out under the pictures; no VAT talk before the summary', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990099', text: 'عندكو ايه؟' }), async (brief) => ({
-    plan: { read: 'menu', stage: 'discovery', objective: 'menu', actions: [] },
-    reply: quiet('الأسعار قبل ضريبة القيمة المضافة 14%:\nكفتة 480ج\nريش 950ج\nفرخة 260ج\nساندوتش 95ج\nبطاطس 35ج'),
-    rewrite: ['ده اللي عندنا 👇 تحب تبدأ بإيه؟']
-  }));
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /VAT while they are choosing/);
-});
-
-test('no script: the same filler opening two replies in a row is dropped the second time', async () => {
-  const phone = '201099990111';
-  await turn(db, evolutionPayload({ phone, text: 'كيلو كفتة' }), async () => ({
-    plan: { read: 'x', stage: 'ordering', objective: 'x', actions: [] }, reply: quiet('حلو، الكفتة عندك 👌 تحب حاجة تانية؟') }));
-  const t = await turn(db, evolutionPayload({ phone, text: 'بس كده' }), async () => ({
-    plan: { read: 'x', stage: 'details', objective: 'x', actions: [] }, reply: quiet('حلو، نكلمك على نفس الرقم ده؟') }));
-  assert.deepEqual(t.checked.decision.reply_messages, ['نكلمك على نفس الرقم ده؟']);
-});
-
 test('the agent writes its own JSON: slips are repaired, raw JSON never reaches the customer', async () => {
   const phone = '201099990122';
   const say = async (text, reply) => (await turn(db, evolutionPayload({ phone, text }), async () => ({
@@ -866,25 +802,6 @@ test('the agent writes its own JSON: slips are repaired, raw JSON never reaches 
   // broken beyond repair: the messages are rescued, never the JSON itself
   const r = await say('ازيك', '{"reply_messages": ["الحمد لله 😊 تحب تطلب؟"], "handoff": {"needed": false "reason": ""}');
   assert.deepEqual(r, ['الحمد لله 😊 تحب تطلب؟']);
-});
-
-test('food first, then details: "anything else?" until they say that\'s all', async () => {
-  const phone = '201099990133';
-  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
-    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
-  await manageCart(db, intake, 'set_branch', [], 'المعادي');
-  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
-  const t = await turn(db, evolutionPayload({ phone, text: 'لا خليهم اتنين' }), async (brief) => {
-    assert.match(brief.brief, /have NOT said they are done choosing/);
-    return { plan: { read: 'x', stage: 'ordering', objective: 'x', actions: [] }, reply: quiet('تمام، اتنين 👌 اسم حضرتك إيه؟'),
-             rewrite: ['تمام، خليتهم اتنين 👌 تحب حاجة تانية معاهم؟'] };
-  });
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /not said they are done choosing/);
-  const t2 = await turn(db, evolutionPayload({ phone, text: 'لا شكرا' }), async (brief) => {
-    assert.match(brief.brief, /CHOOSING: done/);
-    return { plan: { read: 'x', stage: 'details', objective: 'x', actions: [] }, reply: quiet('تمام 👌 اسم حضرتك إيه؟') };
-  });
-  assert.ok(!t2.nodes['Check Reply'].violations.some(v => /done choosing/.test(v)));
 });
 
 test('a dish this branch lacks: other branches are offered only if they can take the order', async () => {
@@ -908,36 +825,6 @@ test('a dish this branch lacks: other branches are offered only if they can take
   assert.ok(p.available_at.includes('الزمالك'), JSON.stringify(p));
 });
 
-test('"كاليماري مقلي": no menu talk, no VAT while choosing, even with dishes in', async () => {
-  const phone = '201099990166';
-  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
-    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
-  await manageCart(db, intake, 'set_branch', [], 'المعادي');
-  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
-  const t = await turn(db, evolutionPayload({ phone, text: 'وكمان واحدة مقلية' }), async () => ({
-    plan: { read: 'x', stage: 'ordering', objective: 'x', actions: [] },
-    reply: quiet('مقلي مش ظاهر في المنيو. تحب واحدة بـ240ج قبل الضريبة؟'), rewrite: ['حاضر 👌 تحب حاجة تانية؟'] }));
-  const v = t.nodes['Check Reply'].violations.join('\n');
-  assert.match(v, /VAT while they are choosing/);
-  assert.match(v, /مش ظاهر/);
-});
-
-test('"كيلو *كاليماري بالكيلو*" loses the second بالكيلو; nothing is "جاهز" before it is placed', async () => {
-  const phone = '201099990177';
-  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
-    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
-  await manageCart(db, intake, 'set_branch', [], 'المعادي');
-  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
-  const t = await turn(db, evolutionPayload({ phone, text: 'بس كده' }), async () => ({
-    plan: { read: 'x', stage: 'details', objective: 'x', actions: [] },
-    reply: quiet('طلبك جاهز 👌 نكلمك على نفس الرقم ده؟'), rewrite: ['تمام 👌 نكلمك على نفس الرقم ده؟'] }));
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /not placed yet/);
-  const t2 = await turn(db, evolutionPayload({ phone, text: 'ايوه' }), async () => ({
-    plan: { read: 'x', stage: 'details', objective: 'x', actions: [] },
-    reply: quiet('كيلو *كفتة بالكيلو* — 480ج\nنص كيلو *طرب بالكيلو* حار — 260ج') }));
-  assert.deepEqual(t2.checked.decision.reply_messages, ['كيلو *كفتة* — 480ج\nنص كيلو *طرب* حار — 260ج']);
-});
-
 test('the first add can carry the branch: one call, no race with set_branch', async () => {
   const phone = '201099990188';
   const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
@@ -946,27 +833,6 @@ test('the first add can carry the branch: one call, no race with set_branch', as
   assert.equal(r.status, 'DONE', JSON.stringify(r));
   assert.equal(r.branch, 'المعادي');
   assert.ok(r.cart.some(l => l.menu_id === 'M007'));
-});
-
-test('the minimum order is not news while the order is empty', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990199', text: 'do you deliver to Maadi?' }), async () => ({
-    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
-    reply: quiet('Yes, from our Maadi branch. Delivery is EGP 25 with a EGP 150 minimum order. What would you like?'),
-    rewrite: ['Yes, from our Maadi branch, delivery is EGP 25. What would you like?'] }));
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /minimum order now/);
-});
-
-test('browsing: a few highlights with prices, not the whole section; "كم كيلو" reads "كام كيلو"', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990211', text: 'عندكو ايه في المشويات؟' }), async () => ({
-    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
-    reply: quiet('عندنا *كفتة*، *طرب*، *ريش*، *شيش*، *فراخ*، *سجق*، *كبدة*. تحب أنهي وكم كيلو؟'),
-    rewrite: ['أشهر حاجة عندنا *كفتة* 480ج للكيلو و*ريش* 950ج 👌 تحب كام كيلو؟'] }));
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /lists 7 dishes/);
-  const t2 = await turn(db, evolutionPayload({ phone: '201099990222', text: 'رشحلي حاجة' }), async () => ({
-    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
-    reply: quiet('جرب *الكفتة* أو *الريش*، تحب كم كيلو؟'), rewrite: ['جرب *الكفتة* 480ج للكيلو، تحب كام كيلو؟'] }));
-  assert.match(t2.nodes['Check Reply'].violations.join('\n'), /without their prices/);
-  assert.match(t2.checked.decision.reply_messages.join('\n'), /كام كيلو/);
 });
 
 test('the same add twice in a row goes in once', async () => {
@@ -993,63 +859,4 @@ test('"one more of the same" in a new message still adds', async () => {
                    where wa_id = $1`, [intake.wa_id]);
   const r = await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
   assert.equal(r.cart.find(l => l.menu_id === 'M007').quantity, 2, JSON.stringify(r.cart));
-});
-
-test('"ازيكو" gets answered; order status in plain words, not "متعلم إنه جاهز"', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990255', text: 'ازيكو، عايز أحجز ترابيزة' }), async () => ({
-    plan: { read: 'x', stage: 'reservation', objective: 'x', actions: [] },
-    reply: quiet('أهلاً 😊 تحب تحجز في أي فرع؟'), rewrite: ['الحمد لله تمام 😊 تحب تحجز في أي فرع؟'] }));
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /asked how you are/);
-  const t2 = await turn(db, evolutionPayload({ phone: '201099990266', text: 'الاوردر جهز؟' }), async () => ({
-    plan: { read: 'x', stage: 'support', objective: 'x', actions: [] },
-    reply: quiet('الأوردر لسه مش متعلم إنه جاهز.'), rewrite: ['لسه الفرع بيحضّره 🙏 هتابع معاهم وأقولك.'] }));
-  assert.match(t2.nodes['Check Reply'].violations.join('\n'), /متعلم إنه/);
-});
-
-test('Franco "3ayza" is a woman speaking: "تحبي" is fine', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990277', text: 'ezayko, 3ayza a3mel order' }), async () => ({
-    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] }, reply: quiet('الحمد لله تمام 😊 تحبي دليفري ولا استلام؟') }));
-  assert.ok(!t.nodes['Check Reply'].violations.some(v => /feminine/.test(v)), t.nodes['Check Reply'].violations.join('\n'));
-});
-
-test('offering one dish to add carries its price; "anything else?" does not need one', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990288', text: 'ايه احسن رز عندكو؟' }), async () => ({
-    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
-    reply: quiet('أحسن حاجة عندنا الرز البسمتي، تحب أضيف رز بسمتي؟'), rewrite: ['الرز البسمتي 60ج، تحب أضيفه؟'] }));
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /without its price/);
-  const t2 = await turn(db, evolutionPayload({ phone: '201099990299', text: 'كيلو كفتة' }), async () => ({
-    plan: { read: 'x', stage: 'ordering', objective: 'x', actions: [] }, reply: quiet('تمام 👌 تحب أضيف حاجة تانية؟') }));
-  assert.ok(!t2.nodes['Check Reply'].violations.some(v => /without its price/.test(v)));
-});
-
-test('dropping "تمام يا نور" never leaves a reply starting with a loose "و"', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990311', text: 'هدفع اونلاين' }), async () => ({
-    plan: { read: 'x', stage: 'details', objective: 'x', actions: [] },
-    reply: quiet('تمام يا نور، ورابط الدفع هيوصلك بعد ما أأكد الأوردر. نكلمك على نفس الرقم ده؟') }));
-  assert.deepEqual(t.checked.decision.reply_messages, ['تمام، ورابط الدفع هيوصلك بعد ما أأكد الأوردر. نكلمك على نفس الرقم ده؟']);
-});
-
-test('a short Latin message keeps the chat\'s language: "tamam akkedi" after Franco is still Arabic', async () => {
-  const phone = '201099990322';
-  await turn(db, evolutionPayload({ phone, text: 'ezayko, 3ayza a3mel order' }), async () => ({
-    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] }, reply: quiet('الحمد لله تمام 😊 تحبي تطلبي إيه؟') }));
-  await turn(db, evolutionPayload({ phone, text: 'tamam akkedi' }), async (b) => {
-    assert.match(b.brief, /latest message is in: Franco/);
-    return { plan: { read: 'x', stage: 'x', objective: 'x', actions: [] }, reply: quiet('تمام 👌') };
-  });
-  const en = '201099990333';
-  await turn(db, evolutionPayload({ phone: en, text: 'Hi, I would like to order please' }), async () => ({
-    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] }, reply: quiet('Hi! What would you like?') }));
-  await turn(db, evolutionPayload({ phone: en, text: 'ok thanks' }), async (b) => {
-    assert.match(b.brief, /latest message is in: English/);
-    return { plan: { read: 'x', stage: 'x', objective: 'x', actions: [] }, reply: quiet('You are welcome!') };
-  });
-});
-
-test('"ازيكو" is answered at the start, not by a "كده تمام؟" at the end', async () => {
-  const t = await turn(db, evolutionPayload({ phone: '201099990344', text: 'ازيكو، عايز زي المرة اللي فاتت' }), async () => ({
-    plan: { read: 'x', stage: 'x', objective: 'x', actions: [] },
-    reply: quiet('أهلاً بيك 😊 ده طلبك 👇\nكفتة — 480ج\n\nكده تمام؟ أأكدلك الأوردر؟'),
-    rewrite: ['الحمد لله تمام 😊 ده طلبك 👇\nكفتة — 480ج\n\nكده تمام؟ أأكدلك الأوردر؟'] }));
-  assert.match(t.nodes['Check Reply'].violations.join('\n'), /asked how you are/);
 });

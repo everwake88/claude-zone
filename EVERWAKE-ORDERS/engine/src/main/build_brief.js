@@ -308,42 +308,6 @@ const spokeBefore = recent.some(m => m.direction === 'outbound');
 let gapH = null;
 if (str(state.last_turn_at)) gapH = (Date.now() - new Date(str(state.last_turn_at)).getTime()) / 3600000;
 const isFirstReply = !spokeBefore || (gapH !== null && gapH >= 12);
-// a pin, a voice note or a photo has no words of theirs: "[shared a location pin]"
-// is our marker, not English — the language they used before decides
-const ownWords = customerText.replace(/\[[a-z ]+\]/gi, ' ');
-const earlierWords = ownWords.trim() ? '' : recent.filter(m => m.direction === 'inbound').map(m => str(m.text || m.body)).join(' ').replace(/\[[a-z ]+\]/gi, ' ');
-const langText = ownWords.trim() ? ownWords : earlierWords;
-// done choosing: they said so ("بس كده"، "كده تمام"، "that's all"), or said no to "anything else?";
-// until then their name, number, address and payment wait — a detail they give on their own is still taken
-const DONE_RE = /(?<!\p{L})(بس كده|بس كدا|كده بس|كدا بس|وبس|كده تمام|كدا تمام|كده كفاية|كفاية كده|كفايه كده|خلاص كده|كده خلاص|مش عايز حاجة تانية|مش عايز حاجه تانيه|مش عاوز حاجة تانية|مفيش حاجة تانية|مفيش حاجه تانيه|لا كده|لأ كده|bas keda|bas kda|keda bas|kda bas|keda tamam|kda tmam|that'?s all|that'?s it|nothing else)(?!\p{L})/iu;
-const ASKED_MORE_RE = /(حاجة تانية|حاجه تانيه|حاجة كمان|تزود|تضيف|أزودلك|اضيفلك|أضيفلك|anything else|something else)/iu;
-const NO_RE = /^\s*(لا|لأ|لاء|لا شكرا|لا شكراً|لا متشكر|لا ميرسي|no|nope|la2|la|no thanks)(?!\p{L})/iu;
-const chatMsgs = [...recent];
-if (customerText && !chatMsgs.some(m => m.direction === 'inbound' && str(m.text || m.body) === customerText))
-  chatMsgs.push({ direction: 'inbound', text: customerText });
-let doneChoosing = false;
-chatMsgs.forEach((m, i) => {
-  if (m.direction !== 'inbound') return;
-  const t = str(m.text || m.body);
-  const before = chatMsgs.slice(0, i).reverse().find(x => x.direction === 'outbound');
-  if (DONE_RE.test(t) || (NO_RE.test(t) && t.trim().length <= 24 && before && ASKED_MORE_RE.test(str(before.text || before.body)))) doneChoosing = true;
-});
-const ar = (langText.match(/[؀-ۿ]/g) || []).length;
-const la = (langText.match(/[A-Za-z]/g) || []).length;
-// Franco: Egyptian Arabic typed in Latin letters ("3ayez", "a7la", "ezayak") — an Egyptian, answered in Egyptian Arabic
-const FRANCO = /[a-z][2357689]|[2357689][a-z]|\b(ana|enta|enty|ezay|ezayak|3ayez|3ayza|3awz|3awza|keda|kda|leh|eh|feen|fen|emta|bekam|b kam|kam|el|fe|mesh|msh|momken|tab|ya3ni|yaany|ba2a|delwa2ty|dlw2ty|lazem|3ala|3and|3ando|3andko|ma3a|wala|aw|ah|aywa|la2|shokran|7aga|7elw|tamam)\b/gi;
-const francoHits = (langText.match(FRANCO) || []).length;
-// a short Latin message ("tamam akkedi", "ok") says too little on its own: the chat's language so far decides
-const shortLatin = !ar && la && langText.trim().split(/\s+/).length <= 5 && francoHits < 2;
-const pastText = recent.filter(m => m.direction === 'inbound' && str(m.text || m.body) !== customerText)
-  .map(m => str(m.text || m.body)).join(' ').replace(/\[[a-z ]+\]/gi, ' ');
-const pastAr = (pastText.match(/[؀-ۿ]/g) || []).length, pastLa = (pastText.match(/[A-Za-z]/g) || []).length;
-const pastFranco = !pastAr && pastLa && (pastText.match(FRANCO) || []).length >= 2;
-const franco = (!ar && la && francoHits >= 2) || (shortLatin && (pastFranco || francoHits >= 1 && pastAr > pastLa));
-const lang = shortLatin && !franco && pastAr > pastLa ? 'Arabic'
-  : franco ? 'Franco-Arabic — Egyptian Arabic typed in Latin letters: answer in Egyptian Arabic (Arabic letters), never in English'
-  : ar && la ? (ar >= la ? 'Arabic (some English words)' : 'English (some Arabic words)') : (la ? 'English' : 'Arabic');
-// nothing in words at all (a first message that is only a pin) → Egyptian Arabic, the default here
 
 const clip = (s, n) => { s = str(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const who = (m) => m.direction === 'inbound' ? 'customer: '
@@ -385,7 +349,6 @@ const facts = [
   `- Customer: WhatsApp name "${str(norm.customer_name) || str(customer.display_name) || '—'}" (often a nickname — do not assume it is their real name)`
     + (profileName ? ` · name on file from previous orders: ${profileName}` : '')
     + ` · ${phoneHidden ? 'their phone number is HIDDEN by WhatsApp privacy — you cannot see it; ask them to type a number for the order, and never quote the internal ID' : 'their WhatsApp number: ' + localPhone(customer.phone || intake.wa_id)}`,
-  `- Their latest message is in: ${lang}`,
   `- First reply of this conversation: ${isFirstReply ? 'YES' : 'no'}${gapH !== null ? ` (last turn ${gapH < 1 ? Math.round(gapH * 60) + ' min' : Math.round(gapH) + ' h'} ago)` : ''}`,
   `- Messages bundled into this turn: ${num(claim.buffered_count, 1)}`,
   ...situation.map(s => '- ' + s),
@@ -421,15 +384,11 @@ const facts = [
   '',
   ...historyFacts,
   '',
-  // an empty order: the branch and the food come first — their name, number, address details and
-  // payment are not on the list yet (anything they volunteer is still saved)
+  // the state of the order, as facts: what is still needed to place it, or that nothing is in it yet
   (cartItems.length || pending.length)
-    ? (doneChoosing
-        ? 'CHOOSING: done — they said that\'s all.'
-        : 'CHOOSING: they have NOT said they are done choosing — after what you add or change, ask lightly, in your own words, whether they\'d like anything else. Their name, number, building/floor and payment wait until they say that\'s all (or move on to their details themselves).')
-      + `\nSTILL MISSING TO PLACE AN ORDER: ${missing.length ? missing.map(f => LABEL[f] || f).join(' · ') : 'nothing — details complete'}`
+    ? `STILL MISSING TO PLACE AN ORDER (asked once they're done choosing — you read that from the chat): ${missing.length ? missing.map(f => LABEL[f] || f).join(' · ') : 'nothing — details complete'}`
     : `THE ORDER IS STILL EMPTY — first: ${missing.filter(f => ['delivery_method', 'branch', 'delivery_area'].includes(f)).map(f => LABEL[f] || f).join(' · ') || 'nothing — help them choose what to eat'}`
-      + ' · then help them choose their food. Their name, number, building/floor and payment are NOT asked until the order has dishes and they are done choosing (save any they give on their own).',
+      + ' · then helping them choose. Nothing is ordered yet, so there is nothing to take their name, number or address for (anything they give on their own is still saved).',
   `ORDER SUMMARY: ${cartItems.length ? summaryStatus : 'n/a (cart empty)'}`,
   `OFFERS RUNNING NOW:\n${offerLines.length ? offerLines.join('\n') : '- none'}`,
   `MENU PICTURES: ${menuPics}`,
@@ -516,8 +475,6 @@ return [{
     branch_id: branchId || null,
     branch_name: branch ? branch.name_ar : null,
     is_first_reply: isFirstReply,
-    done_choosing: doneChoosing,
-    language_hint: lang,
     cart_has_items: cartItems.length > 0,
     pending_count: pending.length,
     missing_details: missing,
