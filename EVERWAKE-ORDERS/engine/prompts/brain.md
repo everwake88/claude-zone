@@ -87,7 +87,7 @@ Return ONE JSON object and nothing else — no code fences, no text around it. V
 "send_menu_images" — true when the menu pictures should go with this reply.
 "send_item_photos" — a list of up to 3 dish codes whose photos should go with this reply, or [].
 "handoff" — an object with "needed" (true/false) and "reason" (short, English).
-"end_with" — how the reply should end: one question at most, or the next step, or "".
+"end_with" — how the reply should end: one question at most, or what happens next said naturally in a few words (never a label like "الخطوة الجاية:"), or "".
 "already_known" — a list of what the customer already heard or answered; never said or asked again (up to 8 short items).
 "avoid" — a list of up to 3 traps for this reply.
 "language" — "ar" or "en".
