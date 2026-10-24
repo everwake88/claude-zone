@@ -212,11 +212,21 @@ const payLine = (o) => {
 
 // ---- returning customer ------------------------------------------------------------------
 const UNIT_EN = { kg: 'kg', piece: 'pcs', person: 'ppl' };
+// what a status means, the way the host would put it
+const ORDER_STATUS = {
+  placed: 'sent to the branch, waiting for them to start it', accepted: 'the branch accepted it, being prepared in the kitchen',
+  preparing: 'being prepared in the kitchen', ready: 'ready at the branch', out_for_delivery: 'with the driver, on the way',
+  delivered: 'delivered', picked_up: 'picked up', cancelled: 'cancelled'
+};
+const sinceText = (t) => {
+  const m = Math.round((Date.now() - new Date(t).getTime()) / 60000);
+  return !Number.isFinite(m) || m < 0 ? '' : m < 120 ? ` · placed ${m} min ago` : m < 2880 ? ` · placed ${Math.round(m / 60)} h ago` : '';
+};
 const orderLine = (o) => {
   const items = arr(o.items).filter(i => !i.gift).map(i => `${i.name} ${UNIT_EN[i.unit] ? fmt(i.quantity) + ' ' + UNIT_EN[i.unit] : '×' + fmt(i.quantity)}`
     + (arr(i.choices).length ? ` (${arr(i.choices).map(c => arr(c.selected).map(s => str(obj(s).name || s)).join('+')).join(', ')})` : '')).join('، ');
   const driver = obj(o.driver), track = obj(o.tracking);
-  return `${o.order_no} · ${str(o.placed_at).slice(0, 10)} · ${o.branch_name || ''} · ${o.delivery_method || ''} · total ${money$(o.total)} · status ${o.status}`
+  return `${o.order_no} · ${str(o.placed_at).slice(0, 10)}${sinceText(o.placed_at)} · ${o.branch_name || ''} · ${o.delivery_method || ''} · total ${money$(o.total)} · status ${o.status} (${ORDER_STATUS[o.status] || o.status})`
     + (o.last_update_at ? ` (last update ${String(o.last_update_at).slice(0, 16).replace('T', ' ')} UTC)` : '')
     + (driver.name ? `\n    driver: ${driver.name} (${driver.phone || 'no number'})`
        + (track.eta_min != null ? ` · about ${track.km_left} km / ${track.eta_min} min from the customer (position from ${num(track.minutes_ago)} min ago)` : '') : '')
