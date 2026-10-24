@@ -8,7 +8,11 @@ const t = $input.first().json || {};
 let a = t;
 let req = t.request;
 if (typeof req === 'string') { try { req = JSON.parse(req); } catch (e) { req = null; } }
-if (req && typeof req === 'object' && !Array.isArray(req)) {
+if (t.details !== undefined && t.details_json === undefined) {
+  // {"none": true} is n8n's stand-in when the agent left details out
+  const d = t.details && typeof t.details === 'object' && t.details.none === true && Object.keys(t.details).length === 1 ? '' : t.details;
+  a = { action: t.action, details_json: d ?? '' };
+} else if (req && typeof req === 'object' && !Array.isArray(req)) {
   a = { action: req.action, details_json: req.details !== undefined ? req.details : (req.details_json ?? '') };
 } else if (t.action === undefined && t.input !== undefined) {
   try { a = typeof t.input === 'string' ? JSON.parse(t.input) : (t.input || {}); } catch (e) { a = {}; }

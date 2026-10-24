@@ -1,0 +1,24 @@
+{
+ "manage_cart": [
+  {"action":"set_branch","branch":"gleem"},
+  {"action":"add","items":[{"menu_id":"M044","quantity":0.5,"choices":[{"selected":["مشوي"]}]}]},
+  {"action":"place_order"},
+  {"action":"reorder_last"},
+  {"action":"apply_code","items":[{"promo_code":"SEA10"}]},
+  {"action":"add","items":"[{\"menu_id\":\"M013\",\"quantity\":1}]"},
+  {"action":"clear","items":[]},
+  {"action":"set_branch","branch":"gleem","items":[]},
+  {"request":{"action":"set_branch","branch":"gleem"}}
+ ],
+ "save_customer_details": [
+  {"details":{"delivery_method":"delivery","address_area":"سموحة"}},
+  {"details":"{\"full_name\":\"محمد\"}"},
+  {"full_name":"محمد"}
+ ],
+ "manage_reservation": [
+  {"action":"update","details":{"branch":"gleem","date":"2026-10-25","time":"21:00","guests":6}},
+  {"action":"summary"},
+  {"action":"submit","details":{}},
+  {"action":"update","details_json":"{\"guests\":4}"}
+ ]
+}

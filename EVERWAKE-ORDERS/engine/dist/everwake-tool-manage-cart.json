@@ -35,7 +35,13 @@
               "name": "wa_id"
             },
             {
-              "name": "request",
+              "name": "action"
+            },
+            {
+              "name": "branch"
+            },
+            {
+              "name": "items",
               "type": "any"
             }
           ]
@@ -52,7 +58,7 @@
         320
       ],
       "parameters": {
-        "jsCode": "// =====================================================================\n// EVERWAKE — Tool: manage_cart · NODE: Read Args\n// Normalises whatever shape n8n hands over into clean arguments: the\n// agent's one JSON object (request: {action, items, branch}), the older\n// mapped fields, or the legacy single `input` blob.\n// =====================================================================\nconst t = $input.first().json || {};\nlet a = t;\nlet req = t.request;\nif (typeof req === 'string') { try { req = JSON.parse(req); } catch (e) { req = null; } }\nif (req && typeof req === 'object' && !Array.isArray(req)) {\n  a = { action: req.action, branch_id: req.branch ?? req.branch_id,\n        items_json: req.items !== undefined ? req.items : (req.items_json !== undefined ? req.items_json : []) };\n} else if (t.action === undefined && t.input !== undefined) {\n  try { a = typeof t.input === 'string' ? JSON.parse(t.input) : (t.input || {}); } catch (e) { a = {}; }\n  if (typeof a === 'string') { try { a = JSON.parse(a); } catch (e) { a = {}; } }\n}\nconst s = (v) => String(v == null ? '' : v).trim();\nconst action = s(a.action !== undefined ? a.action : t.action).toLowerCase();\nlet branch = s(a.branch_id !== undefined ? a.branch_id : t.branch_id);\n// \"same as last time\" with no branch chosen yet → the branch of that order\nif (action === 'reorder_last' && !branch) branch = '__last_order__';\n\nreturn [{\n  json: {\n    tenant_id: s(t.tenant_id || a.tenant_id),\n    wa_id: s(t.wa_id || a.wa_id),\n    action,\n    items_json: (v => typeof v === 'string' ? v : JSON.stringify(v ?? []))(a.items_json !== undefined ? a.items_json : (t.items_json !== undefined ? t.items_json : '[]')),\n    branch_id: action === 'set_branch' || action === 'reorder_last' ? branch : ''\n  }\n}];\n"
+        "jsCode": "// =====================================================================\n// EVERWAKE — Tool: manage_cart · NODE: Read Args\n// Normalises whatever shape n8n hands over into clean arguments: the\n// agent's fields (action, branch, items — items a list; [{}] is n8n's\n// stand-in when the agent left it out), one request object, the older\n// items_json text, or the legacy single `input` blob.\n// =====================================================================\nconst t = $input.first().json || {};\nlet a = t;\nlet req = t.request;\nif (typeof req === 'string') { try { req = JSON.parse(req); } catch (e) { req = null; } }\nif (t.items !== undefined || t.branch !== undefined) {\n  a = { action: t.action, branch_id: t.branch, items_json: t.items };\n} else if (req && typeof req === 'object' && !Array.isArray(req)) {\n  a = { action: req.action, branch_id: req.branch ?? req.branch_id,\n        items_json: req.items !== undefined ? req.items : (req.items_json !== undefined ? req.items_json : []) };\n} else if (t.action === undefined && t.input !== undefined) {\n  try { a = typeof t.input === 'string' ? JSON.parse(t.input) : (t.input || {}); } catch (e) { a = {}; }\n  if (typeof a === 'string') { try { a = JSON.parse(a); } catch (e) { a = {}; } }\n}\nconst s = (v) => String(v == null ? '' : v).trim();\nconst action = s(a.action !== undefined ? a.action : t.action).toLowerCase();\nlet branch = s(a.branch_id !== undefined ? a.branch_id : t.branch_id);\nif (branch.toLowerCase() === 'none') branch = '';   // n8n's stand-in when the agent left it out\n// \"same as last time\" with no branch chosen yet → the branch of that order\nif (action === 'reorder_last' && !branch) branch = '__last_order__';\n\nreturn [{\n  json: {\n    tenant_id: s(t.tenant_id || a.tenant_id),\n    wa_id: s(t.wa_id || a.wa_id),\n    action,\n    items_json: (v => {\n      if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return v; } }\n      const list = Array.isArray(v) ? v : (v && typeof v === 'object' ? [v] : []);\n      return JSON.stringify(list.filter(x => x && typeof x === 'object' && Object.keys(x).length));\n    })(a.items_json !== undefined ? a.items_json : (t.items_json !== undefined ? t.items_json : '[]')),\n    branch_id: action === 'set_branch' || action === 'reorder_last' ? branch : ''\n  }\n}];\n"
       },
       "id": "ef2cf277-5f98-526e-afd1-e45152278a93"
     },

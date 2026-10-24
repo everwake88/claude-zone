@@ -123,7 +123,7 @@ const chain = (name, textExpr, system, pos) => ({
   parameters: { promptType: 'define', text: textExpr, messages: { messageValues: [{ message: system }] } } });
 // the agent fills one JSON object per call ($fromAI type json): a list
 // typed into a "string" field made n8n refuse the call and stop the turn
-const ANY = ['request', 'details'];
+const ANY = ['items', 'details'];
 const toolInputSchema = (ids) => ids.map(id => ({ id, displayName: id, required: false, defaultMatch: false, display: true,
                                                   canBeUsedToMatch: true, type: ANY.includes(id) ? 'any' : 'string' }));
 // onError: a call the tool can't take (the wrong shape, a timeout) goes back to the
@@ -252,7 +252,9 @@ function buildMain() {
   w.add(tool('manage_cart', 'Everwake — Tool: manage_cart', prompt('tool_manage_cart.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    request: "={{ $fromAI('request', 'An object (not text in quotes). action: exactly one of add, update, remove, replace, clear, set_branch, reorder_last, apply_code, place_order. items: the dishes this action touches, e.g. [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]; for apply_code [{\"promo_code\":\"THE CODE\"}]; left out for clear, set_branch, reorder_last and place_order. branch: only for set_branch, the branch code or name. Never include prices. Examples: {\"action\":\"set_branch\",\"branch\":\"gleem\"} · {\"action\":\"add\",\"items\":[{\"menu_id\":\"M013\",\"quantity\":1}]} · {\"action\":\"place_order\"}', 'json') }}"
+    action: "={{ $fromAI('action', 'Exactly one of: add, update, remove, replace, clear, set_branch, reorder_last, apply_code, place_order', 'string') }}",
+    branch: "={{ $fromAI('branch', 'Only for set_branch: the branch code or name from THE BRANCHES. Leave it out for every other action.', 'string', 'none') }}",
+    items: "={{ $fromAI('items', 'The dishes this action touches: a list like [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]. For apply_code: [{\"promo_code\":\"THE CODE\"}]. Leave it out (never an empty list) for clear, set_branch, reorder_last and place_order. Never include prices.', 'json', [{}]) }}"
   }, [1560, 720]));
   w.add(tool('save_customer_details', 'Everwake — Tool: save_customer_details', prompt('tool_save_details.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
@@ -262,7 +264,8 @@ function buildMain() {
   w.add(tool('manage_reservation', 'Everwake — Tool: manage_reservation', prompt('tool_manage_reservation.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    request: "={{ $fromAI('request', 'An object (not text in quotes). action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4} } · {\"action\":\"summary\"}', 'json') }}"
+    action: "={{ $fromAI('action', 'Exactly one of: update, summary, submit, cancel, status', 'string') }}",
+    details: "={{ $fromAI('details', 'Only for update (and cancel when they have several bookings): only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4}. date is YYYY-MM-DD and time is HH:MM on the 24-hour clock. Leave it out for summary, submit and status.', 'json', {\"none\":true}) }}"
   }, [1880, 900]));
 
   w.add(pg('Read Back State', 'select everwake.read_back($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [1840, 460]));
@@ -350,7 +353,7 @@ function buildCart() {
     'A placed order the customer pays **online** gets its Paymob payment link from the dashboard (**Create Payment Link**, header auth *Everwake Outbox Secret*), so the agent sends it in the same reply.',
     'Every call first re-checks the cart against the live menu, so a dish switched off in the dashboard is never sold.'
   ].join('\n'), [0, 0], 1200, 220, 5));
-  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'request'], [0, 320]));
+  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'action', 'branch', 'items'], [0, 320]));
   w.add(code('Read Args', 'cart/read_args.js', [220, 320]));
   w.add(pg('Load Cart + Menu', 'select everwake.cart_context($1::uuid, $2::text, $3::text) as r;',
            "={{ [ $json.tenant_id, $json.wa_id, $json.branch_id || '' ] }}", [440, 320]));
@@ -413,7 +416,7 @@ function buildReservation() {
     '**actions** **update** (any of branch, date, time, guests, name, phone, occasion, special requests — every value is checked: in the future, not too far ahead, while the branch is open, not more guests than it seats) · **summary** (the text the customer confirms) · **submit** (only a summary they agreed to, unchanged since: the branch\'s operations WhatsApp gets the ticket with the customer\'s details, and the dashboard\'s Reservations page shows it) · **cancel** · **status**.',
     'The team calls the customer and presses Confirm on the dashboard — that is when the customer hears it is confirmed.'
   ].join('\n'), [0, 0], 1200, 240, 5));
-  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'request'], [0, 320]));
+  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'action', 'details'], [0, 320]));
   w.add(code('Read Args', 'reservation/read_args.js', [220, 320]));
   w.add(pg('Booking', "select everwake.reservation_tool($1::uuid, $2::text, $3::text, convert_from(decode($4::text, 'base64'), 'UTF8')) as r;",
            '={{ [ $json.tenant_id, $json.wa_id, $json.action, $json.details_b64 ] }}', [440, 320]));

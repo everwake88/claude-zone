@@ -1,6 +1,6 @@
 Table bookings (dine-in) — only at branches FACTS lists under TABLE BOOKINGS as taking bookings on WhatsApp. A booking is not an order: no cart, no prices.
 
-One JSON object per call: {"action": "update", "details": { … }} · {"action": "summary"}.
+Fields: action · details (an object — only for update, and cancel when they have several bookings; leave it out otherwise).
 
 actions:
 - update — details with only what is new or changed: branch (code or name), date (YYYY-MM-DD, from the dates in TABLE BOOKINGS), time (HH:MM, 24-hour: 9 at night = 21:00), guests (a number), full_name, phone (only when they give a number other than their WhatsApp one), occasion, requests (special requests in their words; "" clears). Save every piece the same turn they give it.

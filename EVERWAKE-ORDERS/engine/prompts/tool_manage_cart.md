@@ -1,6 +1,6 @@
 The cart, the branch, offers and placing the order. The tool prices everything from the chosen branch's menu and applies the restaurant's offers — never send a price.
 
-One JSON object per call: {"action": "…", "items": [ … ], "branch": "…"} — items only when the action touches dishes, branch only for set_branch.
+Fields: action · items (a list — only when the action touches dishes; leave it out otherwise, never an empty list) · branch (only for set_branch).
 
 actions:
 - add / update / remove / replace / clear — dishes in items

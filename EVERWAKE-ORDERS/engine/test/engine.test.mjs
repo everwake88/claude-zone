@@ -662,18 +662,28 @@ test('what the stress test caught: Franco gets Arabic, no semicolons, EGP in Eng
 });
 
 test('tool inputs: one JSON object from the agent (a list where text was expected stopped the turn)', async () => {
+  // what the model really sends: flat fields; n8n fills what it left out with the defaults
   const cart = (await runCode('cart/read_args.js', { input: { tenant_id: 't', wa_id: 'w',
-    request: { action: 'add', items: [{ menu_id: 'M013', quantity: 1 }] } } }))[0];
+    action: 'add', branch: 'none', items: [{ menu_id: 'M013', quantity: 1 }] } }))[0];
   assert.equal(cart.action, 'add');
   assert.deepEqual(JSON.parse(cart.items_json), [{ menu_id: 'M013', quantity: 1 }]);
+  const setBranch = (await runCode('cart/read_args.js', { input: { action: 'set_branch', branch: 'gleem', items: [{}] } }))[0];
+  assert.equal(setBranch.branch_id, 'gleem');
+  assert.equal(setBranch.items_json, '[]');
+  const reorder = (await runCode('cart/read_args.js', { input: { action: 'reorder_last', branch: 'none', items: [{}] } }))[0];
+  assert.equal(reorder.branch_id, '__last_order__');
+  const asText = (await runCode('cart/read_args.js', { input: { action: 'add', branch: 'none', items: '[{"menu_id":"M002"}]' } }))[0];
+  assert.equal(asText.items_json, '[{"menu_id":"M002"}]');
   const branch = (await runCode('cart/read_args.js', { input: { request: '{"action":"set_branch","branch":"gleem"}' } }))[0];
   assert.equal(branch.branch_id, 'gleem');
   assert.equal(branch.items_json, '[]');
   const old = (await runCode('cart/read_args.js', { input: { action: 'add', items_json: '[{"menu_id":"M001"}]', branch_id: '' } }))[0];
   assert.equal(old.items_json, '[{"menu_id":"M001"}]');
-  const rsv = (await runCode('reservation/read_args.js', { input: { request: { action: 'update', details: { guests: 4 } } } }))[0];
+  const rsv = (await runCode('reservation/read_args.js', { input: { action: 'update', details: { guests: 4 } } }))[0];
   assert.equal(rsv.action, 'update');
   assert.deepEqual(JSON.parse(Buffer.from(rsv.details_b64, 'base64').toString()), { guests: 4 });
+  const summary = (await runCode('reservation/read_args.js', { input: { action: 'summary', details: { none: true } } }))[0];
+  assert.equal(Buffer.from(summary.details_b64, 'base64').toString(), '');
 
   const phone = '201099996666';
   const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
