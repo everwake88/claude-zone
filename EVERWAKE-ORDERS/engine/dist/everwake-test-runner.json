@@ -1,0 +1,283 @@
+{
+  "name": "Everwake — Test Runner",
+  "nodes": [
+    {
+      "name": "Sticky — Test Runner",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        -420
+      ],
+      "parameters": {
+        "content": "## Everwake · Test Runner — chat with an agent, nothing goes on WhatsApp\nOpen the chat (**Open chat** at the bottom) and write as a customer. The real **Main** workflow answers from a pretend number (200000000001), so you test exactly what customers get — but the replies are only recorded, no kitchen ticket is sent, and it works while the restaurant is still onboarding.\n**/reset** a brand-new customer · **/later 5 <message>** 5 hours pass first · **/pin 31.2,29.9** a location pin · **#2 <message>** a second pretend customer · **@slug <message>** another restaurant.\nThe restaurant to test is set at the top of **Read Test Command** (seagull). The test chat shows in the dashboard inbox as «تجربة»; an order it places shows on the board — **/reset** removes it.\n### After import\n1. Pick the **Everwake DB** credential on the two Postgres nodes.\n2. On **Run The Agent (Main)** pick *Everwake — Main (Brain + Agent)* (it shows SET_AFTER_IMPORT).",
+        "width": 1500,
+        "height": 380,
+        "color": 6
+      },
+      "id": "37f45ad5-31b3-5293-ad5a-b02efef8436d"
+    },
+    {
+      "name": "Chat With The Agent (test)",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -260,
+        0
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "id": "715c1af3-105f-597b-a7ce-91dee92aede3",
+      "webhookId": "1cc41a4a-c0ac-506a-ad64-1b94a8b918ec"
+    },
+    {
+      "name": "Read Test Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Test Runner · NODE: Read Test Command\n// Chat with a restaurant's agent as a pretend customer. The real Main\n// workflow answers; nothing is sent on WhatsApp.\n//\n//   any text                 a customer message\n//   /reset   (ريست)          forget the test chat: a brand-new customer\n//   /later 5 <message>       5 hours pass first (بعد 5 …), then the message\n//   /pin 31.2,29.9 [text]    a location pin (لوكيشن), with or without text\n//   #2 <message>             a second pretend customer (#1 … #99)\n//   @gleem <message>         another restaurant, by its slug\n// =====================================================================\nconst RESTAURANT = 'seagull';      // the slug (or English name) of the restaurant to test\nconst NAME = 'تجربة';              // the WhatsApp profile name the agent sees\n\nlet raw = String($input.first().json.chatInput ?? '').trim();\nlet restaurant = RESTAURANT, n = 1;\nlet m;\nif ((m = raw.match(/^@(\\S+)\\s*([\\s\\S]*)$/))) { restaurant = m[1]; raw = m[2].trim(); }\nif ((m = raw.match(/^#(\\d{1,2})\\s*([\\s\\S]*)$/))) { n = Math.min(Math.max(Number(m[1]), 1), 99); raw = m[2].trim(); }\n\nconst later = raw.match(/^\\/(?:later|بعد)\\s+(\\d+(?:\\.\\d+)?)\\s*([\\s\\S]*)$/i);\nif (later) raw = later[2].trim();\nconst reset = /^\\/?(reset|ريست)$/i.test(raw);\nconst pin = raw.match(/^\\/(?:pin|لوكيشن)\\s+(-?\\d+(?:\\.\\d+)?)\\s*[,،\\s]\\s*(-?\\d+(?:\\.\\d+)?)\\s*([\\s\\S]*)$/i);\nconst text = pin ? pin[3].trim() : (reset ? '' : raw);\n\nreturn [{\n  json: {\n    restaurant,\n    wa_id: '2000000000' + String(n).padStart(2, '0'),\n    push_name: NAME + (n > 1 ? ' ' + n : ''),\n    text,\n    location: pin ? { lat: Number(pin[1]), lng: Number(pin[2]) } : null,\n    reset,\n    later_hours: later ? Number(later[1]) : 0,\n    empty: !reset && !text && !pin\n  }\n}];\n"
+      },
+      "id": "1ba862df-fe77-5d03-adaa-ec6ff61b9167"
+    },
+    {
+      "name": "Prepare Test Chat",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        180,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.test_chat_prepare($1::text, $2::text, $3::boolean, $4::numeric) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $json.restaurant, $json.wa_id, $json.reset, $json.later_hours ] }}"
+        }
+      },
+      "id": "228f87cd-2f74-555c-a6d4-a340e47a0448"
+    },
+    {
+      "name": "Route: A Message To Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        400,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "233bd34c-c6e8-5a53-a9b1-7c7c2186197e",
+              "leftValue": "={{ !$('Read Test Command').first().json.reset && !$('Read Test Command').first().json.empty }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a1881853-435a-5e73-aeb1-aad0cbc8f4a5"
+    },
+    {
+      "name": "Fake WhatsApp Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Test Runner · NODE: Fake WhatsApp Message\n// The message as Evolution would deliver it, plus test_run: Main then\n// records its replies instead of sending them.\n// =====================================================================\nconst cmd = $('Read Test Command').first().json;\nconst r = $input.first().json.r;\nconst message = cmd.location\n  ? { locationMessage: { degreesLatitude: cmd.location.lat, degreesLongitude: cmd.location.lng, name: cmd.text || undefined } }\n  : { conversation: cmd.text };\nreturn [{\n  json: {\n    test_run: true,\n    query: { token: r.token },\n    body: {\n      event: 'messages.upsert',\n      instance: r.instance,\n      data: {\n        key: { remoteJid: `${r.wa_id}@s.whatsapp.net`, fromMe: false, id: 'TESTIN' + Date.now() + Math.random().toString(36).slice(2, 8) },\n        pushName: cmd.push_name,\n        messageType: cmd.location ? 'locationMessage' : 'conversation',\n        messageTimestamp: Math.floor(Date.now() / 1000),\n        message\n      }\n    }\n  }\n}];\n"
+      },
+      "id": "7936017b-589e-547a-a1f7-2a87380dcdce"
+    },
+    {
+      "name": "Run The Agent (Main)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        840,
+        -100
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SET_AFTER_IMPORT",
+          "mode": "list",
+          "cachedResultName": "Everwake — Main (Brain + Agent)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "id": "b1cf3b09-6f48-5183-a594-f43cdd8db587"
+    },
+    {
+      "name": "Load The Reply",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1060,
+        -100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.test_chat_result($1::uuid, $2::text, $3::timestamptz) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Test Chat').first().json.r.tenant_id, $('Prepare Test Chat').first().json.r.wa_id, $('Prepare Test Chat').first().json.r.since ] }}"
+        }
+      },
+      "executeOnce": true,
+      "id": "cda54ff4-cd18-538b-a1c3-d24e0f40d324"
+    },
+    {
+      "name": "Format Test Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Test Runner · NODE: Format Test Result\n// What the chat (and whoever is testing) reads back: the reply exactly as\n// the customer would get it, then what the agent did and why.\n// =====================================================================\nconst cmd = $('Read Test Command').first().json;\nconst prep = $('Prepare Test Chat').first().json.r || {};\nconst res = ($input.first().json.r) || {};\nconst short = (v, n = 600) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return !s ? '' : s.length > n ? s.slice(0, n - 1) + '…' : s; };\n\nif (cmd.empty) return [{ json: { output: 'Type a customer message, or /reset, /later 5 <message>, /pin <lat>,<lng>.' } }];\nif (prep.reset) return [{ json: { output: `RESET — ${prep.restaurant}: the test chat ${prep.wa_id} starts from zero (a brand-new customer).` } }];\n\nlet route = null;\ntry { route = $('Run The Agent (Main)').first().json?.r?.route || null; } catch (e) { /* not run */ }\nconst replies = Array.isArray(res.replies) ? res.replies : [];\nconst said = replies.map(m => m.kind === 'text' ? m.text : `[${m.kind}] ${m.text || ''}`).join('\\n[[NEXT]]\\n');\nconst t = res.turn || {};\nconst b = t.plan && typeof t.plan === 'object' ? t.plan : null;\nconst plan = !b ? null : b.used ? `${b.stage} — ${b.objective}${b.place_order ? ' · PLACE' : ''}${b.show_summary ? ' · SUMMARY' : ''}` : `(no plan: ${b.error})`;\n\nconst lines = [\n  `${prep.later_hours ? `(${prep.later_hours} hours later) ` : ''}CUSTOMER: ${res.customer ?? cmd.text}`,\n  `AGENT: ${said || `(no reply — ${route && route !== 'agent' ? 'route ' + route : 'see the Main execution'})`}`,\n  '',\n  `${prep.restaurant} · ${prep.status}${res.mode === 'human' ? ' · A PERSON TOOK OVER' : ''} · stage=${t.stage ?? '-'} · ${t.seconds ?? '-'}s · ${t.tokens ?? '-'} tokens`,\n  `tools=${short(t.tools || [])}${(t.tool_problems || []).length ? ' · problems=' + short(t.tool_problems, 400) : ''}`,\n  (t.caught || []).length ? `caught=${short(t.caught, 800)}${t.rewritten ? ' → rewritten' : ''}` : 'caught=none',\n  `plan=${plan ?? '(none)'}`,\n  `branch=${res.branch ?? '-'} · cart=${short(res.cart || [])}`,\n  `details=${short(res.details || {}, 500)}`,\n  res.orders ? `orders=${short(res.orders)}` : '',\n  t.order_placed ? `ORDER PLACED ${t.order_placed} (no ticket sent to the kitchen in a test)` : '',\n  t.handoff && t.handoff.needed ? `HANDOFF: ${t.handoff.reason}` : ''\n].filter(l => l !== '');\nreturn [{ json: { output: lines.join('\\n'), reply: said || null } }];\n"
+      },
+      "id": "2bacc907-2b5b-5bf9-afad-72aa26c66652"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat With The Agent (test)": {
+      "main": [
+        [
+          {
+            "node": "Read Test Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Test Command": {
+      "main": [
+        [
+          {
+            "node": "Prepare Test Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Test Chat": {
+      "main": [
+        [
+          {
+            "node": "Route: A Message To Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: A Message To Send?": {
+      "main": [
+        [
+          {
+            "node": "Fake WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Test Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fake WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Run The Agent (Main)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run The Agent (Main)": {
+      "main": [
+        [
+          {
+            "node": "Load The Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load The Reply": {
+      "main": [
+        [
+          {
+            "node": "Format Test Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

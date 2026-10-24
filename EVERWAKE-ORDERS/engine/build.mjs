@@ -3,7 +3,7 @@
 // Everwake Orders · engine builder
 //
 // The engine's code lives in src/ (one file per n8n Code node) and its
-// prompts in prompts/. This script assembles them into five workflows
+// prompts in prompts/. This script assembles them into six workflows
 // you import into n8n (dist/*.json):
 //
 //   Everwake — Main (Brain + Agent)            the WhatsApp webhook, every restaurant
@@ -12,6 +12,8 @@
 //   Everwake — Tool: manage_reservation        called by the Agent (table bookings)
 //   Everwake — Outbox + Housekeeping           staff replies, status messages,
 //                                              "we're back", every minute
+//   Everwake — Test Runner                     chat with an agent as a pretend
+//                                              customer; nothing goes on WhatsApp
 //
 //   node build.mjs
 //
@@ -50,7 +52,7 @@ class Workflow {
   constructor(name) { this.name = name; this.nodes = []; this.connections = {}; }
   add(node) {
     node.id = uuidOf(this.name + '::' + node.name);
-    if (['n8n-nodes-base.webhook', 'n8n-nodes-base.wait'].includes(node.type)) node.webhookId = uuidOf(this.name + '::hook::' + node.name);
+    if (['n8n-nodes-base.webhook', 'n8n-nodes-base.wait', '@n8n/n8n-nodes-langchain.chatTrigger'].includes(node.type)) node.webhookId = uuidOf(this.name + '::hook::' + node.name);
     this.nodes.push(node);
     return node.name;
   }
@@ -121,6 +123,7 @@ const trigger = (name, inputs, pos) => ({
   parameters: { workflowInputs: { values: inputs.map(n => ({ name: n })) } } });
 
 const I = "$('Intake').first().json.r";
+const TEST = "$('Normalize Inbound').first().json.is_test === true";
 
 // =========================================================================
 // Main
@@ -144,6 +147,9 @@ function buildMain() {
 
   w.add({ name: 'WA — Evolution Webhook', type: 'n8n-nodes-base.webhook', typeVersion: 2.1, position: [-2300, 600],
           parameters: { httpMethod: 'POST', path: 'everwake-evo', options: {} } });
+  w.add({ name: 'Test Runner Call', type: 'n8n-nodes-base.executeWorkflowTrigger', typeVersion: 1.1, position: [-2300, 800],
+          parameters: { inputSource: 'passthrough' },
+          notes: 'The Test Runner workflow: a pretend chat, nothing is sent on WhatsApp.', notesInFlow: true });
   w.add(code('Normalize Inbound', 'main/normalize_inbound.js', [-2100, 600]));
   w.add(iff('Route: Actionable?', '!$json.is_ignorable', [-1900, 600]));
   w.add(noop('Exit: Ignored', [-1700, 820]));
@@ -151,7 +157,7 @@ function buildMain() {
   w.add(iff('Route: To The Agent?', "$json.r.route === 'agent'", [-1500, 560]));
 
   // not for the agent: the OFF switch, a phone reply, or nothing to do
-  w.add(iff('Route: Apologise (Agent OFF)?', "$json.r.route === 'paused' && $json.r.send_apology === true", [-1300, 820]));
+  w.add(iff('Route: Apologise (Agent OFF)?', `$json.r.route === 'paused' && $json.r.send_apology === true && !${TEST}`, [-1300, 820]));
   w.add(code('Prepare Apology', 'main/prepare_apology.js', [-1100, 760]));
   w.add(evo('Evolution — Send Apology', 'message/sendText', '{ number: $json.reply_to, text: $json.text, delay: 800, linkPreview: false }', [-900, 760]));
   w.add(code('Record Apology', 'main/record_apology_send.js', [-700, 760]));
@@ -169,6 +175,7 @@ function buildMain() {
   const presence = w.nodes.find(n => n.name === 'Send Typing Presence');
   presence.parameters.url = `={{ ${I}.channel.base_url }}/chat/sendPresence/{{ ${I}.channel.instance }}`;
   presence.parameters.headerParameters.parameters[0].value = `={{ ${I}.channel.api_key }}`;
+  w.add(iff('Route: Real Customer?', `!${TEST}`, [-1400, 360]));
   w.add(wait('Debounce Wait 6s', 6, [-1100, 460]));
   w.add(pg('Claim Debounce Window', 'select everwake.claim_window($1::uuid, $2::text, $3::text, $4::bigint) as r;',
            `={{ [ ${I}.tenant_id, ${I}.wa_id, $('Normalize Inbound').first().json.run_id, String(${I}.buffer_id) ] }}`,
@@ -256,6 +263,8 @@ function buildMain() {
   w.add(code('Prepare Outbound Messages', 'main/prepare_outbound.js', [3800, 360]));
   w.add({ name: 'Outbound Loop', type: 'n8n-nodes-base.splitInBatches', typeVersion: 3, position: [4020, 360], parameters: { options: { reset: false } } });
   w.add(noop('Turn Complete', [4240, 160]));
+  w.add(iff('Route: Test Chat?', TEST, [4240, 560]));
+  w.add(code('Pretend Send (test)', 'main/pretend_send.js', [4460, 680]));
   w.add(iff('Route: Text?', "$json.kind === 'text'", [4240, 400]));
   w.add(evo('Evolution — Send Text', 'message/sendText', '{ number: $json.reply_to, text: $json.text, delay: $json.delay_ms, linkPreview: false }', [4460, 320]));
   w.add(evo('Evolution — Send Media', 'message/sendMedia',
@@ -264,7 +273,7 @@ function buildMain() {
   w.add(code('Record Send', 'main/record_reply_send.js', [4680, 400]));
   w.add(pg('Log Outbound', b64sql('log_outbound'), '={{ [ $json.b64_log ] }}', [4900, 400]));
 
-  w.add(iff('Route: Order Placed?', "!!$('Build Persist Payload').first().json.order_placed_no", [3580, 640]));
+  w.add(iff('Route: Order Placed?', `!!$('Build Persist Payload').first().json.order_placed_no && !${TEST}`, [3580, 640]));
   w.add(pg('Load Order Ticket', 'select everwake.order_ticket($1::uuid, $2::text) as r;',
            "={{ [ $('Build Persist Payload').first().json.tenant_id, $('Build Persist Payload').first().json.order_placed_no ] }}", [3800, 640]));
   w.add(code('Build Order Ticket', 'main/build_order_ticket.js', [4020, 640]));
@@ -273,9 +282,11 @@ function buildMain() {
                [3560, 820], 900, 140, 3));
 
   w.chain('WA — Evolution Webhook', 'Normalize Inbound', 'Route: Actionable?');
+  w.link('Test Runner Call', 'Normalize Inbound');
   w.link('Route: Actionable?', 'Intake', 0); w.link('Route: Actionable?', 'Exit: Ignored', 1);
   w.chain('Intake', 'Route: To The Agent?');
-  w.link('Route: To The Agent?', 'Send Typing Presence', 0); w.link('Route: To The Agent?', 'Route: Apologise (Agent OFF)?', 1);
+  w.link('Route: To The Agent?', 'Route: Real Customer?', 0);
+  w.link('Route: Real Customer?', 'Send Typing Presence', 0); w.link('Route: Real Customer?', 'Debounce Wait 6s', 1); w.link('Route: To The Agent?', 'Route: Apologise (Agent OFF)?', 1);
   w.link('Route: Apologise (Agent OFF)?', 'Prepare Apology', 0); w.link('Route: Apologise (Agent OFF)?', 'Route: Typed On The Phone?', 1);
   w.chain('Prepare Apology', 'Evolution — Send Apology', 'Record Apology', 'Log Apology');
   w.link('Route: Typed On The Phone?', 'Wait For Own Echo 5s', 0); w.link('Route: Typed On The Phone?', 'Exit: Not For The Agent', 1);
@@ -300,7 +311,9 @@ function buildMain() {
   w.chain('Build Rewrite Request', 'Rewrite', 'Finalize Rewrite', 'Build Persist Payload');
   w.chain('Build Persist Payload', 'Persist Turn + Unlock', 'Load Reply Media', 'Prepare Outbound Messages', 'Outbound Loop');
   w.link('Persist Turn + Unlock', 'Route: Order Placed?');
-  w.link('Outbound Loop', 'Turn Complete', 0); w.link('Outbound Loop', 'Route: Text?', 1);
+  w.link('Outbound Loop', 'Turn Complete', 0); w.link('Outbound Loop', 'Route: Test Chat?', 1);
+  w.link('Route: Test Chat?', 'Pretend Send (test)', 0); w.link('Route: Test Chat?', 'Route: Text?', 1);
+  w.chain('Pretend Send (test)', 'Record Send');
   w.link('Route: Text?', 'Evolution — Send Text', 0); w.link('Route: Text?', 'Evolution — Send Media', 1);
   w.link('Evolution — Send Text', 'Record Send'); w.link('Evolution — Send Media', 'Record Send');
   w.chain('Record Send', 'Log Outbound', 'Outbound Loop');
@@ -431,14 +444,52 @@ function buildOutbox() {
   return w;
 }
 
-export const workflows = { main: buildMain, cart: buildCart, details: buildDetails, reservation: buildReservation, outbox: buildOutbox };
+// =========================================================================
+// Test Runner
+// =========================================================================
+function buildTestRunner() {
+  const w = new Workflow('Everwake — Test Runner');
+  w.add(sticky('Sticky — Test Runner', [
+    '## Everwake · Test Runner — chat with an agent, nothing goes on WhatsApp',
+    'Open the chat (**Open chat** at the bottom) and write as a customer. The real **Main** workflow answers from a pretend number (200000000001), so you test exactly what customers get — but the replies are only recorded, no kitchen ticket is sent, and it works while the restaurant is still onboarding.',
+    '**/reset** a brand-new customer · **/later 5 <message>** 5 hours pass first · **/pin 31.2,29.9** a location pin · **#2 <message>** a second pretend customer · **@slug <message>** another restaurant.',
+    'The restaurant to test is set at the top of **Read Test Command** (seagull). The test chat shows in the dashboard inbox as «تجربة»; an order it places shows on the board — **/reset** removes it.',
+    '### After import',
+    '1. Pick the **Everwake DB** credential on the two Postgres nodes.',
+    '2. On **Run The Agent (Main)** pick *Everwake — Main (Brain + Agent)* (it shows SET_AFTER_IMPORT).'
+  ].join('\n'), [-300, -420], 1500, 380, 6));
+  w.add({ name: 'Chat With The Agent (test)', type: '@n8n/n8n-nodes-langchain.chatTrigger', typeVersion: 1.1, position: [-260, 0],
+          parameters: { options: {} } });
+  w.add(code('Read Test Command', 'test_runner/read_command.js', [-40, 0]));
+  w.add(pg('Prepare Test Chat', 'select everwake.test_chat_prepare($1::text, $2::text, $3::boolean, $4::numeric) as r;',
+           '={{ [ $json.restaurant, $json.wa_id, $json.reset, $json.later_hours ] }}', [180, 0]));
+  w.add(iff('Route: A Message To Send?', "!$('Read Test Command').first().json.reset && !$('Read Test Command').first().json.empty", [400, 0]));
+  w.add(code('Fake WhatsApp Message', 'test_runner/fake_message.js', [620, -100]));
+  w.add({ name: 'Run The Agent (Main)', type: 'n8n-nodes-base.executeWorkflow', typeVersion: 1.2, position: [840, -100],
+          parameters: {
+            workflowId: { __rl: true, value: 'SET_AFTER_IMPORT', mode: 'list', cachedResultName: 'Everwake — Main (Brain + Agent)' },
+            workflowInputs: { mappingMode: 'defineBelow', value: {}, matchingColumns: [], schema: [], attemptToConvertTypes: false, convertFieldsToString: true },
+            options: { waitForSubWorkflow: true } },
+          alwaysOutputData: true, onError: 'continueRegularOutput' });
+  w.add(pg('Load The Reply', 'select everwake.test_chat_result($1::uuid, $2::text, $3::timestamptz) as r;',
+           "={{ [ $('Prepare Test Chat').first().json.r.tenant_id, $('Prepare Test Chat').first().json.r.wa_id, $('Prepare Test Chat').first().json.r.since ] }}",
+           [1060, -100], { executeOnce: true }));
+  w.add(code('Format Test Result', 'test_runner/format_result.js', [1280, 0]));
+  w.chain('Chat With The Agent (test)', 'Read Test Command', 'Prepare Test Chat', 'Route: A Message To Send?');
+  w.link('Route: A Message To Send?', 'Fake WhatsApp Message', 0); w.link('Route: A Message To Send?', 'Format Test Result', 1);
+  w.chain('Fake WhatsApp Message', 'Run The Agent (Main)', 'Load The Reply', 'Format Test Result');
+  return w;
+}
+
+export const workflows = { main: buildMain, cart: buildCart, details: buildDetails, reservation: buildReservation, outbox: buildOutbox,
+                           test: buildTestRunner };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   mkdirSync(join(ROOT, 'dist'), { recursive: true });
   const files = {
     main: 'everwake-main.json', cart: 'everwake-tool-manage-cart.json',
     details: 'everwake-tool-save-customer-details.json', reservation: 'everwake-tool-manage-reservation.json',
-    outbox: 'everwake-outbox.json'
+    outbox: 'everwake-outbox.json', test: 'everwake-test-runner.json'
   };
   for (const [k, build] of Object.entries(workflows)) {
     const w = build();

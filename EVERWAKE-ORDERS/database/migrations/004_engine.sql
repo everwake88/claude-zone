@@ -315,8 +315,10 @@ begin
                                       'pause_id', v_pause);
   end if;
 
-  -- still onboarding: only the restaurant's test numbers reach the agent ----
+  -- still onboarding: only the restaurant's test numbers (and the Test
+  -- Runner's pretend number, 013) reach the agent ----
   if t.status = 'onboarding'
+     and not (coalesce((p ->> 'test_run')::boolean, false) and everwake.is_test_number(cust.wa_id))
      and not (coalesce(s -> 'test_numbers', '[]'::jsonb) ? cust.wa_id
               or (cust.phone is not null and coalesce(s -> 'test_numbers', '[]'::jsonb) ? cust.phone)) then
     return base || jsonb_build_object('route', 'not_live');

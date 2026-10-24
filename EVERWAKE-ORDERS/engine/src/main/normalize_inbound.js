@@ -10,6 +10,9 @@
 // Captions count as text; a voice note / photo / sticker with no text
 // goes through as a bracketed marker so the agent can answer naturally.
 // Reactions, edits, deletes and receipts are ignored.
+// A run from the Test Runner workflow (test_run, next to the payload —
+// a real webhook can't set it) is a pretend chat: Main records the
+// replies but sends nothing on WhatsApp.
 // =====================================================================
 // @include shared/basics.js
 
@@ -24,6 +27,7 @@ const message = data.message || {};
 const event = String(body.event || payload.event || '').toLowerCase();
 const instance = str(body.instance || body.instanceName || data.instance || data.instanceName || payload.instance);
 const token = str(query.token || query.t || '');
+const testRun = payload.test_run === true;
 
 const text =
   message.conversation ||
@@ -102,7 +106,7 @@ const slim = (v, depth = 0) => {
 const intake = {
   provider: 'evolution', instance, token, external_id: messageId, wa_id: waId, reply_to: replyTo, phone, lid,
   phone_hidden: phoneHidden, push_name: pushName, text: customerMessage, message_type: hasLocation ? 'location' : msgType,
-  has_location: hasLocation, location: locationObj, from_me: fromMe,
+  has_location: hasLocation, location: locationObj, from_me: fromMe, test_run: testRun || undefined,
   raw: slim({ event, instance, data: { key, pushName: data.pushName, messageType: data.messageType,
                                        messageTimestamp: data.messageTimestamp, message } })
 };
@@ -122,6 +126,7 @@ return [{
     is_group: isGroup,
     has_location: hasLocation,
     location: locationObj,
+    is_test: testRun,
     is_ignorable: ignorable || !customerMessage || isGroup || !waId || !instance,
     received_at: new Date().toISOString(),
     b64_intake: b64(intake)

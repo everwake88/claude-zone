@@ -50,6 +50,21 @@
       "webhookId": "77c0c90a-8b18-5556-a2a5-3e71f5515411"
     },
     {
+      "name": "Test Runner Call",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2300,
+        800
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "notes": "The Test Runner workflow: a pretend chat, nothing is sent on WhatsApp.",
+      "notesInFlow": true,
+      "id": "8218c7a7-a241-5ea6-ad23-337c007aeb49"
+    },
+    {
       "name": "Normalize Inbound",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -58,7 +73,7 @@
         600
       ],
       "parameters": {
-        "jsCode": "// =====================================================================\n// EVERWAKE — Main · NODE: Normalize Inbound\n// Evolution API payload -> one flat, predictable shape (the Seagull\n// contract), plus what a multi-restaurant engine needs:\n//   · instance + token   → which restaurant, and proof it is Evolution\n//   · phone and lid      → both identities, so a customer hidden behind a\n//                          WhatsApp private id is still recognised\n//   · from_me            → a message the restaurant typed on the phone\n//                          itself: logged for the inbox and the agent\n// Captions count as text; a voice note / photo / sticker with no text\n// goes through as a bracketed marker so the agent can answer naturally.\n// Reactions, edits, deletes and receipts are ignored.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201554354929 → 01554354929\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\n// a villa or a house has no floor or apartment to ask for\nconst HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;\nconst fieldNeeded = (f, d) => !(['address_floor', 'address_apartment'].includes(f)\n  && HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' ')));\n// a weight the Egyptian way: 0.5 → نص كيلو, 1.5 → كيلو ونص\nconst kiloText = (q) => {\n  const n = Math.round(num(q) * 100) / 100, whole = Math.floor(n), part = Math.round((n - whole) * 100) / 100;\n  const frac = { 0.25: 'ربع', 0.5: 'نص', 0.75: 'تلت تربع' }[part];\n  if (part && !frac) return `${fmt(n)} كيلو`;\n  if (!whole) return `${frac} كيلو`;\n  const w = whole === 1 ? 'كيلو' : whole === 2 ? '2 كيلو' : `${whole} كيلو`;\n  return frac ? `${w} و${frac}` : w;\n};\nconst payload = $input.first().json;\nconst makeRunId = () => ['run', Date.now(), Math.random().toString(36).slice(2, 10)].join('_');\n\nconst body = payload.body && typeof payload.body === 'object' ? payload.body : payload;\nconst query = obj(payload.query);\nconst data = body.data || payload.data || body;\nconst key = data.key || {};\nconst message = data.message || {};\nconst event = String(body.event || payload.event || '').toLowerCase();\nconst instance = str(body.instance || body.instanceName || data.instance || data.instanceName || payload.instance);\nconst token = str(query.token || query.t || '');\n\nconst text =\n  message.conversation ||\n  message.extendedTextMessage?.text ||\n  message.imageMessage?.caption ||\n  message.videoMessage?.caption ||\n  message.documentMessage?.caption ||\n  message.buttonsResponseMessage?.selectedDisplayText ||\n  message.listResponseMessage?.title ||\n  message.templateButtonReplyMessage?.selectedDisplayText ||\n  data.messageText || data.text || '';\n\nconst location = message.locationMessage || message.liveLocationMessage || data.locationMessage || data.location || null;\n\nconst IGNORE = ['reactionMessage', 'protocolMessage', 'editedMessage', 'senderKeyDistributionMessage', 'pollUpdateMessage',\n                'messageContextInfo'];\nconst msgType = data.messageType || Object.keys(message).filter(k => k !== 'messageContextInfo')[0] || 'text';\nconst isMessageEvent = !event || /messages[._]upsert/.test(event) || /send[._]message/.test(event);\nconst ignorable = IGNORE.includes(msgType) || !isMessageEvent;\n\nconst MEDIA_MARK = {\n  audioMessage: '[voice note]', pttMessage: '[voice note]', imageMessage: '[photo]', videoMessage: '[video]',\n  stickerMessage: '[sticker]', documentMessage: '[file]', contactMessage: '[contact card]'\n};\n\nconst fromMe = Boolean(key.fromMe || data.fromMe || payload.fromMe) || /send[._]message/.test(event);\nconst remoteJid = String(key.remoteJid || data.remoteJid || data.from || payload.from || '');\nconst pushName = fromMe ? null : (data.pushName || payload.pushName || null);\nconst isGroup = remoteJid.includes('@g.us') || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter');\n\n// WhatsApp often hides the phone behind a private id (\"…@lid\"); Evolution\n// may give the real number in another field. reply_to = where a reply must\n// go (the number, or the FULL \"…@lid\" jid); wa_id = the customer key.\nconst digitsOf = (j) => String(j || '').replace(/@.*$/, '').replace(/:\\d+$/, '').replace(/\\D/g, '');\nconst candidates = [key.remoteJid, key.remoteJidAlt, key.senderPn, data.senderPn, key.participantAlt, data.remoteJid, data.sender]\n  .filter(Boolean).map(String);\nconst phoneJid = candidates.find(j => /@(s\\.whatsapp\\.net|c\\.us)$/.test(j)) || null;\nconst lidJid = candidates.find(j => /@lid$/.test(j)) || null;\nconst phone = phoneJid ? digitsOf(phoneJid) : '';\nconst lid = lidJid ? digitsOf(lidJid) : '';\nconst waId = phone || lid || digitsOf(remoteJid);\nconst replyTo = phone || lidJid || digitsOf(remoteJid);\nconst phoneHidden = !phone && !!lid;\nconst messageId = key.id || data.id || data.messageId || payload.id || `${waId}_${Date.now()}`;\n\nconst lat = location?.degreesLatitude ?? location?.latitude ?? location?.lat ?? null;\nconst lng = location?.degreesLongitude ?? location?.longitude ?? location?.lng ?? null;\nconst hasLocation = lat !== null && lng !== null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));\n\nlet customerMessage = String(text || '').trim();\nif (!customerMessage && hasLocation) customerMessage = '[shared a location pin]';\nif (!customerMessage && MEDIA_MARK[msgType]) customerMessage = MEDIA_MARK[msgType];\n\nconst locationObj = hasLocation ? {\n  lat: Number(lat), lng: Number(lng),\n  name: location?.name || null, address: location?.address || null,\n  maps_url: `https://www.google.com/maps?q=${Number(lat)},${Number(lng)}`\n} : null;\n\n// keep the raw payload for support, minus media bytes and thumbnails\nconst slim = (v, depth = 0) => {\n  if (depth > 6) return null;\n  if (typeof v === 'string') return v.length > 2000 ? `[${v.length} chars]` : v;\n  if (Array.isArray(v)) return v.slice(0, 20).map(x => slim(x, depth + 1));\n  if (v && typeof v === 'object') {\n    const o = {};\n    for (const [k, x] of Object.entries(v)) {\n      if (/^(base64|jpegThumbnail|thumbnail|mediaKey|fileEncSha256|fileSha256)$/i.test(k)) continue;\n      o[k] = slim(x, depth + 1);\n    }\n    return o;\n  }\n  return v;\n};\n\nconst intake = {\n  provider: 'evolution', instance, token, external_id: messageId, wa_id: waId, reply_to: replyTo, phone, lid,\n  phone_hidden: phoneHidden, push_name: pushName, text: customerMessage, message_type: hasLocation ? 'location' : msgType,\n  has_location: hasLocation, location: locationObj, from_me: fromMe,\n  raw: slim({ event, instance, data: { key, pushName: data.pushName, messageType: data.messageType,\n                                       messageTimestamp: data.messageTimestamp, message } })\n};\n\nreturn [{\n  json: {\n    run_id: makeRunId(),\n    instance,\n    wa_id: waId,\n    reply_to: replyTo,\n    phone_hidden: phoneHidden,\n    customer_name: pushName,\n    customer_message: customerMessage,\n    external_id: messageId,\n    message_type: intake.message_type,\n    from_me: fromMe,\n    is_group: isGroup,\n    has_location: hasLocation,\n    location: locationObj,\n    is_ignorable: ignorable || !customerMessage || isGroup || !waId || !instance,\n    received_at: new Date().toISOString(),\n    b64_intake: b64(intake)\n  }\n}];\n"
+        "jsCode": "// =====================================================================\n// EVERWAKE — Main · NODE: Normalize Inbound\n// Evolution API payload -> one flat, predictable shape (the Seagull\n// contract), plus what a multi-restaurant engine needs:\n//   · instance + token   → which restaurant, and proof it is Evolution\n//   · phone and lid      → both identities, so a customer hidden behind a\n//                          WhatsApp private id is still recognised\n//   · from_me            → a message the restaurant typed on the phone\n//                          itself: logged for the inbox and the agent\n// Captions count as text; a voice note / photo / sticker with no text\n// goes through as a bracketed marker so the agent can answer naturally.\n// Reactions, edits, deletes and receipts are ignored.\n// A run from the Test Runner workflow (test_run, next to the payload —\n// a real webhook can't set it) is a pretend chat: Main records the\n// replies but sends nothing on WhatsApp.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201554354929 → 01554354929\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\n// a villa or a house has no floor or apartment to ask for\nconst HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;\nconst fieldNeeded = (f, d) => !(['address_floor', 'address_apartment'].includes(f)\n  && HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' ')));\n// a weight the Egyptian way: 0.5 → نص كيلو, 1.5 → كيلو ونص\nconst kiloText = (q) => {\n  const n = Math.round(num(q) * 100) / 100, whole = Math.floor(n), part = Math.round((n - whole) * 100) / 100;\n  const frac = { 0.25: 'ربع', 0.5: 'نص', 0.75: 'تلت تربع' }[part];\n  if (part && !frac) return `${fmt(n)} كيلو`;\n  if (!whole) return `${frac} كيلو`;\n  const w = whole === 1 ? 'كيلو' : whole === 2 ? '2 كيلو' : `${whole} كيلو`;\n  return frac ? `${w} و${frac}` : w;\n};\nconst payload = $input.first().json;\nconst makeRunId = () => ['run', Date.now(), Math.random().toString(36).slice(2, 10)].join('_');\n\nconst body = payload.body && typeof payload.body === 'object' ? payload.body : payload;\nconst query = obj(payload.query);\nconst data = body.data || payload.data || body;\nconst key = data.key || {};\nconst message = data.message || {};\nconst event = String(body.event || payload.event || '').toLowerCase();\nconst instance = str(body.instance || body.instanceName || data.instance || data.instanceName || payload.instance);\nconst token = str(query.token || query.t || '');\nconst testRun = payload.test_run === true;\n\nconst text =\n  message.conversation ||\n  message.extendedTextMessage?.text ||\n  message.imageMessage?.caption ||\n  message.videoMessage?.caption ||\n  message.documentMessage?.caption ||\n  message.buttonsResponseMessage?.selectedDisplayText ||\n  message.listResponseMessage?.title ||\n  message.templateButtonReplyMessage?.selectedDisplayText ||\n  data.messageText || data.text || '';\n\nconst location = message.locationMessage || message.liveLocationMessage || data.locationMessage || data.location || null;\n\nconst IGNORE = ['reactionMessage', 'protocolMessage', 'editedMessage', 'senderKeyDistributionMessage', 'pollUpdateMessage',\n                'messageContextInfo'];\nconst msgType = data.messageType || Object.keys(message).filter(k => k !== 'messageContextInfo')[0] || 'text';\nconst isMessageEvent = !event || /messages[._]upsert/.test(event) || /send[._]message/.test(event);\nconst ignorable = IGNORE.includes(msgType) || !isMessageEvent;\n\nconst MEDIA_MARK = {\n  audioMessage: '[voice note]', pttMessage: '[voice note]', imageMessage: '[photo]', videoMessage: '[video]',\n  stickerMessage: '[sticker]', documentMessage: '[file]', contactMessage: '[contact card]'\n};\n\nconst fromMe = Boolean(key.fromMe || data.fromMe || payload.fromMe) || /send[._]message/.test(event);\nconst remoteJid = String(key.remoteJid || data.remoteJid || data.from || payload.from || '');\nconst pushName = fromMe ? null : (data.pushName || payload.pushName || null);\nconst isGroup = remoteJid.includes('@g.us') || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter');\n\n// WhatsApp often hides the phone behind a private id (\"…@lid\"); Evolution\n// may give the real number in another field. reply_to = where a reply must\n// go (the number, or the FULL \"…@lid\" jid); wa_id = the customer key.\nconst digitsOf = (j) => String(j || '').replace(/@.*$/, '').replace(/:\\d+$/, '').replace(/\\D/g, '');\nconst candidates = [key.remoteJid, key.remoteJidAlt, key.senderPn, data.senderPn, key.participantAlt, data.remoteJid, data.sender]\n  .filter(Boolean).map(String);\nconst phoneJid = candidates.find(j => /@(s\\.whatsapp\\.net|c\\.us)$/.test(j)) || null;\nconst lidJid = candidates.find(j => /@lid$/.test(j)) || null;\nconst phone = phoneJid ? digitsOf(phoneJid) : '';\nconst lid = lidJid ? digitsOf(lidJid) : '';\nconst waId = phone || lid || digitsOf(remoteJid);\nconst replyTo = phone || lidJid || digitsOf(remoteJid);\nconst phoneHidden = !phone && !!lid;\nconst messageId = key.id || data.id || data.messageId || payload.id || `${waId}_${Date.now()}`;\n\nconst lat = location?.degreesLatitude ?? location?.latitude ?? location?.lat ?? null;\nconst lng = location?.degreesLongitude ?? location?.longitude ?? location?.lng ?? null;\nconst hasLocation = lat !== null && lng !== null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));\n\nlet customerMessage = String(text || '').trim();\nif (!customerMessage && hasLocation) customerMessage = '[shared a location pin]';\nif (!customerMessage && MEDIA_MARK[msgType]) customerMessage = MEDIA_MARK[msgType];\n\nconst locationObj = hasLocation ? {\n  lat: Number(lat), lng: Number(lng),\n  name: location?.name || null, address: location?.address || null,\n  maps_url: `https://www.google.com/maps?q=${Number(lat)},${Number(lng)}`\n} : null;\n\n// keep the raw payload for support, minus media bytes and thumbnails\nconst slim = (v, depth = 0) => {\n  if (depth > 6) return null;\n  if (typeof v === 'string') return v.length > 2000 ? `[${v.length} chars]` : v;\n  if (Array.isArray(v)) return v.slice(0, 20).map(x => slim(x, depth + 1));\n  if (v && typeof v === 'object') {\n    const o = {};\n    for (const [k, x] of Object.entries(v)) {\n      if (/^(base64|jpegThumbnail|thumbnail|mediaKey|fileEncSha256|fileSha256)$/i.test(k)) continue;\n      o[k] = slim(x, depth + 1);\n    }\n    return o;\n  }\n  return v;\n};\n\nconst intake = {\n  provider: 'evolution', instance, token, external_id: messageId, wa_id: waId, reply_to: replyTo, phone, lid,\n  phone_hidden: phoneHidden, push_name: pushName, text: customerMessage, message_type: hasLocation ? 'location' : msgType,\n  has_location: hasLocation, location: locationObj, from_me: fromMe, test_run: testRun || undefined,\n  raw: slim({ event, instance, data: { key, pushName: data.pushName, messageType: data.messageType,\n                                       messageTimestamp: data.messageTimestamp, message } })\n};\n\nreturn [{\n  json: {\n    run_id: makeRunId(),\n    instance,\n    wa_id: waId,\n    reply_to: replyTo,\n    phone_hidden: phoneHidden,\n    customer_name: pushName,\n    customer_message: customerMessage,\n    external_id: messageId,\n    message_type: intake.message_type,\n    from_me: fromMe,\n    is_group: isGroup,\n    has_location: hasLocation,\n    location: locationObj,\n    is_test: testRun,\n    is_ignorable: ignorable || !customerMessage || isGroup || !waId || !instance,\n    received_at: new Date().toISOString(),\n    b64_intake: b64(intake)\n  }\n}];\n"
       },
       "id": "f4d6e2aa-a212-582d-ad2f-3cb7d60c32d6"
     },
@@ -184,8 +199,8 @@
           },
           "conditions": [
             {
-              "id": "f1f6eb74-05df-57f0-a13a-982a89966125",
-              "leftValue": "={{ $json.r.route === 'paused' && $json.r.send_apology === true }}",
+              "id": "4e99a02c-4a91-5ce8-a4f6-344bdb9f0ff8",
+              "leftValue": "={{ $json.r.route === 'paused' && $json.r.send_apology === true && !$('Normalize Inbound').first().json.is_test === true }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -413,6 +428,41 @@
       "notes": "timeout 1s on purpose: we never wait for the typing indicator.",
       "notesInFlow": true,
       "id": "103352d7-636c-5713-a3a8-98c1daf58ee8"
+    },
+    {
+      "name": "Route: Real Customer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1400,
+        360
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a41d3823-abac-5527-a95b-a4a134132d7d",
+              "leftValue": "={{ !$('Normalize Inbound').first().json.is_test === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "1f64b2a0-7a6c-5928-abb8-56b6937ec205"
     },
     {
       "name": "Debounce Wait 6s",
@@ -1362,6 +1412,54 @@
       "id": "5df13416-3bcf-5584-aa10-e6597493c10e"
     },
     {
+      "name": "Route: Test Chat?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4240,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "64f2d9a6-ae82-5798-a1d0-cfc0d3025663",
+              "leftValue": "={{ $('Normalize Inbound').first().json.is_test === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "781c7db2-9556-59d7-a8bc-3ceee704979f"
+    },
+    {
+      "name": "Pretend Send (test)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4460,
+        680
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Main · NODE: Pretend Send (test chat)\n// A Test Runner chat (Normalize Inbound is_test): nothing goes out on\n// WhatsApp. Answers like Evolution would, so Record Send logs the\n// message and the agent remembers it next turn.\n// =====================================================================\nreturn [{ json: { body: { key: { id: 'TEST' + Date.now() + Math.random().toString(36).slice(2, 8) } } } }];\n"
+      },
+      "id": "daa42a37-7cf4-5044-a0fd-e7a1cc1694d0"
+    },
+    {
       "name": "Route: Text?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
@@ -1532,8 +1630,8 @@
           },
           "conditions": [
             {
-              "id": "edaad756-b43c-5e4f-afd4-cffcab7a1303",
-              "leftValue": "={{ !!$('Build Persist Payload').first().json.order_placed_no }}",
+              "id": "06081ac0-3154-57a1-a8f6-4b45c05131ca",
+              "leftValue": "={{ !!$('Build Persist Payload').first().json.order_placed_no && !$('Normalize Inbound').first().json.is_test === true }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -1667,6 +1765,17 @@
         ]
       ]
     },
+    "Test Runner Call": {
+      "main": [
+        [
+          {
+            "node": "Normalize Inbound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Route: Actionable?": {
       "main": [
         [
@@ -1700,7 +1809,7 @@
       "main": [
         [
           {
-            "node": "Send Typing Presence",
+            "node": "Route: Real Customer?",
             "type": "main",
             "index": 0
           }
@@ -1708,6 +1817,24 @@
         [
           {
             "node": "Route: Apologise (Agent OFF)?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Real Customer?": {
+      "main": [
+        [
+          {
+            "node": "Send Typing Presence",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Debounce Wait 6s",
             "type": "main",
             "index": 0
           }
@@ -2219,7 +2346,36 @@
         ],
         [
           {
+            "node": "Route: Test Chat?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Test Chat?": {
+      "main": [
+        [
+          {
+            "node": "Pretend Send (test)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Route: Text?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pretend Send (test)": {
+      "main": [
+        [
+          {
+            "node": "Record Send",
             "type": "main",
             "index": 0
           }

@@ -592,3 +592,51 @@ test('the Egyptian voice: نص كيلو, 01… numbers, no "العربة", and a
     await db.query(`update everwake.tenants set settings = $2 where id = $1`, [tenant, before]);
   }
 });
+
+test('the Test Runner: a pretend customer reaches the agent while onboarding, nothing for WhatsApp, /reset forgets it', async () => {
+  const tenant = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  const was = (await sql(db, `select status as r from everwake.tenants where id = $1`, [tenant])).r;
+  await db.query(`update everwake.tenants set status = 'onboarding' where id = $1`, [tenant]);
+  try {
+    const cmd = (await runCode('test_runner/read_command.js', { input: { chatInput: '@nile_grill #3 /later 2 عندكم فراخ؟' } }))[0];
+    assert.equal(cmd.restaurant, 'nile_grill');
+    assert.equal(cmd.wa_id, '200000000003');
+    assert.equal(cmd.later_hours, 2);
+    assert.equal(cmd.text, 'عندكم فراخ؟');
+    let prep = await sql(db, 'select everwake.test_chat_prepare($1::text, $2::text, $3::boolean, $4::numeric) as r',
+                         [cmd.restaurant, cmd.wa_id, cmd.reset, cmd.later_hours]);
+    assert.equal(prep.r.instance, 'nilegrill');
+    const fake = (await runCode('test_runner/fake_message.js', { input: prep, nodes: { 'Read Test Command': cmd } }))[0];
+    assert.equal(fake.test_run, true);
+
+    const t = await turn(db, fake, async () => ({
+      plan: { read: 'asks about chicken', stage: 'discovery', objective: 'answer', actions: [] },
+      reply: quiet('أيوه عندنا فرخة مشوية بـ 260ج 👌 تحب نص ولا كاملة؟')
+    }));
+    assert.equal(t.route, 'agent', 'onboarding, yet the test chat reaches the agent');
+    assert.equal(t.nodes['Normalize Inbound'].is_test, true);
+    const res = (await sql(db, 'select everwake.test_chat_result($1::uuid, $2::text, $3::timestamptz) as r',
+                           [tenant, cmd.wa_id, prep.r.since])).r;
+    assert.equal(res.customer, 'عندكم فراخ؟');
+    assert.equal(res.replies[0].text, 'أيوه عندنا فرخة مشوية بـ 260ج 👌 تحب نص ولا كاملة؟');
+    assert.equal(res.turn.plan.objective, 'answer');
+    const out = (await runCode('test_runner/format_result.js', { input: { r: res },
+      nodes: { 'Read Test Command': cmd, 'Prepare Test Chat': prep, 'Run The Agent (Main)': { r: { route: 'agent' } } } }))[0];
+    assert.match(out.output, /^\(2 hours later\) CUSTOMER: عندكم فراخ؟\nAGENT: أيوه عندنا فرخة/);
+
+    // a real customer can't pretend: test_run inside the webhook body does nothing
+    const real = evolutionPayload({ phone: '200000000004', text: 'hi' });
+    real.body.test_run = true;
+    const n = (await runCode('main/normalize_inbound.js', { input: real }))[0];
+    assert.equal(n.is_test, false);
+    assert.equal((await callB64(db, 'intake', n.b64_intake)).r.route, 'not_live');
+
+    prep = await sql(db, 'select everwake.test_chat_prepare($1::text, $2::text, true, 0) as r', ['nile_grill', cmd.wa_id]);
+    assert.equal(prep.r.reset, true);
+    assert.equal((await sql(db, `select count(*)::int as r from everwake.messages where wa_id = $1`, [cmd.wa_id])).r, 0);
+    assert.equal((await sql(db, `select count(*)::int as r from everwake.customers where wa_id = $1`, [cmd.wa_id])).r, 0);
+    await assert.rejects(sql(db, `select everwake.test_chat_prepare('nile_grill', '201011112222', true, 0)`), /pretend numbers/);
+  } finally {
+    await db.query(`update everwake.tenants set status = $2 where id = $1`, [tenant, was]);
+  }
+});
