@@ -947,3 +947,24 @@ test('the first add can carry the branch: one call, no race with set_branch', as
   assert.equal(r.branch, 'المعادي');
   assert.ok(r.cart.some(l => l.menu_id === 'M007'));
 });
+
+test('the minimum order is not news while the order is empty', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990199', text: 'do you deliver to Maadi?' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
+    reply: quiet('Yes, from our Maadi branch. Delivery is EGP 25 with a EGP 150 minimum order. What would you like?'),
+    rewrite: ['Yes, from our Maadi branch, delivery is EGP 25. What would you like?'] }));
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /minimum order now/);
+});
+
+test('browsing: a few highlights with prices, not the whole section; "كم كيلو" reads "كام كيلو"', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990211', text: 'عندكو ايه في المشويات؟' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
+    reply: quiet('عندنا *كفتة*، *طرب*، *ريش*، *شيش*، *فراخ*، *سجق*، *كبدة*. تحب أنهي وكم كيلو؟'),
+    rewrite: ['أشهر حاجة عندنا *كفتة* 480ج للكيلو و*ريش* 950ج 👌 تحب كام كيلو؟'] }));
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /lists 7 dishes/);
+  const t2 = await turn(db, evolutionPayload({ phone: '201099990222', text: 'رشحلي حاجة' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] },
+    reply: quiet('جرب *الكفتة* أو *الريش*، تحب كم كيلو؟'), rewrite: ['جرب *الكفتة* 480ج للكيلو، تحب كام كيلو؟'] }));
+  assert.match(t2.nodes['Check Reply'].violations.join('\n'), /without their prices/);
+  assert.match(t2.checked.decision.reply_messages.join('\n'), /كام كيلو/);
+});

@@ -114,6 +114,7 @@ messages = messages.map(m => {
     .replace(/\[\[\s*NEXT\s*\]\]/g, '')
     .replace(/\s*[؛;](?=\s)/g, '.')                // nobody types a semicolon on WhatsApp
     .replace(/(^|[\s،.؟!(])هل\s+/g, '$1')           // "هل الطلب دليفري؟" is MSA: Egyptians ask "الطلب دليفري؟"
+    .replace(/(?<!\p{L})كم(?= (?:كيلو|واحد|واحدة|قطعة|طبق|شخص|فرد|نفر|علبة)(?!\p{L}))/gu, 'كام')   // "كم كيلو" is MSA: "كام كيلو"
     .replace(/(?<!\p{L})(?:اسمه|اسمها) حضرتك/gu, 'اسم حضرتك')   // "اسمه حضرتك إيه؟" → "اسم حضرتك إيه؟"
     // "كيلو *كاليماري بالكيلو*": the weight is already said, the menu's "بالكيلو" goes
     .replace(/((?:ربع|نص|تلت|تلات|كيلو|كيلوين|\d+(?:\.\d+)?)\s*(?:كيلو)?[^\n*]{0,3}\*[^*\n]+?)\s+بالكيلو(\*)/gu, '$1$2')
@@ -295,6 +296,18 @@ if (placeholder) violations.push(`The reply contains the placeholder "${placehol
 if (!placedNo && !showedSummaryAsked() && /(?<!\p{L})(طلبك|الطلب|الأوردر|الاوردر|أوردرك|اوردرك) (كده )?(جاهز|اتجهز|خلص)(?!\p{L})/u.test(joined))
   violations.push('The order is not placed yet — don\'t say it is "جاهز". Say what comes next in plain words (their details, or "أأكدلك الأوردر؟").');
 function showedSummaryAsked() { return decision.showed_order_summary === true || String(decision.showed_order_summary).toLowerCase() === 'true'; }
+// the minimum order is for when they are under it, not news while the order is still empty
+const MIN_RE = /الحد الأدنى|الحد الادنى|أقل طلب|اقل طلب|أقل أوردر|اقل اوردر|minimum/i;
+if (!items.length && MIN_RE.test(joined) && !MIN_RE.test(str(pre.customer_message))
+    && !toolProblems.some(p => obj(p).code === 'BELOW_MINIMUM'))
+  violations.push('Don\'t bring up the minimum order now — it matters only once the order is under it (or when they ask). Answer what they asked and keep it short.');
+// browsing: a few highlights with their prices, not the whole section read out
+const dishNames = (joined.match(/\*[^*\n]{2,40}\*/g) || []).length;
+const priceCount = (toWesternDigits(joined).match(/\d+(?:\.\d+)?\s*(?:ج|EGP)|EGP\s*\d+/g) || []).length;
+if (!showedSummaryAsked() && !placedNo && dishNames > 6)
+  violations.push(`The reply lists ${dishNames} dishes at once. Give a few highlights (3–5) with their prices, and ask what they feel like — the rest when they ask.`);
+else if (!showedSummaryAsked() && !placedNo && dishNames >= 2 && priceCount === 0 && !items.length)
+  violations.push('Dishes are named without their prices. Say each highlight with its price (as the MENU shows), briefly.');
 const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
 if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
 const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);
