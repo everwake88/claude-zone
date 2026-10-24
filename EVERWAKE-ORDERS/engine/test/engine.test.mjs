@@ -1005,3 +1005,9 @@ test('"ازيكو" gets answered; order status in plain words, not "متعلم �
     reply: quiet('الأوردر لسه مش متعلم إنه جاهز.'), rewrite: ['لسه الفرع بيحضّره 🙏 هتابع معاهم وأقولك.'] }));
   assert.match(t2.nodes['Check Reply'].violations.join('\n'), /متعلم إنه/);
 });
+
+test('Franco "3ayza" is a woman speaking: "تحبي" is fine', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990277', text: 'ezayko, 3ayza a3mel order' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [] }, reply: quiet('الحمد لله تمام 😊 تحبي دليفري ولا استلام؟') }));
+  assert.ok(!t.nodes['Check Reply'].violations.some(v => /feminine/.test(v)), t.nodes['Check Reply'].violations.join('\n'));
+});

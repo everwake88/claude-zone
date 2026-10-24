@@ -265,7 +265,7 @@ if (failedTools.length && joined) {
 }
 // "معاكي" to Ahmed: the customer is "you" in the masculine unless their own words show a woman
 const FEM_YOU = /(?<!\p{L})(معاكي|ليكي|عليكي|عندكي|بيكي|ليكِ|تحبي|تحبّي|عايزاه|ابعتيلي|ابعتي|قوليلي|اكتبيلي|تأكدي|حضرتِك)(?!\p{L})/u;
-const SHE_SAID = /(?<!\p{L})(عايزة|عاوزة|عايزه|عاوزه|جاية|جايه|محتاجة|مبسوطة|متأكدة|أنا ست|انا ست|مدام)(?!\p{L})/u;
+const SHE_SAID = /(?<![\p{L}\d])(عايزة|عاوزة|عايزه|عاوزه|جاية|جايه|محتاجة|مبسوطة|متأكدة|أنا ست|انا ست|مدام|3ayza|3ayzah|3awza|3awzah|3ayzaa|aayza|gaya|gayah|me7taga|m7taga|mabsota|mabsoota|mot2akeda|ana set)(?![\p{L}\d])/iu;   // Arabic letters or Franco
 // …or a clearly female name (WhatsApp name or the name they gave)
 const FEMALE = new Set(('منى منة منه مريم سارة ساره نور نورا نورهان هبة هبه ياسمين فاطمة فاطمه رحاب رانيا ريهام شيماء شيما سلمى سلمي ' +
   'ندى ندي دينا داليا مي مى ميار ملك جنى جنا حبيبة حبيبه رنا هند إيمان ايمان أسماء اسماء آية ايه آيه علياء عبير نهى نها نسمة ' +
