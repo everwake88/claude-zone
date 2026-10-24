@@ -921,3 +921,19 @@ test('"كاليماري مقلي": no menu talk, no VAT while choosing, even wit
   assert.match(v, /VAT while they are choosing/);
   assert.match(v, /مش ظاهر/);
 });
+
+test('"كيلو *كاليماري بالكيلو*" loses the second بالكيلو; nothing is "جاهز" before it is placed', async () => {
+  const phone = '201099990177';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  const t = await turn(db, evolutionPayload({ phone, text: 'بس كده' }), async () => ({
+    plan: { read: 'x', stage: 'details', objective: 'x', actions: [] },
+    reply: quiet('طلبك جاهز 👌 نكلمك على نفس الرقم ده؟'), rewrite: ['تمام 👌 نكلمك على نفس الرقم ده؟'] }));
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /not placed yet/);
+  const t2 = await turn(db, evolutionPayload({ phone, text: 'ايوه' }), async () => ({
+    plan: { read: 'x', stage: 'details', objective: 'x', actions: [] },
+    reply: quiet('كيلو *كفتة بالكيلو* — 480ج\nنص كيلو *طرب بالكيلو* حار — 260ج') }));
+  assert.deepEqual(t2.checked.decision.reply_messages, ['كيلو *كفتة* — 480ج\nنص كيلو *طرب* حار — 260ج']);
+});

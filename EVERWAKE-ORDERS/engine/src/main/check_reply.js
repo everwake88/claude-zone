@@ -115,6 +115,8 @@ messages = messages.map(m => {
     .replace(/\s*[؛;](?=\s)/g, '.')                // nobody types a semicolon on WhatsApp
     .replace(/(^|[\s،.؟!(])هل\s+/g, '$1')           // "هل الطلب دليفري؟" is MSA: Egyptians ask "الطلب دليفري؟"
     .replace(/(?<!\p{L})(?:اسمه|اسمها) حضرتك/gu, 'اسم حضرتك')   // "اسمه حضرتك إيه؟" → "اسم حضرتك إيه؟"
+    // "كيلو *كاليماري بالكيلو*": the weight is already said, the menu's "بالكيلو" goes
+    .replace(/((?:ربع|نص|تلت|تلات|كيلو|كيلوين|\d+(?:\.\d+)?)\s*(?:كيلو)?[^\n*]{0,3}\*[^*\n]+?)\s+بالكيلو(\*)/gu, '$1$2')
     .replace(/(?<!\p{L})(?:اسمه|اسمها)(?= (?:صوص|مشوي|مقلي|حجم|صغير|كبير|سادة|حار|بالصوص)(?!\p{L}))/gu, 'تحبه')   // "اسمه صوص أحمر ولا أبيض؟" → "تحبه صوص…"
     // "حلو يا عبدالرحمن 😊" opening a reply sounds scripted: drop the filler + name, keep the content
     .replace(/^(?:حلو|حلوة|تمام|ماشي|جميل|اوكي|أوكي|طيب|عظيم)\s+يا\s+(?!فندم)[^\s،,.!؟\n]+[،,!.]?\s*(?:[😊👌🙏✅]\uFE0F?\s*)?(?=\S)/u, '')
@@ -289,6 +291,10 @@ if (items.length && !booking && !placedNo && pre.done_choosing === false && !too
 // the prompt's examples hold placeholders ([اسمك], [المطعم] …): never words for the customer
 const placeholder = joined.match(/\[(اسمك|اسمي|المطعم|الفرع|رقم الأوردر|رقم الطلب)\]/);
 if (placeholder) violations.push(`The reply contains the placeholder "${placeholder[0]}". Write the real thing from FACTS (your name, the restaurant's, the branch, the order number), or leave it out.`);
+// before it is placed nothing is "ready": that reads as if the food were done
+if (!placedNo && !showedSummaryAsked() && /(?<!\p{L})(طلبك|الطلب|الأوردر|الاوردر|أوردرك|اوردرك) (كده )?(جاهز|اتجهز|خلص)(?!\p{L})/u.test(joined))
+  violations.push('The order is not placed yet — don\'t say it is "جاهز". Say what comes next in plain words (their details, or "أأكدلك الأوردر؟").');
+function showedSummaryAsked() { return decision.showed_order_summary === true || String(decision.showed_order_summary).toLowerCase() === 'true'; }
 const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
 if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
 const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);
