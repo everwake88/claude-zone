@@ -58,7 +58,7 @@ const branchByCode = (code) => branches.find(b => str(b.code) === str(code)) || 
 const activeOrder = db.active_order && db.active_order !== 'null' ? obj(db.active_order) : {};
 const seedCart = obj(activeOrder.cart).items ? obj(activeOrder.cart) : { items: [] };
 
-const ALLOWED = ['add', 'update', 'remove', 'replace', 'clear', 'set_branch', 'place_order', 'reorder_last', 'apply_code', 'summary'];
+const ALLOWED = ['add', 'update', 'remove', 'replace', 'clear', 'set_branch', 'place_order', 'reorder_last', 'apply_code', 'summary', 'quote'];
 // "summary": nothing changes — the order is re-priced with what is known now (the delivery
 // area saved since the last call, today's menu) and the totals come back for the summary
 const SUMMARY_WORDS = ['summary', 'view', 'show', 'recalculate', 'totals', 'review', 'get', 'status'];
@@ -72,7 +72,7 @@ if (!action) return fail('BAD_ACTION', { allowed: ALLOWED });
 
 // ---- arguments ------------------------------------------------------------
 let patchItems = [];
-if (['add', 'update', 'remove', 'replace', 'apply_code'].includes(action)) {
+if (['add', 'update', 'remove', 'replace', 'apply_code', 'quote'].includes(action)) {
   try {
     const raw = args.items_json;
     patchItems = typeof raw === 'string' ? JSON.parse(raw || '[]') : arr(raw);
@@ -140,7 +140,7 @@ if (action === 'reorder_last') {
 
 // an add that names the branch while none is set yet: set it in the same call (two calls at
 // once — set_branch and add — would race, and the add would find no branch)
-if (['add', 'replace'].includes(effective) && !targetBranchId && str(db.requested_branch_id)) {
+if (['add', 'replace', 'quote'].includes(effective) && !targetBranchId && str(db.requested_branch_id)) {
   const br = branchById(str(db.requested_branch_id));
   if (br && br.accepting_orders !== false) {
     targetBranchId = str(br.id);
@@ -148,7 +148,7 @@ if (['add', 'replace'].includes(effective) && !targetBranchId && str(db.requeste
     branchSetBy = 'agent';
   }
 }
-if (['add', 'update', 'remove', 'replace'].includes(effective) && !targetBranchId) {
+if (['add', 'update', 'remove', 'replace', 'quote'].includes(effective) && !targetBranchId) {
   // nothing is priced until the branch is known: each can have its own menu and prices
   const wanted = patchItems.map(p => {
     const id = str(obj(p).menu_id).toUpperCase();
@@ -427,6 +427,10 @@ const pendingChoices = [];
 const resolvedPids = [];
 const menuChanges = { removed: [], repriced: [], to_pending: [], pending_dropped: [] };
 let carriedPending = prevPending.slice();
+// a quote ("how much would that come to?") prices only the dishes asked about, on an empty copy:
+// nothing is added, and the workflow saves nothing for it
+const isQuote = action === 'quote';
+if (isQuote) { items = []; carriedPending = []; effective = 'add'; }
 
 // =========================================================================
 // re-check every line against the menu this call works with
@@ -871,6 +875,7 @@ return [{
     payment_not_taken: payNotTaken,
     place,
     is_place: placeNow,
+    is_quote: isQuote,
     b64_place: placeNow ? b64(place.payload) : '',
     b64_cart: b64({ tenant_id: args.tenant_id, wa_id: args.wa_id, branch_id: targetBranchId || null,
                     zone_id: zoneHere ? zoneHere.id : null, cart: { items }, totals,

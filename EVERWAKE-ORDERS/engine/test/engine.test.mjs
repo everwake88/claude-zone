@@ -873,3 +873,18 @@ test('a rough total of prices she just stated is true arithmetic, not an invente
   });
   assert.ok(!t.nodes['Check Reply'].violations.some(v => /not prices, totals/.test(v)), t.nodes['Check Reply'].violations.join('\n'));
 });
+
+test('a quote prices dishes for "how much would that come to?" without touching the order', async () => {
+  const phone = '201099990366';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  const before = (await sql(db, `select cart as r from everwake.orders where wa_id = $1 and status = 'draft'`, [intake.wa_id])).r;
+  const q = await manageCart(db, intake, 'quote', [{ menu_id: 'M001', quantity: 0.5 }, { menu_id: 'M001', quantity: 1, force_new: true }]);
+  assert.equal(q.status, 'QUOTE', JSON.stringify(q).slice(0, 300));
+  assert.equal(q.subtotal, 720, 'half a kilo and a kilo of kofta');
+  assert.ok(!q.priced.some(l => l.menu_id === 'M007'), 'only the dishes asked about');
+  const after = (await sql(db, `select cart as r from everwake.orders where wa_id = $1 and status = 'draft'`, [intake.wa_id])).r;
+  assert.deepEqual(after, before, 'their order is unchanged');
+});

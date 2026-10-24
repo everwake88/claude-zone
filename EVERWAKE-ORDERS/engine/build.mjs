@@ -239,8 +239,8 @@ function buildMain() {
   w.add(tool('manage_cart', 'Everwake — Tool: manage_cart', prompt('tool_manage_cart.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    action: "={{ $fromAI('action', 'Exactly one of: add, update, remove, replace, clear, set_branch, reorder_last, apply_code, summary, place_order', 'string') }}",
-    branch: "={{ $fromAI('branch', 'For set_branch, or with the first add while no branch is set (one call, never set_branch and add at once): the branch code or name from THE BRANCHES. Leave it out otherwise.', 'string', 'none') }}",
+    action: "={{ $fromAI('action', 'Exactly one of: add, update, remove, replace, clear, set_branch, reorder_last, apply_code, summary, quote, place_order', 'string') }}",
+    branch: "={{ $fromAI('branch', 'For set_branch, or with the first add or a quote while no branch is set (one call, never set_branch and add at once): the branch code or name from THE BRANCHES. Leave it out otherwise.', 'string', 'none') }}",
     items: "={{ $fromAI('items', 'The dishes this action touches: a list like [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]. For apply_code: [{\"promo_code\":\"THE CODE\"}]. Leave it out (never an empty list) for clear, set_branch, reorder_last and place_order. Never include prices.', 'json', [{}]) }}"
   }, [1560, 720]));
   w.add(tool('save_customer_details', 'Everwake — Tool: save_customer_details', prompt('tool_save_details.md'), {
@@ -347,6 +347,7 @@ function buildCart() {
   w.add(iff('Applied OK?', '$json.ok', [880, 320]));
   w.add(iff('Route: Place Order?', '$json.is_place', [1100, 240]));
   w.add(pg('Place Order', b64sql('place_order'), '={{ [ $json.b64_place ] }}', [1320, 140]));
+  w.add(iff('Route: Just A Quote?', '$json.is_quote === true', [1210, 420]));
   w.add(pg('Persist Cart', b64sql('persist_cart'), '={{ [ $json.b64_cart ] }}', [1320, 340]));
   w.add(pg('Payment Needed?', 'select everwake.payment_after_place($1::uuid, $2::text) as r;',
            "={{ [ $('Read Args').first().json.tenant_id, ($json.r && $json.r.order_no) || '' ] }}", [1540, 140], { alwaysOutputData: true }));
@@ -362,7 +363,9 @@ function buildCart() {
   w.add(code('Format Tool Error', 'cart/format_tool_error.js', [1100, 460]));
   w.chain('Tool Called By Agent', 'Read Args', 'Load Cart + Menu', 'Apply + Recalculate', 'Applied OK?');
   w.link('Applied OK?', 'Route: Place Order?', 0); w.link('Applied OK?', 'Format Tool Error', 1);
-  w.link('Route: Place Order?', 'Place Order', 0); w.link('Route: Place Order?', 'Persist Cart', 1);
+  w.link('Route: Place Order?', 'Place Order', 0); w.link('Route: Place Order?', 'Route: Just A Quote?', 1);
+  // a quote prices dishes without touching the order: nothing to save
+  w.link('Route: Just A Quote?', 'Format Tool Response', 0); w.link('Route: Just A Quote?', 'Persist Cart', 1);
   w.chain('Place Order', 'Payment Needed?', 'Route: Payment Link?');
   w.link('Route: Payment Link?', 'Create Payment Link', 0); w.link('Route: Payment Link?', 'Format Tool Response', 1);
   w.link('Create Payment Link', 'Format Tool Response'); w.link('Persist Cart', 'Format Tool Response');

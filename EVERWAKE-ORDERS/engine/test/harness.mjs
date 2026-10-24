@@ -97,7 +97,7 @@ export async function manageCart(db, intake, action, items = [], branch = '') {
     const no = (nodes['Place Order'].r || {}).order_no || '';
     nodes['Payment Needed?'] = await sql(db, 'select everwake.payment_after_place($1::uuid, $2::text) as r', [args.tenant_id, no]);
     if (nodes['Payment Needed?'].r && nodes['Payment Needed?'].r.needed) nodes['Create Payment Link'] = await payLinks.make(db, args.tenant_id, no);
-  } else await callB64(db, 'persist_cart', applied.b64_cart);
+  } else if (!applied.is_quote) await callB64(db, 'persist_cart', applied.b64_cart);   // a quote saves nothing
   return JSON.parse((await runCode('cart/format_tool_response.js', { input: {}, nodes }))[0].response);
 }
 

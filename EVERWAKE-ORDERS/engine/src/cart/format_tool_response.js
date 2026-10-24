@@ -40,6 +40,19 @@ const changes = r.menu_changed ? r.menu_changes : undefined;
 const out = (facts) => [{ json: { response: JSON.stringify(facts) } }];
 const waiting = arr(r.pending_after).map(p => ({ pending_id: p.pid, name: p.name, levels_left: p.levels_left }));
 
+// ---- a quote: what these dishes would cost, nothing added -------------------------------
+if (r.action === 'quote') {
+  return out({
+    status: 'QUOTE',
+    branch: r.branch_name,
+    priced: r.cart_lines,
+    ...totals,
+    still_needs_a_choice: waiting,
+    problems,
+    fact: 'Nothing was added and their order is unchanged: these are the prices of the dishes you asked about, for a rough idea. Say the total in a few words (and what a dish still needs, if its price depends on a choice).'
+  });
+}
+
 // ---- place_order --------------------------------------------------------------
 if (r.action === 'place_order') {
   if (r.is_place && placed && placed.ok && placed.order_no) {
