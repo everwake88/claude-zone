@@ -397,7 +397,12 @@ const facts = [
   '',
   ...historyFacts,
   '',
-  `STILL MISSING TO PLACE AN ORDER: ${missing.length ? missing.map(f => LABEL[f] || f).join(' · ') : 'nothing — details complete'}`,
+  // an empty order: the branch and the food come first — their name, number, address details and
+  // payment are not on the list yet (anything they volunteer is still saved)
+  (cartItems.length || pending.length)
+    ? `STILL MISSING TO PLACE AN ORDER: ${missing.length ? missing.map(f => LABEL[f] || f).join(' · ') : 'nothing — details complete'}`
+    : `THE ORDER IS STILL EMPTY — first: ${missing.filter(f => ['delivery_method', 'branch', 'delivery_area'].includes(f)).map(f => LABEL[f] || f).join(' · ') || 'nothing — help them choose what to eat'}`
+      + ' · then help them choose their food. Their name, number, building/floor and payment are NOT asked until the order has dishes and they are done choosing (save any they give on their own).',
   `ORDER SUMMARY: ${cartItems.length ? summaryStatus : 'n/a (cart empty)'}`,
   `OFFERS RUNNING NOW:\n${offerLines.length ? offerLines.join('\n') : '- none'}`,
   `MENU PICTURES: ${menuPics}`,

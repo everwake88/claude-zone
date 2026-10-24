@@ -102,6 +102,8 @@ messages = messages.map(m => {
     .replace(/\s*[؛;](?=\s)/g, '.')                // nobody types a semicolon on WhatsApp
     .replace(/(^|[\s،.؟!(])هل\s+/g, '$1')           // "هل الطلب دليفري؟" is MSA: Egyptians ask "الطلب دليفري؟"
     .replace(/(?<!\p{L})(?:اسمه|اسمها) حضرتك/gu, 'اسم حضرتك')   // "اسمه حضرتك إيه؟" → "اسم حضرتك إيه؟"
+    // "حلو يا عبدالرحمن 😊" opening a reply sounds scripted: drop the filler + name, keep the content
+    .replace(/^(?:حلو|حلوة|تمام|ماشي|جميل|اوكي|أوكي|طيب|عظيم)\s+يا\s+(?!فندم)[^\s،,.!؟\n]+[،,!.]?\s*(?:[😊👌🙏✅]\uFE0F?\s*)?(?=\S)/u, '')
     .replace(/(\d{1,2}(?::\d{2})?)\s*مساءً?(?![\u0600-\u06FF])/g, '$1 بالليل')
     .replace(/(\d{1,2}(?::\d{2})?)\s*صباحاً?(?![\u0600-\u06FF])/g, '$1 الصبح')
     .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
@@ -252,6 +254,11 @@ const femaleName = custNames.some(n => FEMALE.has(str(n).trim().split(/\s+/)[0].
 const fem = joined.match(FEM_YOU);
 if (fem && !femaleName && !SHE_SAID.test([pre.customer_message, pre.history_text].map(str).join(' ')))
   violations.push(`The reply speaks to the customer in the feminine ("${fem[1]}") but nothing they wrote says they are a woman. Use the masculine ("معاك"، "ليك"، "تحب"، "ابعتلي").`);
+// an empty order: help them choose first — their name, number, address details and payment come after
+const ASKS_DETAILS = /(?<!\p{L})(اسمك|اسم حضرتك|اسمه حضرتك|نكلمك على نفس الرقم|نكلمك على الرقم|رقمك|رقم موبايلك|رقم تليفونك|رقم تليفون|الدور كام|الشقة كام|رقم العمارة|هتدفع|الدفع كاش|تدفع كاش)(?!\p{L})/u;
+const booking = toolsUsed.includes('manage_reservation') || pre.reservation_in_progress === true || /reservation/i.test(str(obj(pre.brain).stage));
+if (!items.length && !pending.length && !booking && !placedNo && ASKS_DETAILS.test(joined))
+  violations.push('The order is still empty: do not ask for their name, number, address details or payment yet. Help them choose what to eat first (the branch or delivery area first if it is not known). Details come once the order has dishes and they are done choosing.');
 const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
 if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
 const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);

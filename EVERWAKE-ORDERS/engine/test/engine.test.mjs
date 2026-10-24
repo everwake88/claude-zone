@@ -819,3 +819,19 @@ test('the client\'s test: "اسمه حضرتك" tidied; a vague "لو وُجدت
   assert.match(c.decision.reply_messages[0], /اسم حضرتك إيه؟/);
   assert.match(c.violations.join('\n'), /sounds like a system/);
 });
+
+test('the client\'s test: an empty order is not the moment for name and number; "حلو يا عبدالرحمن" is dropped', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990088', pushName: 'Abdo', text: 'عاوز اعمل اوردر' }), async (brief) => {
+    assert.match(brief.facts_text, /THE ORDER IS STILL EMPTY — first: .*name, number, building\/floor and payment are NOT asked/);
+    assert.doesNotMatch(brief.facts_text, /STILL MISSING TO PLACE AN ORDER/);
+    return { plan: { read: 'wants to order', stage: 'discovery', objective: 'order type', actions: [] },
+             reply: quiet('تمام، تحت أمرك 😊 نكلمك على نفس الرقم ده؟ واسمك إيه؟'),
+             rewrite: ['تحت أمرك 😊 الأوردر دليفري ولا استلام من الفرع؟'] };
+  });
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /order is still empty/);
+  const t2 = await turn(db, evolutionPayload({ phone: '201099990088', text: 'دليفري' }), async () => ({
+    plan: { read: 'delivery', stage: 'discovery', objective: 'area', actions: [] },
+    reply: quiet('حلو يا عبدالرحمن 😊\nابعتلي اللوكيشن أو اسم المنطقة')
+  }));
+  assert.deepEqual(t2.checked.decision.reply_messages, ['ابعتلي اللوكيشن أو اسم المنطقة']);
+});
