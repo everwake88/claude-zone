@@ -1045,3 +1045,11 @@ test('a short Latin message keeps the chat\'s language: "tamam akkedi" after Fra
     return { plan: { read: 'x', stage: 'x', objective: 'x', actions: [] }, reply: quiet('You are welcome!') };
   });
 });
+
+test('"ازيكو" is answered at the start, not by a "كده تمام؟" at the end', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990344', text: 'ازيكو، عايز زي المرة اللي فاتت' }), async () => ({
+    plan: { read: 'x', stage: 'x', objective: 'x', actions: [] },
+    reply: quiet('أهلاً بيك 😊 ده طلبك 👇\nكفتة — 480ج\n\nكده تمام؟ أأكدلك الأوردر؟'),
+    rewrite: ['الحمد لله تمام 😊 ده طلبك 👇\nكفتة — 480ج\n\nكده تمام؟ أأكدلك الأوردر؟'] }));
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /asked how you are/);
+});

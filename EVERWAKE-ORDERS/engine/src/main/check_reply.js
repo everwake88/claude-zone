@@ -319,7 +319,7 @@ else if (!showedSummaryAsked() && !placedNo && dishNames >= 2 && priceCount === 
 // "ازيك؟" / "عامل إيه؟" is a question: the first reply answers it
 const HOW_ARE_YOU = /(?<!\p{L})(ازيك|ازيكو|ازيكم|إزيك|إزيكو|عامل ايه|عامل إيه|عاملين ايه|عاملين إيه|ezayak|ezayko|how are you)(?!\p{L})/iu;
 if (pre.is_first_reply === true && HOW_ARE_YOU.test(str(pre.customer_message))
-    && !/الحمد لله|الحمدلله|تمام|كويس|بخير|fine|good|great|well/i.test(joined))
+    && !/الحمد لله|الحمدلله|تمام|كويس|بخير|fine|good|great|well/i.test(joined.slice(0, 40)))   // in the opening, not "كده تمام؟" at the end
   violations.push('They asked how you are ("ازيك"). Answer it first in a word or two ("الحمد لله تمام 😊"), then the rest.');
 const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
 if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
