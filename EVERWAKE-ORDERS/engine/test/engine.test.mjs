@@ -693,3 +693,18 @@ test('a pin with no words is not English; "هل" and "مساءً" are tidied awa
   assert.match(t.brief.facts_text, /Their latest message is in: Arabic$/m);
   assert.deepEqual(t.checked.decision.reply_messages, ['أهلاً بيك 😊 الأوردر دليفري ولا استلام؟ الفرع مفتوح لحد 11 بالليل.']);
 });
+
+test('a tool call that failed: the reply may not say the dishes went in', async () => {
+  const phone = '201099998888';
+  const t = await turn(db, evolutionPayload({ phone, text: 'نص كيلو جمبري وكيلو كاليماري' }), async () => ({
+    plan: { read: 'order', stage: 'ordering', objective: 'add', actions: [] },
+    tools: [{ tool: 'manage_cart', fail: 'Credentials not found' }],
+    reply: quiet('نص كيلو جمبري وكيلو كاليماري عندك 👌 تحب حاجة تانية؟'),
+    rewrite: ['ثانية واحدة بس أتأكدلك من حاجة وأرجعلك 🙏']
+  }));
+  const c = t.nodes['Check Reply'];
+  assert.equal(c.tool_calls[0].status, 'ERROR');
+  assert.equal(c.tool_calls[0].error, 'Credentials not found');
+  assert.match(c.violations.join('\n'), /FAILED and changed nothing: manage_cart \(Credentials not found\).*0 dish line/);
+  assert.deepEqual(t.checked.decision.reply_messages, ['ثانية واحدة بس أتأكدلك من حاجة وأرجعلك 🙏']);
+});

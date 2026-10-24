@@ -25,7 +25,7 @@ const lines = [
   '',
   `${prep.restaurant} · ${prep.status}${res.mode === 'human' ? ' · A PERSON TOOK OVER' : ''} · stage=${t.stage ?? '-'} · ${t.seconds ?? '-'}s · ${t.tokens ?? '-'} tokens`,
   ...((t.calls || []).length
-    ? t.calls.map(c => `→ ${c.tool} ${short(c.asked, 220)} ⇒ ${c.status || '?'}${(c.problems || []).length ? ' ' + c.problems.join(',') : ''}`)
+    ? t.calls.map(c => `→ ${c.tool} ${short(c.asked, 220)} ⇒ ${c.status || '?'}${c.error ? ' «' + c.error + '»' : ''}${(c.problems || []).length ? ' ' + c.problems.join(',') : ''}`)
     : [`tools=${short(t.tools || [])}`]),
   (t.tool_problems || []).length ? `problems=${short(t.tool_problems, 400)}` : '',
   t.agent_error ? `AGENT ERROR: ${t.agent_error}` : '',

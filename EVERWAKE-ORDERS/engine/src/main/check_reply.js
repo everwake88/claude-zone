@@ -57,9 +57,12 @@ for (const st of steps) {
   if (o && typeof o === 'object' && o.response && typeof o.response === 'string') { try { o = JSON.parse(o.response); } catch (e) {} }
   if (tool) {
     const input = obj(obj(st).action).toolInput;
+    // a call that failed: n8n hands back {"error": …} (or nothing readable) — nothing happened
+    const failed = !o || typeof o !== 'object' || (o.error != null && !o.status) || obj(st).errored === true;
+    const errText = failed ? str(o && typeof o === 'object' ? (obj(o.error).message || o.error || 'no answer') : 'unreadable answer').slice(0, 300) : null;
     toolCalls.push({ tool, asked: (typeof input === 'string' ? input : JSON.stringify(input ?? '')).slice(0, 300),
-                     status: o && typeof o === 'object' ? str(o.status) || null : 'unreadable',
-                     problems: o && typeof o === 'object' ? arr(o.problems).map(p => str(obj(p).code || p)).slice(0, 6) : [] });
+                     status: failed ? 'ERROR' : (str(o.status) || null), error: errText || undefined,
+                     problems: !failed ? arr(o.problems).map(p => str(obj(p).code || p)).slice(0, 6) : [] });
   }
   if (!o || typeof o !== 'object') continue;
   if (tool === 'manage_reservation') {
@@ -215,6 +218,15 @@ if (leak) violations.push(`The reply shows an internal code or word ("${leak[0]}
 const SYSTEM_TALK = /(?<!\p{L})(الفريق المختص|طلب نشط|المساعدة الافتراضية|الأسعار الإرشادية|التلامس العرضي|العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
 const sys = joined.match(SYSTEM_TALK);
 if (sys) violations.push(`The reply sounds like a system ("${sys[1]}"). Say it the way a person at the restaurant would on WhatsApp ("الأوردر"، "طلبك"، "كده عندك…"، "أأكدلك الأوردر؟").`);
+// a tool whose last call failed did nothing: the reply must not say it did
+const lastCall = {};
+for (const c of toolCalls) lastCall[c.tool] = c;
+const failedTools = Object.values(lastCall).filter(c => c.status === 'ERROR');
+if (failedTools.length && joined) {
+  violations.push(`These tool calls FAILED and changed nothing: ${failedTools.map(c => `${c.tool} (${c.error})`).join('; ')}. `
+    + `The order now has ${items.length} dish line(s)${branchId ? '' : ' and no branch is set'}. Do not say or imply that anything from those calls was added, set or saved, and don't repeat their order back as if it went in. `
+    + 'Say warmly in one line that you are sorting one small thing out and will confirm in a moment, or ask the one thing still needed.');
+}
 const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
 if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
 const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);

@@ -155,7 +155,9 @@ export async function turn(db, payload, script, opts = {}) {
   // the Agent: the scripted tool calls run through the real tool workflows
   const steps = [];
   for (const call of s.tools || []) {
-    const result = call.tool === 'manage_cart'
+    // a call n8n refused or the tool workflow failed on: the agent sees {"error": …}
+    const result = call.fail ? { error: call.fail }
+      : call.tool === 'manage_cart'
       ? await manageCart(db, r, call.action, call.items || [], call.branch || '')
       : call.tool === 'manage_reservation'
         ? await manageReservation(db, r, call.action, call.details || '')
