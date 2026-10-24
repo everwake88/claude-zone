@@ -62,6 +62,7 @@ for (const st of steps) {
     const errText = failed ? str(o && typeof o === 'object' ? (obj(o.error).message || o.error || 'no answer') : 'unreadable answer').slice(0, 300) : null;
     toolCalls.push({ tool, asked: (typeof input === 'string' ? input : JSON.stringify(input ?? '')).slice(0, 300),
                      status: failed ? 'ERROR' : (str(o.status) || null), error: errText || undefined,
+                     payment: !failed && o.payment && typeof o.payment === 'object' ? str(o.payment.status) || 'unknown' : undefined,
                      problems: !failed ? arr(o.problems).map(p => str(obj(p).code || p)).slice(0, 6) : [] });
   }
   if (!o || typeof o !== 'object') continue;
@@ -99,6 +100,7 @@ messages = messages.map(m => {
     .replace(/\[\[\s*NEXT\s*\]\]/g, '')
     .replace(/\s*[؛;](?=\s)/g, '.')                // nobody types a semicolon on WhatsApp
     .replace(/(^|[\s،.؟!(])هل\s+/g, '$1')           // "هل الطلب دليفري؟" is MSA: Egyptians ask "الطلب دليفري؟"
+    .replace(/(?<!\p{L})(?:اسمه|اسمها) حضرتك/gu, 'اسم حضرتك')   // "اسمه حضرتك إيه؟" → "اسم حضرتك إيه؟"
     .replace(/(\d{1,2}(?::\d{2})?)\s*مساءً?(?![\u0600-\u06FF])/g, '$1 بالليل')
     .replace(/(\d{1,2}(?::\d{2})?)\s*صباحاً?(?![\u0600-\u06FF])/g, '$1 الصبح')
     .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
@@ -221,7 +223,7 @@ const leak = joined.match(LEAK);
 if (leak) violations.push(`The reply shows an internal code or word ("${leak[0]}") — say it in plain words for the customer.`);
 
 // sounding like a system, not a person (Arabic words have no \b: letters on either side end the match)
-const SYSTEM_TALK = /(?<!\p{L})(الخطوة الجاية|الخطوة التالية|بيانات السواق|بيانات الطيار|ظاهر عندي|ظاهرين عندي|ظاهرة عندي|بيانات سواق|بيانات تتبع|الفريق المختص|طلب نشط|المساعدة الافتراضية|الأسعار الإرشادية|التلامس العرضي|العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
+const SYSTEM_TALK = /(?<!\p{L})(لو وُجدت|لو وجدت|إن وجدت|ان وجدت|إن وُجدت|الرسوم المقررة|الخطوة الجاية|الخطوة التالية|بيانات السواق|بيانات الطيار|ظاهر عندي|ظاهرين عندي|ظاهرة عندي|بيانات سواق|بيانات تتبع|الفريق المختص|طلب نشط|المساعدة الافتراضية|الأسعار الإرشادية|التلامس العرضي|العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
 const sys = joined.match(SYSTEM_TALK);
 if (sys) violations.push(`The reply sounds like a system ("${sys[1]}"). Say it the way a person at the restaurant would on WhatsApp ("الأوردر"، "طلبك"، "كده عندك…"، "أأكدلك الأوردر؟").`);
 // a tool whose last call failed did nothing: the reply must not say it did

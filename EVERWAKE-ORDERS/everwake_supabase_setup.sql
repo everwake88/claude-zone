@@ -6092,7 +6092,8 @@ create trigger menu_option_branches_audit after insert or update or delete on ev
 
 -- ---------------------------------------------------------------------
 -- The payment methods a branch takes: its own list, or the restaurant's.
--- "online" only while the restaurant's Paymob account is on. No branch
+-- "online" only while the restaurant's Paymob account is on and knows the
+-- dashboard's address (without it no payment link can be made). No branch
 -- given: every method at least one branch takes.
 -- ---------------------------------------------------------------------
 create or replace function everwake.payment_methods_at(p_tenant uuid, p_branch uuid default null)
@@ -6100,7 +6101,8 @@ returns jsonb language sql stable as $$
   with t as (
     select array(select jsonb_array_elements_text(coalesce(everwake.merged_settings(x.settings) -> 'payment_methods',
                                                            '["cash"]'::jsonb))) as pm,
-           exists (select 1 from everwake.payment_accounts a where a.tenant_id = p_tenant and a.enabled) as online
+           exists (select 1 from everwake.payment_accounts a
+                    where a.tenant_id = p_tenant and a.enabled and nullif(btrim(a.dashboard_url), '') is not null) as online
       from everwake.tenants x where x.id = p_tenant
   ), lists as (
     select coalesce(nullif(array(select m from unnest(b.payment_methods) m where m <> 'online' or (select online from t)), '{}'),

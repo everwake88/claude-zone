@@ -808,3 +808,14 @@ function fieldNeededProbe(d) {
   const src = readFileSync(new URL('../src/shared/basics.js', import.meta.url), 'utf8');
   return new Function('d', src + '\nreturn fieldNeeded("address_floor", d);')(d);
 }
+
+test('the client\'s test: "اسمه حضرتك" tidied; a vague "لو وُجدت" fee note is caught', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990077', text: 'العجمي البيطاش' }), async () => ({
+    plan: { read: 'area', stage: 'details', objective: 'name', actions: [] },
+    reply: quiet('تمام 👌 اسمه حضرتك إيه؟\nالأسعار غير شاملة الرسوم المقررة من الفرع، لو وُجدت.'),
+    rewrite: ['تمام 👌 تحب تطلب إيه؟']
+  }));
+  const c = t.nodes['Check Reply'];
+  assert.match(c.decision.reply_messages[0], /اسم حضرتك إيه؟/);
+  assert.match(c.violations.join('\n'), /sounds like a system/);
+});
