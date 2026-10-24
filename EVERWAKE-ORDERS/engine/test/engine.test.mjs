@@ -758,3 +758,17 @@ test('"أنا معاكي" to Ahmed is caught; to a customer who wrote "عايز�
   }));
   assert.deepEqual(t.nodes['Check Reply'].violations, []);
 });
+
+test('the cart: "summary" re-prices with the delivery area saved after the dishes', async () => {
+  const phone = '201099990055';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'الزمالك');
+  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  await (await import('./harness.mjs')).saveDetails(db, intake, { delivery_method: 'delivery', address_area: 'الدقي' });
+  const r = await manageCart(db, intake, 'summary');
+  assert.equal(r.status, 'DONE');
+  assert.equal(r.delivery_fee, 35, 'the Dokki zone fee, saved after the dish went in');
+  assert.equal(r.total, Math.round((r.subtotal - (r.discount_total || 0) + r.vat + 35) * 100) / 100);
+  assert.equal((await manageCart(db, intake, 'show')).status, 'DONE', 'a near word is the same');
+});

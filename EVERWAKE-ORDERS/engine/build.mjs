@@ -252,7 +252,7 @@ function buildMain() {
   w.add(tool('manage_cart', 'Everwake — Tool: manage_cart', prompt('tool_manage_cart.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    action: "={{ $fromAI('action', 'Exactly one of: add, update, remove, replace, clear, set_branch, reorder_last, apply_code, place_order', 'string') }}",
+    action: "={{ $fromAI('action', 'Exactly one of: add, update, remove, replace, clear, set_branch, reorder_last, apply_code, summary, place_order', 'string') }}",
     branch: "={{ $fromAI('branch', 'Only for set_branch: the branch code or name from THE BRANCHES. Leave it out for every other action.', 'string', 'none') }}",
     items: "={{ $fromAI('items', 'The dishes this action touches: a list like [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]. For apply_code: [{\"promo_code\":\"THE CODE\"}]. Leave it out (never an empty list) for clear, set_branch, reorder_last and place_order. Never include prices.', 'json', [{}]) }}"
   }, [1560, 720]));

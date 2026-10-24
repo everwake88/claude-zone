@@ -138,6 +138,12 @@ for (const e of Object.values(obj(allLookup.items))) { add(num(e.price_min, NaN)
 for (const i of items) { add(num(i.unit_price)); add(num(i.line_total)); add(num(i.base_price)); add(num(i.quantity)); }
 [order.subtotal, order.discount_total, order.vat, order.delivery_fee, order.total, placedTotal].forEach(v => add(num(v, NaN)));
 for (const a of arr(order.applied_offers)) add(num(a.amount, NaN));
+// the order's food + VAT with the delivery fee of the area saved since the last re-price
+{
+  const food = num(order.subtotal, NaN) - num(order.discount_total, 0) + num(order.vat, 0);
+  for (const fee of [num(zone.delivery_fee, NaN), ...arr(allLookup.zones).map(z => num(z.delivery_fee, NaN))])
+    if (Number.isFinite(food) && Number.isFinite(fee)) add(food + fee);
+}
 toolNumbers.forEach(add);
 for (const b of arr(allLookup.branches)) {
   ['delivery_fee', 'min_order', 'max_delivery_km', 'vat_percent', 'prep_minutes'].forEach(k => add(num(b[k], NaN)));

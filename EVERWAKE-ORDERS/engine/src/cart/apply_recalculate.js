@@ -58,8 +58,12 @@ const branchByCode = (code) => branches.find(b => str(b.code) === str(code)) || 
 const activeOrder = db.active_order && db.active_order !== 'null' ? obj(db.active_order) : {};
 const seedCart = obj(activeOrder.cart).items ? obj(activeOrder.cart) : { items: [] };
 
-const ALLOWED = ['add', 'update', 'remove', 'replace', 'clear', 'set_branch', 'place_order', 'reorder_last', 'apply_code'];
-const action = ALLOWED.includes(str(args.action).toLowerCase()) ? str(args.action).toLowerCase() : '';
+const ALLOWED = ['add', 'update', 'remove', 'replace', 'clear', 'set_branch', 'place_order', 'reorder_last', 'apply_code', 'summary'];
+// "summary": nothing changes — the order is re-priced with what is known now (the delivery
+// area saved since the last call, today's menu) and the totals come back for the summary
+const SUMMARY_WORDS = ['summary', 'view', 'show', 'recalculate', 'totals', 'review', 'get', 'status'];
+const asked = str(args.action).toLowerCase();
+const action = SUMMARY_WORDS.includes(asked) ? 'summary' : (ALLOWED.includes(asked) ? asked : '');
 
 function fail(code, facts) {
   return [{ json: { ok: false, error_code: code, facts: facts || {}, tenant_id: args.tenant_id, wa_id: args.wa_id } }];
