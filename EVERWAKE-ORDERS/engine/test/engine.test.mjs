@@ -886,3 +886,24 @@ test('food first, then details: "anything else?" until they say that\'s all', as
   });
   assert.ok(!t2.nodes['Check Reply'].violations.some(v => /done choosing/.test(v)));
 });
+
+test('a dish this branch lacks: other branches are offered only if they can take the order', async () => {
+  const h = await import('./harness.mjs');
+  const open = async (phone) => (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  // delivering to دجلة: only Maadi delivers there, so Zamalek's lamb chops are not offered
+  const a = await open('201099990144');
+  await manageCart(db, a, 'set_branch', [], 'المعادي');
+  await h.saveDetails(db, a, { delivery_method: 'delivery', address_area: 'دجلة' });
+  let r = await manageCart(db, a, 'add', [{ menu_id: 'M002', quantity: 1 }]);
+  let p = r.problems.find(x => x.code === 'NOT_ON_THIS_BRANCH_MENU');
+  assert.deepEqual(p.available_at, [], JSON.stringify(p));
+  assert.match(p.note, /don't offer one/);
+  // picking up: any open branch that has it
+  const b = await open('201099990155');
+  await manageCart(db, b, 'set_branch', [], 'المعادي');
+  await h.saveDetails(db, b, { delivery_method: 'pickup' });
+  r = await manageCart(db, b, 'add', [{ menu_id: 'M002', quantity: 1 }]);
+  p = r.problems.find(x => x.code === 'NOT_ON_THIS_BRANCH_MENU');
+  assert.ok(p.available_at.includes('الزمالك'), JSON.stringify(p));
+});

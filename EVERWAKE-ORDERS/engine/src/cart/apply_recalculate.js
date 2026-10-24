@@ -160,6 +160,18 @@ const menuChoices = obj(lookup.choices);
 function labelsOf(e) {
   return [e.name, e.name_en].concat(arr(e.aliases)).filter(Boolean).map(normalizeArabic).filter(Boolean);
 }
+// the other branches worth offering for a dish this branch doesn't have: taking orders now, and
+// for a delivery, only the ones that deliver where the customer is (never Cairo to Alexandria)
+function branchesThatCanTakeIt(codes) {
+  const delivery = str(customer.delivery_method).toLowerCase() !== 'pickup';
+  const area = normalizeArabic(str(customer.address_area));
+  return codes.map(c => branchByCode(c)).filter(b => b && str(b.id) !== str(targetBranchId)
+    && b.accepting_orders !== false && !['not_accepting', 'closed', 'paused'].includes(str(branchStates[b.id])))
+    .filter(b => !delivery || (!area && !zone) || arr(all.zones).some(z => str(z.branch_id) === str(b.id)
+      && ((zone && str(z.id) === str(zone.id)) || (area && arr(z.areas).some(a => normalizeArabic(str(a)) === area)))))
+    .map(b => str(b.name_ar));
+}
+
 function findIn(items, text) {
   const target = normalizeArabic(text);
   if (!target) return null;
@@ -486,9 +498,11 @@ if (effective === 'clear') {
       if (elsewhere && arr(elsewhere.e.branches).length) {
         // by the dish's name, not its code: "جمبري وسط" finds this branch's other shrimp
         const dishName = str(elsewhere.e.name) || requested;
+        const availableAt = branchesThatCanTakeIt(arr(elsewhere.e.branches));
         cartErrors.push({ code: 'NOT_ON_THIS_BRANCH_MENU', requested: dishName, branch: branchName(targetBranchId),
-          available_at: arr(elsewhere.e.branches).map(c => obj(branchByCode(c)).name_ar || c), suggestions: suggestAlternatives(dishName, 4),
-          note: 'offer the suggestions (this branch\'s closest dishes) by name and price, or the branches that have it' });
+          available_at: availableAt, suggestions: suggestAlternatives(dishName, 4),
+          note: 'offer the suggestions (this branch\'s closest dishes) by name and price'
+            + (availableAt.length ? ', or the branches in available_at (they can take this order)' : '; no other branch can take this order, so don\'t offer one') });
       } else {
         cartErrors.push({ code: 'ITEM_NOT_FOUND', requested, suggestions: suggestAlternatives(requested, 3) });
       }
