@@ -115,6 +115,7 @@ messages = messages.map(m => {
     .replace(/\s*[؛;](?=\s)/g, '.')                // nobody types a semicolon on WhatsApp
     .replace(/(^|[\s،.؟!(])هل\s+/g, '$1')           // "هل الطلب دليفري؟" is MSA: Egyptians ask "الطلب دليفري؟"
     .replace(/(?<!\p{L})كم(?= (?:كيلو|واحد|واحدة|قطعة|طبق|شخص|فرد|نفر|علبة)(?!\p{L}))/gu, 'كام')   // "كم كيلو" is MSA: "كام كيلو"
+    .replace(/([\u0621-\u064A])ا{2,}(?=[\u0621-\u064A])/g, '$1ا')   // a doubled alef inside a word is a typo ("معااك")
     .replace(/(?<!\p{L})(?:اسمه|اسمها) حضرتك/gu, 'اسم حضرتك')   // "اسمه حضرتك إيه؟" → "اسم حضرتك إيه؟"
     // "كيلو *كاليماري بالكيلو*": the weight is already said, the menu's "بالكيلو" goes
     .replace(/((?:ربع|نص|تلت|تلات|كيلو|كيلوين|\d+(?:\.\d+)?)\s*(?:كيلو)?[^\n*]{0,3}\*[^*\n]+?)\s+بالكيلو(\*)/gu, '$1$2')
