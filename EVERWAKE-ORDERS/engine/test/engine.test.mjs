@@ -718,3 +718,43 @@ test('a tool call that failed: the reply may not say the dishes went in', async 
   assert.match(c.violations.join('\n'), /FAILED and changed nothing: manage_cart \(Credentials not found\).*0 dish line/);
   assert.deepEqual(t.checked.decision.reply_messages, ['ثانية واحدة بس أتأكدلك من حاجة وأرجعلك 🙏']);
 });
+
+test('the cart: a cooking word on a dish without choices is a kitchen note; a dish not at this branch comes with alternatives', async () => {
+  const phone = '201099990011';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  let r = await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  r = await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1, choices: [{ selected: ['مقرمشة'] }] }]);
+  assert.equal(r.status, 'DONE');
+  assert.ok(!(r.problems || []).some(p => p.code === 'CHOICE_NOT_AN_OPTION'), JSON.stringify(r.problems));
+  assert.match(r.cart.find(l => l.menu_id === 'M007').notes, /مقرمشة/);
+  r = await manageCart(db, intake, 'add', [{ menu_id: 'M002', quantity: 1 }]);
+  const p = r.problems.find(x => x.code === 'NOT_ON_THIS_BRANCH_MENU');
+  assert.equal(p.requested, 'ريش ضاني', 'by name, never the code');
+  assert.ok(p.suggestions.length > 0, 'the closest dishes here: ' + JSON.stringify(p));
+});
+
+test('the cart: changing a line by its line_id alone', async () => {
+  const phone = '201099990022';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  let r = await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 2 }]);
+  const line = r.cart.find(l => l.menu_id === 'M007').line_id;
+  r = await manageCart(db, intake, 'update', [{ line_id: line, quantity: 1 }]);
+  assert.ok(!(r.problems || []).some(p => p.code === 'ITEM_NOT_FOUND'), JSON.stringify(r.problems));
+  assert.equal(r.cart.find(l => l.menu_id === 'M007').quantity, 1);
+});
+
+test('"أنا معاكي" to Ahmed is caught; to a customer who wrote "عايزة" it is fine', async () => {
+  let t = await turn(db, evolutionPayload({ phone: '201099990033', text: 'لا خلاص مش هطلب النهارده' }), async () => ({
+    plan: { read: 'bye', stage: 'other', objective: 'close', actions: [] },
+    reply: quiet('ولا يهمك، لما تحب تطلب أنا معاكي.'), rewrite: ['ولا يهمك، لما تحب تطلب أنا معاك.']
+  }));
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /feminine \("معاكي"\)/);
+  t = await turn(db, evolutionPayload({ phone: '201099990044', text: 'أنا عايزة أطلب بكرة' }), async () => ({
+    plan: { read: 'later', stage: 'other', objective: 'ok', actions: [] },
+    reply: quiet('تمام، لما تحبي أنا معاكي 😊')
+  }));
+  assert.deepEqual(t.nodes['Check Reply'].violations, []);
+});

@@ -227,6 +227,22 @@ if (failedTools.length && joined) {
     + `The order now has ${items.length} dish line(s)${branchId ? '' : ' and no branch is set'}. Do not say or imply that anything from those calls was added, set or saved, and don't repeat their order back as if it went in. `
     + 'Say warmly in one line that you are sorting one small thing out and will confirm in a moment, or ask the one thing still needed.');
 }
+// "معاكي" to Ahmed: the customer is "you" in the masculine unless their own words show a woman
+const FEM_YOU = /(?<!\p{L})(معاكي|ليكي|عليكي|عندكي|بيكي|ليكِ|تحبي|تحبّي|عايزاه|ابعتيلي|ابعتي|قوليلي|اكتبيلي|تأكدي|حضرتِك)(?!\p{L})/u;
+const SHE_SAID = /(?<!\p{L})(عايزة|عاوزة|عايزه|عاوزه|جاية|جايه|محتاجة|مبسوطة|متأكدة|أنا ست|انا ست|مدام)(?!\p{L})/u;
+// …or a clearly female name (WhatsApp name or the name they gave)
+const FEMALE = new Set(('منى منة منه مريم سارة ساره نور نورا نورهان هبة هبه ياسمين فاطمة فاطمه رحاب رانيا ريهام شيماء شيما سلمى سلمي ' +
+  'ندى ندي دينا داليا مي مى ميار ملك جنى جنا حبيبة حبيبه رنا هند إيمان ايمان أسماء اسماء آية ايه آيه علياء عبير نهى نها نسمة ' +
+  'نسمه سماح أمل امل منار مروة مروه نرمين نيرمين يارا لمياء ليلى ليلي هالة هاله غادة غاده ولاء وفاء رشا رضوى سهى سها شهد ' +
+  'mona menna mariam maryam sara sarah nour noura nourhan heba yasmin yasmeen fatma rehab rania reham shaimaa salma nada dina dalia ' +
+  'mai mayar malak jana habiba rana hend eman iman asmaa aya alia abeer noha nesma samah amal manar marwa nermin yara lamia laila ' +
+  'layla hala ghada walaa wafaa rasha radwa soha shahd').split(' '));
+const custNames = [state.customer && state.customer.full_name, obj(ctx.customer).full_name, obj(ctx.customer).display_name,
+                   $('Normalize Inbound').first().json.customer_name];
+const femaleName = custNames.some(n => FEMALE.has(str(n).trim().split(/\s+/)[0].toLowerCase().replace(/^ال/, '')));
+const fem = joined.match(FEM_YOU);
+if (fem && !femaleName && !SHE_SAID.test([pre.customer_message, pre.history_text].map(str).join(' ')))
+  violations.push(`The reply speaks to the customer in the feminine ("${fem[1]}") but nothing they wrote says they are a woman. Use the masculine ("معاك"، "ليك"، "تحب"، "ابعتلي").`);
 const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
 if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
 const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);

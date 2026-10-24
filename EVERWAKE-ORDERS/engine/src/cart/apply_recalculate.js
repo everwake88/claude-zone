@@ -461,6 +461,11 @@ if (effective === 'clear') {
 } else if (['add', 'update', 'remove', 'replace'].includes(effective)) {
   for (const p0 of patchItems) {
     const p = { ...obj(p0) };
+    // "update line L4" with no dish named: the dish is the one on that line
+    if (!str(p.menu_id) && !str(p.item_name) && str(p.line_id)) {
+      const onLine = items.find(i => str(i.line_id) === str(p.line_id));
+      if (onLine) p.menu_id = str(onLine.code);
+    }
     const resolved = resolveMenuItem(p);
     if (resolved && resolved.ambiguous) {
       cartErrors.push({ code: 'WHICH_ONE', requested: str(p.item_name) || str(p.menu_id),
@@ -475,8 +480,11 @@ if (effective === 'clear') {
       const requested = str(p.item_name) || str(p.menu_id);
       const elsewhere = findIn(allItems, requested) || (allItems[str(p.menu_id).toUpperCase()] ? { id: str(p.menu_id).toUpperCase(), e: allItems[str(p.menu_id).toUpperCase()] } : null);
       if (elsewhere && arr(elsewhere.e.branches).length) {
-        cartErrors.push({ code: 'NOT_ON_THIS_BRANCH_MENU', requested, branch: branchName(targetBranchId),
-          available_at: arr(elsewhere.e.branches).map(c => obj(branchByCode(c)).name_ar || c), suggestions: suggestAlternatives(requested, 3) });
+        // by the dish's name, not its code: "جمبري وسط" finds this branch's other shrimp
+        const dishName = str(elsewhere.e.name) || requested;
+        cartErrors.push({ code: 'NOT_ON_THIS_BRANCH_MENU', requested: dishName, branch: branchName(targetBranchId),
+          available_at: arr(elsewhere.e.branches).map(c => obj(branchByCode(c)).name_ar || c), suggestions: suggestAlternatives(dishName, 4),
+          note: 'offer the suggestions (this branch\'s closest dishes) by name and price, or the branches that have it' });
       } else {
         cartErrors.push({ code: 'ITEM_NOT_FOUND', requested, suggestions: suggestAlternatives(requested, 3) });
       }
@@ -517,6 +525,12 @@ if (effective === 'clear') {
       ? placeChoices(menuChoices, id, rawFromAccepted(existingLine.choices))
       : (priorPending ? placeChoices(menuChoices, id, obj(priorPending).choices) : { byLevel: {}, unplaced: [] });
     const newPlaced = placeChoices(menuChoices, id, p.choices);
+    // a dish with no choices at all ("كاليماري مقلي" when it is only made one way):
+    // the word goes to the kitchen as a note, not back to the customer as a problem
+    if (!arr(newPlaced.levels).length && newPlaced.unplaced.length) {
+      p.notes = [str(p.notes), ...newPlaced.unplaced.map(str)].filter(Boolean).join(' · ');
+      newPlaced.unplaced = [];
+    }
     for (const u of newPlaced.unplaced) {
       cartErrors.push({ code: 'CHOICE_NOT_AN_OPTION', menu_id: id, item_name: entry.name, requested: u,
         levels: arr(newPlaced.levels).map(L => ({ level: L.level, label: L.label_ar, options: arr(L.options).map(o => o.name) })) });
