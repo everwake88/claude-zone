@@ -360,7 +360,7 @@ const facts = [
       + (seating(branch) ? ' · ' + seating(branch) : '')
       + ` · delivery fee: ${fee == null ? 'not set — the branch confirms it' : money$(fee)}${minOrder ? ' · minimum order ' + money$(minOrder) : ''}`
       + (bStatus.state === 'closed' && settings.accept_orders_when_closed ? ' · orders taken now are prepared when it opens' : '')
-      + (bStatus.state === 'closed' && !settings.accept_orders_when_closed ? ' · orders cannot be placed until it opens' : '')
+      + (bStatus.state === 'closed' && !settings.accept_orders_when_closed ? ' · orders cannot be placed until it opens — and nothing places one later by itself: their choices stay in this chat, and it goes in when they message again once it is open' : '')
     : (branches.length ? 'NOT CHOSEN YET — nothing can be priced or added until it is (each branch can have its own menu and prices)' : 'the restaurant has no branch set up')}`,
   branch && branch.price_note_ar ? `  prices at this branch (for you; tell the customer only if they ask about prices or fees): ${branch.price_note_ar}` : '',
   `ORDER TYPE: ${mode === 'delivery' ? 'delivery' : (mode === 'pickup' ? 'pickup from the branch' : 'not chosen yet — delivery or pickup')}`,
