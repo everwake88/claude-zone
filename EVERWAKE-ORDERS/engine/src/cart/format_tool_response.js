@@ -17,7 +17,7 @@ const payment = !payNeeded ? undefined
   : (pay && pay.ok && pay.link)
     ? { status: 'LINK_READY', link: pay.link, amount: pay.amount, works_until: pay.valid_until,
         fact: 'They pay online: put this payment link in your reply exactly as it is, with the amount and until when it works. The order is NOT paid until FACTS shows PAID — never say it is paid.' }
-    : { status: (pay && pay.status) || 'LINK_FAILED', reason: pay && pay.reason,
+    : { status: (pay && pay.status) || 'LINK_FAILED', reason: pay && (pay.reason || (pay.error && (pay.error.message || pay.error))),
         fact: (pay && pay.fact) || 'The payment link could not be made right now. The order is placed; the team sends the link (or they can pay cash). Never invent a link.' };
 
 const totals = {

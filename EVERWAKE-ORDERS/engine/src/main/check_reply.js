@@ -62,7 +62,8 @@ for (const st of steps) {
     const errText = failed ? str(o && typeof o === 'object' ? (obj(o.error).message || o.error || 'no answer') : 'unreadable answer').slice(0, 300) : null;
     toolCalls.push({ tool, asked: (typeof input === 'string' ? input : JSON.stringify(input ?? '')).slice(0, 300),
                      status: failed ? 'ERROR' : (str(o.status) || null), error: errText || undefined,
-                     payment: !failed && o.payment && typeof o.payment === 'object' ? str(o.payment.status) || 'unknown' : undefined,
+                     payment: !failed && o.payment && typeof o.payment === 'object'
+                       ? (str(o.payment.status) || 'unknown') + (o.payment.reason ? ` (${str(o.payment.reason).slice(0, 160)})` : '') : undefined,
                      problems: !failed ? arr(o.problems).map(p => str(obj(p).code || p)).slice(0, 6) : [] });
   }
   if (!o || typeof o !== 'object') continue;
