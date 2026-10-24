@@ -172,6 +172,7 @@ const hasPin = location.lat != null && location.lng != null;
 const missing = arr(REQ[mode] || ['phone_confirmed', 'full_name', 'delivery_method'])
   .map(f => (phoneHidden && f === 'phone_confirmed') ? 'phone' : f)
   .filter(f => !(f === 'address_street' && hasPin))
+  .filter(f => fieldNeeded(f, merged))
   .filter(f => !str(merged[f]));
 
 const askedNow = { ...prevAsked };

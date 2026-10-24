@@ -130,6 +130,7 @@ const phoneHidden = obj(state.contact).phone_hidden === true || intake.phone_hid
 const missing = arr(REQ[mode] || ['phone_confirmed', 'full_name', 'delivery_method'])
   .map(f => (phoneHidden && f === 'phone_confirmed') ? 'phone' : f)
   .filter(f => !(f === 'address_street' && hasPin))
+  .filter(f => fieldNeeded(f, details))
   .filter(f => !str(details[f]));
 if (!branchId) missing.push('branch');
 const payNotTaken = branch && str(details.payment_method) && !payOf(branch).includes(str(details.payment_method)) ? str(details.payment_method) : '';
@@ -147,7 +148,8 @@ const LABEL = {
   delivery_area: 'where they are, inside a delivery zone (a location pin is easiest, or their area name)',
   confirm_pin_address: 'their OK that the address from their pin is where the order goes (one line, with building/floor/apartment)'
 };
-const detailLines = Object.entries(details).filter(([, v]) => str(v)).map(([k, v]) => `- ${k} = ${v}`);
+const detailLines = Object.entries(details).filter(([, v]) => str(v))
+  .map(([k, v]) => `- ${k} = ${['phone', 'alt_phone'].includes(k) ? localPhone(v) : v}`);
 
 // ---- the order summary on file -----------------------------------------------------------
 const reviewHash = str(ledger.review_hash);
@@ -337,7 +339,7 @@ const facts = [
   `- You are: ${str(agentName.ar) || 'ياسمين'} (${str(agentName.en) || 'Yasmin'}) from ${brandAr}${brandEn && brandEn !== brandAr ? ' (' + brandEn + ')' : ''}`,
   `- Customer: WhatsApp name "${str(norm.customer_name) || str(customer.display_name) || '—'}" (often a nickname — do not assume it is their real name)`
     + (profileName ? ` · name on file from previous orders: ${profileName}` : '')
-    + ` · ${phoneHidden ? 'their phone number is HIDDEN by WhatsApp privacy — you cannot see it; ask them to type a number for the order, and never quote the internal ID' : 'their WhatsApp number: ' + (customer.phone || intake.wa_id)}`,
+    + ` · ${phoneHidden ? 'their phone number is HIDDEN by WhatsApp privacy — you cannot see it; ask them to type a number for the order, and never quote the internal ID' : 'their WhatsApp number: ' + localPhone(customer.phone || intake.wa_id)}`,
   `- Their latest message is in: ${lang}`,
   `- First reply of this conversation: ${isFirstReply ? 'YES' : 'no'}${gapH !== null ? ` (last turn ${gapH < 1 ? Math.round(gapH * 60) + ' min' : Math.round(gapH) + ' h'} ago)` : ''}`,
   `- Messages bundled into this turn: ${num(claim.buffered_count, 1)}`,

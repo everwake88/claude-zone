@@ -559,3 +559,36 @@ test('branches that differ: Maadi\'s own menu and choice prices, no seating ther
   await sql(db, `select everwake.branch_menu_update($1, $2, jsonb_build_object('items', ${sandwiches}, 'listed', true)) as r`, [tenant, maadi]);
   await sql(db, `update everwake.branches set dine_in = null, payment_methods = null where tenant_id = $1 returning 1 as r`, [tenant]);
 });
+
+test('the Egyptian voice: نص كيلو, 01… numbers, no "العربة", and a villa has no floor to ask for', async () => {
+  const phone = '201099991234';
+  const tenant = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  const before = (await sql(db, `select settings as r from everwake.tenants where id = $1`, [tenant])).r;
+  await db.query(`update everwake.tenants set settings = settings || '{"required_fields": {"delivery": ["phone_confirmed", "full_name",
+    "delivery_method", "address_area", "address_street", "address_building", "address_floor", "address_apartment"]}}' where id = $1`, [tenant]);
+  try {
+    const t = await turn(db, evolutionPayload({ phone, text: 'عايز نص كيلو بوري توصيل لدجلة شارع 9 فيلا 14، أنا أحمد' }), async () => ({
+      plan: { read: 'order + address', stage: 'ordering', objective: 'add and save', actions: [] },
+      tools: [
+        { tool: 'manage_cart', action: 'set_branch', branch: 'المعادي' },
+        { tool: 'manage_cart', action: 'add', items: [{ menu_id: 'M001', quantity: 0.5 }] },
+        { tool: 'save_customer_details', details: { full_name: 'أحمد', delivery_method: 'توصيل', address_area: 'دجلة',
+                                                    address_street: 'شارع 9', address_building: 'فيلا 14' } }
+      ],
+      reply: quiet('تمت إضافة 0.5 كيلو للعربة. هل رقم الواتساب المسجل +201099991234 هو رقم الطلب؟'),
+      rewrite: ['تمام يا أحمد، نص كيلو بوري 👌 أطلب على 01099991234 ولا رقم تاني؟']
+    }));
+    assert.equal(t.steps[1].result.cart[0].say, 'نص كيلو', 'the cart says the weight the way people do');
+    const left = t.steps[2].result.still_missing_for_order;
+    assert.ok(!left.includes('address_floor') && !left.includes('address_apartment'), 'a villa: ' + JSON.stringify(left));
+    const v = t.nodes['Check Reply'].violations.join('\n');
+    assert.match(v, /sounds like a system/);
+    assert.match(v, /local way: 01099991234/);
+    assert.match(v, /نص كيلو/);
+    assert.ok(!/not prices, totals/.test(v), 'the number in its local form is theirs: ' + v);
+    assert.deepEqual(t.checked.decision.reply_messages, ['تمام يا أحمد، نص كيلو بوري 👌 أطلب على 01099991234 ولا رقم تاني؟']);
+    assert.match(t.brief.facts_text, /their WhatsApp number: 01099991234/);
+  } finally {
+    await db.query(`update everwake.tenants set settings = $2 where id = $1`, [tenant, before]);
+  }
+});

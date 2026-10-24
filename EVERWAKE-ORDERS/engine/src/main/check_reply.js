@@ -196,6 +196,15 @@ const LEAK = /\bM\d{3,5}\b|\bP\d+-M\d{3,5}\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{
 const leak = joined.match(LEAK);
 if (leak) violations.push(`The reply shows an internal code or word ("${leak[0]}") — say it in plain words for the customer.`);
 
+// sounding like a system, not a person (Arabic words have no \b: letters on either side end the match)
+const SYSTEM_TALK = /(?<!\p{L})(العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
+const sys = joined.match(SYSTEM_TALK);
+if (sys) violations.push(`The reply sounds like a system ("${sys[1]}"). Say it the way a person at the restaurant would on WhatsApp ("الأوردر"، "طلبك"، "كده عندك…"، "أأكدلك الأوردر؟").`);
+const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);
+if (intlPhone) violations.push(`Write the phone number the local way: ${intlPhone[0].replace(/^\+?20/, '0')}, not ${intlPhone[0]}.`);
+const decimalKilo = joined.match(/(?<![\d.])0?\.(25|5|75)\s*(كيلو|ك)(?!\p{L})/u);
+if (decimalKilo) violations.push(`Say the weight the way people say it (ربع كيلو / نص كيلو / تلت تربع كيلو), not "${decimalKilo[0]}".`);
+
 // links
 const links = joined.match(/https?:\/\/[^\s)]+/gi) || [];
 for (const l of links) {
@@ -213,6 +222,7 @@ for (const m of scan.match(/\d+(?:\.\d+)?/g) || []) {
   if (n < 20) continue;
   if (allowed.has(r2(n)) || allowed.has(Math.round(n))) continue;
   if (m.length >= 7 && textPool.includes(m)) continue;
+  if (/^01\d{9}$/.test(m) && textPool.includes('20' + m.slice(1))) continue;   // a number on file, written the local way
   bad.push(m);
 }
 if (bad.length) violations.push(`These numbers are not prices, totals or details on file: ${[...new Set(bad)].join(', ')}. Use only the numbers in FACTS, the MENU and the tool results (or leave the number out).`);

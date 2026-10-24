@@ -650,6 +650,7 @@ const needZone = mode === 'delivery' && zonesDrawn && settings.require_zone_for_
 const missingDetails = arr(REQ[mode] || ['phone_confirmed', 'full_name', 'delivery_method'])
   .map(f => (phoneHidden && f === 'phone_confirmed') ? 'phone' : f)
   .filter(f => !(f === 'address_street' && hasPin))
+  .filter(f => fieldNeeded(f, customer))
   .filter(f => !str(customer[f]));
 if (needZone && !zoneHere) missingDetails.push('delivery_area');
 // each branch takes its own payment methods (the restaurant's when it set none)
@@ -785,6 +786,8 @@ return [{
     cart_lines: items.map(i => ({
       line_id: i.line_id, menu_id: i.code, name: i.display_name, quantity: i.quantity,
       unit: UNIT_AR[i.unit] || '',
+      // how to say the quantity: "نص كيلو", "كيلو ونص", or a count
+      say: i.unit === 'kg' ? kiloText(i.quantity) : (num(i.quantity) === 1 ? '' : `${fmt(i.quantity)}`),
       choices: arr(i.choices).map(c => arr(c.selected).map(s => s.name).join(' + ')).filter(Boolean),
       notes: i.notes || null, line_total: i.line_total, price_known: i.price_known !== false,
       free_gift: i.gift === true || undefined,
