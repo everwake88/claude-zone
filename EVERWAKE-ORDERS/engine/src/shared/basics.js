@@ -16,8 +16,13 @@ const row = (j) => obj(parseJson(obj(j).r, {}));
 const localPhone = (p) => str(p).replace(/^\+?20(1\d{9})$/, '0$1');
 // a villa or a house has no floor or apartment to ask for
 const HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;
+// …and nobody climbs to a flat when the customer comes down for it or lowers a basket
+// ("هنزل السبت", "حد هينزل يستلم", "لما توصل متطلعش")
+const COMES_DOWN_RE = /السبت|سبت|هنزل|هينزل|هننزل|حنزل|نازل|نازلين|هستلم تحت|هنستلم تحت|استلم تحت|متطلعش|ما تطلعش|مش محتاج تطلع|تحت البيت|تحت العمارة|على الباب تحت|comes? down|basket/i;
 const fieldNeeded = (f, d) => !(['address_floor', 'address_apartment'].includes(f)
-  && HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' ')));
+  && (HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' '))
+      || !!str(d.comes_down)
+      || COMES_DOWN_RE.test([d.address_notes, d.order_notes].map(str).join(' '))));
 // a weight the Egyptian way: 0.5 → نص كيلو, 1.5 → كيلو ونص
 const kiloText = (q) => {
   const n = Math.round(num(q) * 100) / 100, whole = Math.floor(n), part = Math.round((n - whole) * 100) / 100;

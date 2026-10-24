@@ -34,9 +34,9 @@ const rawDetails = args.details_json !== undefined ? args.details_json : args;
 const ADDRESS_FIELDS = ['address_governorate', 'address_city', 'address_area', 'address_street',
   'address_building', 'address_floor', 'address_apartment', 'address_landmark', 'address_notes'];
 const ALLOWED_FIELDS = ['full_name', 'phone', 'phone_confirmed', 'alt_phone', 'delivery_method', 'payment_method',
-  ...ADDRESS_FIELDS, 'address_confirmed', 'order_notes', 'food_prefs'];
+  ...ADDRESS_FIELDS, 'address_confirmed', 'order_notes', 'food_prefs', 'comes_down'];
 const TYPED_ADDRESS = ['address_governorate', 'address_city', 'address_area', 'address_street'];
-const CLEARABLE = ['food_prefs', 'address_landmark', 'address_notes', 'order_notes', 'alt_phone'];
+const CLEARABLE = ['food_prefs', 'address_landmark', 'address_notes', 'order_notes', 'alt_phone', 'comes_down'];
 
 let incoming;
 try {
@@ -149,6 +149,13 @@ for (const [k, v] of Object.entries(incoming)) {
     accepted[k] = digits; continue;
   }
   accepted[k] = val.slice(0, 200);
+}
+// they come down for it / lower a basket: the driver reads it in the address notes
+if (str(accepted.comes_down)) {
+  const words = str(accepted.comes_down);
+  const said = /^(yes|true|نعم|ايوه|أيوه)$/i.test(words) ? 'العميل هينزل يستلم الأوردر تحت' : `العميل هينزل يستلم: ${words}`;
+  const notes = str(accepted.address_notes !== undefined ? accepted.address_notes : base.address_notes);
+  if (!notes.includes(words) && !notes.includes('هينزل يستلم')) accepted.address_notes = (notes ? notes + ' · ' : '') + said;
 }
 
 const merged = { ...base, ...accepted };

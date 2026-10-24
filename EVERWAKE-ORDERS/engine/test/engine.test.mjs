@@ -1,4 +1,5 @@
 // End-to-end conversations through the real engine code and database.
+import { readFileSync } from 'node:fs';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { freshDatabase, connect, turn, evolutionPayload, runCode, sql, callB64, unb64, manageCart, psqlFile } from './harness.mjs';
@@ -772,3 +773,38 @@ test('the cart: "summary" re-prices with the delivery area saved after the dishe
   assert.equal(r.total, Math.round((r.subtotal - (r.discount_total || 0) + r.vat + 35) * 100) / 100);
   assert.equal((await manageCart(db, intake, 'show')).status, 'DONE', 'a near word is the same');
 });
+
+test('"هنزل السبت": no floor or apartment, saved at any stage, the driver is told, the order goes through', async () => {
+  const tenant = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  const before = (await sql(db, `select settings as r from everwake.tenants where id = $1`, [tenant])).r;
+  await db.query(`update everwake.tenants set settings = settings || '{"required_fields": {"delivery": ["phone_confirmed", "full_name",
+    "delivery_method", "address_area", "address_street", "address_building", "address_floor", "address_apartment"]}}' where id = $1`, [tenant]);
+  try {
+    const phone = '201099990066';
+    const h = await import('./harness.mjs');
+    const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+      { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+    await manageCart(db, intake, 'set_branch', [], 'المعادي');
+    await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 2 }]);
+    // said early, before the address
+    let d = await h.saveDetails(db, intake, { comes_down: 'هنزل السبت' });
+    d = await h.saveDetails(db, intake, { delivery_method: 'delivery', address_area: 'دجلة', address_street: 'شارع 9', address_building: '14',
+                                          full_name: 'تسنيم', phone_confirmed: 'yes', payment_method: 'cash' });
+    const left = d.still_missing_for_order;
+    assert.ok(!left.includes('address_floor') && !left.includes('address_apartment'), JSON.stringify(left));
+    const ctx = await sql(db, 'select everwake.details_context($1::uuid, $2::text) as r', [intake.tenant_id, intake.wa_id]);
+    assert.match(JSON.stringify(ctx), /العميل هينزل يستلم: هنزل السبت/, 'the driver reads it in the address notes');
+    const r = await manageCart(db, intake, 'summary');
+    assert.ok(!(r.missing_details || []).some(f => /floor|apartment/.test(f)), JSON.stringify(r.missing_details));
+    // the same words only in the notes count too
+    assert.equal(fieldNeededProbe({ address_notes: 'حد هينزل يستلم' }), false);
+  } finally {
+    await db.query(`update everwake.tenants set settings = $2 where id = $1`, [tenant, before]);
+  }
+});
+
+// fieldNeeded from basics.js, for one line of checks
+function fieldNeededProbe(d) {
+  const src = readFileSync(new URL('../src/shared/basics.js', import.meta.url), 'utf8');
+  return new Function('d', src + '\nreturn fieldNeeded("address_floor", d);')(d);
+}
