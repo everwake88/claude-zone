@@ -21,6 +21,12 @@ const msg = [
   '================ THE DRAFT REPLY ================',
   (d.decision.reply_messages || []).join('\n[[NEXT]]\n'),
   '',
+  '================ WHAT THE TOOLS DID THIS TURN ================',
+  (d.tool_calls || []).length
+    ? d.tool_calls.map(c => `- ${c.tool}: ${c.status || 'no status'}${(c.problems || []).length ? ' (problems: ' + c.problems.join(', ') + ')' : ''}`).join('\n')
+      + `\n(the order now has ${d.cart_items_after || 0} dish line(s))`
+    : '- Nothing: no tool ran this turn, so nothing was added, changed or saved. The reply must not say or imply that anything was added or saved ("تمام، رز سي فود" would mean it was). If they asked for something, say you are on it in a few words or ask the one question needed.',
+  '',
   '================ WHAT IS WRONG WITH IT ================',
   (d.violations || []).map(v => '- ' + v).join('\n'),
   '',

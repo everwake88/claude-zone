@@ -10,7 +10,7 @@
         -420
       ],
       "parameters": {
-        "content": "## Everwake · Test Runner — chat with an agent, nothing goes on WhatsApp\nOpen the chat (**Open chat** at the bottom) and write as a customer. The real **Main** workflow answers from a pretend number (200000000001), so you test exactly what customers get — but the replies are only recorded, no kitchen ticket is sent, and it works while the restaurant is still onboarding.\n**/reset** a brand-new customer · **/later 5 <message>** 5 hours pass first · **/pin 31.2,29.9** a location pin · **#2 <message>** a second pretend customer · **@slug <message>** another restaurant.\nThe restaurant to test is set at the top of **Read Test Command** (seagull). The test chat shows in the dashboard inbox as «تجربة»; an order it places shows on the board — **/reset** removes it.\n### After import\n1. Pick the **Everwake DB** credential on the two Postgres nodes.\n2. On **Run The Agent (Main)** pick *Everwake — Main (Brain + Agent)* (it shows SET_AFTER_IMPORT).",
+        "content": "## Everwake · Test Runner — chat with an agent, nothing goes on WhatsApp\nOpen the chat (**Open chat** at the bottom) and write as a customer. The real **Main** workflow answers from a pretend number (200000000001), so you test exactly what customers get — but the replies are only recorded, no kitchen ticket is sent, and it works while the restaurant is still onboarding.\n**/reset** a brand-new customer · **/last** the latest turn again (when a long one timed out) · **/later 5 <message>** 5 hours pass first · **/pin 31.2,29.9** a location pin · **#2 <message>** a second pretend customer · **@slug <message>** another restaurant.\nThe restaurant to test is set at the top of **Read Test Command** (seagull). The test chat shows in the dashboard inbox as «تجربة»; an order it places shows on the board — **/reset** removes it.\n### After import\n1. Pick the **Everwake DB** credential on the two Postgres nodes.\n2. On **Run The Agent (Main)** pick *Everwake — Main (Brain + Agent)* (it shows SET_AFTER_IMPORT).",
         "width": 1500,
         "height": 380,
         "color": 6
@@ -40,7 +40,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "// =====================================================================\n// EVERWAKE — Test Runner · NODE: Read Test Command\n// Chat with a restaurant's agent as a pretend customer. The real Main\n// workflow answers; nothing is sent on WhatsApp.\n//\n//   any text                 a customer message\n//   /reset   (ريست)          forget the test chat: a brand-new customer\n//   /later 5 <message>       5 hours pass first (بعد 5 …), then the message\n//   /pin 31.2,29.9 [text]    a location pin (لوكيشن), with or without text\n//   #2 <message>             a second pretend customer (#1 … #99)\n//   @gleem <message>         another restaurant, by its slug\n// =====================================================================\nconst RESTAURANT = 'seagull';      // the slug (or English name) of the restaurant to test\nconst NAME = 'تجربة';              // the WhatsApp profile name the agent sees\n\nlet raw = String($input.first().json.chatInput ?? '').trim();\nlet restaurant = RESTAURANT, n = 1;\nlet m;\nif ((m = raw.match(/^@(\\S+)\\s*([\\s\\S]*)$/))) { restaurant = m[1]; raw = m[2].trim(); }\nif ((m = raw.match(/^#(\\d{1,2})\\s*([\\s\\S]*)$/))) { n = Math.min(Math.max(Number(m[1]), 1), 99); raw = m[2].trim(); }\n\nconst later = raw.match(/^\\/(?:later|بعد)\\s+(\\d+(?:\\.\\d+)?)\\s*([\\s\\S]*)$/i);\nif (later) raw = later[2].trim();\nconst reset = /^\\/?(reset|ريست)$/i.test(raw);\nconst pin = raw.match(/^\\/(?:pin|لوكيشن)\\s+(-?\\d+(?:\\.\\d+)?)\\s*[,،\\s]\\s*(-?\\d+(?:\\.\\d+)?)\\s*([\\s\\S]*)$/i);\nconst text = pin ? pin[3].trim() : (reset ? '' : raw);\n\nreturn [{\n  json: {\n    restaurant,\n    wa_id: '2000000000' + String(n).padStart(2, '0'),\n    push_name: NAME + (n > 1 ? ' ' + n : ''),\n    text,\n    location: pin ? { lat: Number(pin[1]), lng: Number(pin[2]) } : null,\n    reset,\n    later_hours: later ? Number(later[1]) : 0,\n    empty: !reset && !text && !pin\n  }\n}];\n"
+        "jsCode": "// =====================================================================\n// EVERWAKE — Test Runner · NODE: Read Test Command\n// Chat with a restaurant's agent as a pretend customer. The real Main\n// workflow answers; nothing is sent on WhatsApp.\n//\n//   any text                 a customer message\n//   /reset   (ريست)          forget the test chat: a brand-new customer\n//   /last    (آخر)           show the latest turn again, sending nothing\n//   /later 5 <message>       5 hours pass first (بعد 5 …), then the message\n//   /pin 31.2,29.9 [text]    a location pin (لوكيشن), with or without text\n//   #2 <message>             a second pretend customer (#1 … #99)\n//   @gleem <message>         another restaurant, by its slug\n// =====================================================================\nconst RESTAURANT = 'seagull';      // the slug (or English name) of the restaurant to test\nconst NAME = 'تجربة';              // the WhatsApp profile name the agent sees\n\nlet raw = String($input.first().json.chatInput ?? '').trim();\nlet restaurant = RESTAURANT, n = 1;\nlet m;\nif ((m = raw.match(/^@(\\S+)\\s*([\\s\\S]*)$/))) { restaurant = m[1]; raw = m[2].trim(); }\nif ((m = raw.match(/^#(\\d{1,2})\\s*([\\s\\S]*)$/))) { n = Math.min(Math.max(Number(m[1]), 1), 99); raw = m[2].trim(); }\n\nconst later = raw.match(/^\\/(?:later|بعد)\\s+(\\d+(?:\\.\\d+)?)\\s*([\\s\\S]*)$/i);\nif (later) raw = later[2].trim();\nconst reset = /^\\/?(reset|ريست)$/i.test(raw);\nconst last = /^\\/(last|آخر)$/i.test(raw);\nconst pin = raw.match(/^\\/(?:pin|لوكيشن)\\s+(-?\\d+(?:\\.\\d+)?)\\s*[,،\\s]\\s*(-?\\d+(?:\\.\\d+)?)\\s*([\\s\\S]*)$/i);\nconst text = pin ? pin[3].trim() : (reset || last ? '' : raw);\n\nreturn [{\n  json: {\n    restaurant,\n    wa_id: '2000000000' + String(n).padStart(2, '0'),\n    push_name: NAME + (n > 1 ? ' ' + n : ''),\n    text,\n    location: pin ? { lat: Number(pin[1]), lng: Number(pin[2]) } : null,\n    reset,\n    last,\n    later_hours: later ? Number(later[1]) : 0,\n    empty: !reset && !last && !text && !pin\n  }\n}];\n"
       },
       "id": "1ba862df-fe77-5d03-adaa-ec6ff61b9167"
     },
@@ -85,8 +85,8 @@
           },
           "conditions": [
             {
-              "id": "233bd34c-c6e8-5a53-a9b1-7c7c2186197e",
-              "leftValue": "={{ !$('Read Test Command').first().json.reset && !$('Read Test Command').first().json.empty }}",
+              "id": "6e11a425-46a0-597c-a753-0ce2bdb52efe",
+              "leftValue": "={{ !$('Read Test Command').first().json.reset && !$('Read Test Command').first().json.last && !$('Read Test Command').first().json.empty }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -101,6 +101,41 @@
         "options": {}
       },
       "id": "a1881853-435a-5e73-aeb1-aad0cbc8f4a5"
+    },
+    {
+      "name": "Route: Show The Last Turn?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        620,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a504bd5f-7121-598f-a099-1854042b1bc4",
+              "leftValue": "={{ $('Read Test Command').first().json.last === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "71bd26ea-b1ac-5306-a3c0-52904ae368ae"
     },
     {
       "name": "Fake WhatsApp Message",
@@ -126,9 +161,10 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "SET_AFTER_IMPORT",
+          "value": "vBnUIhpa3Tfwc0tn",
           "mode": "list",
-          "cachedResultName": "Everwake — Main (Brain + Agent)"
+          "cachedResultName": "Everwake — Main (Brain + Agent)",
+          "cachedResultUrl": "/workflow/vBnUIhpa3Tfwc0tn"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -164,7 +200,7 @@
         "operation": "executeQuery",
         "query": "select everwake.test_chat_result($1::uuid, $2::text, $3::timestamptz) as r;",
         "options": {
-          "queryReplacement": "={{ [ $('Prepare Test Chat').first().json.r.tenant_id, $('Prepare Test Chat').first().json.r.wa_id, $('Prepare Test Chat').first().json.r.since ] }}"
+          "queryReplacement": "={{ [ $('Prepare Test Chat').first().json.r.tenant_id, $('Prepare Test Chat').first().json.r.wa_id, $('Read Test Command').first().json.last ? ($('Prepare Test Chat').first().json.r.last_message_at || $('Prepare Test Chat').first().json.r.since) : $('Prepare Test Chat').first().json.r.since ] }}"
         }
       },
       "executeOnce": true,
@@ -179,7 +215,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "// =====================================================================\n// EVERWAKE — Test Runner · NODE: Format Test Result\n// What the chat (and whoever is testing) reads back: the reply exactly as\n// the customer would get it, then what the agent did and why.\n// =====================================================================\nconst cmd = $('Read Test Command').first().json;\nconst prep = $('Prepare Test Chat').first().json.r || {};\nconst res = ($input.first().json.r) || {};\nconst short = (v, n = 600) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return !s ? '' : s.length > n ? s.slice(0, n - 1) + '…' : s; };\n\nif (cmd.empty) return [{ json: { output: 'Type a customer message, or /reset, /later 5 <message>, /pin <lat>,<lng>.' } }];\nif (prep.reset) return [{ json: { output: `RESET — ${prep.restaurant}: the test chat ${prep.wa_id} starts from zero (a brand-new customer).` } }];\n\nlet route = null;\ntry { route = $('Run The Agent (Main)').first().json?.r?.route || null; } catch (e) { /* not run */ }\nconst replies = Array.isArray(res.replies) ? res.replies : [];\nconst said = replies.map(m => m.kind === 'text' ? m.text : `[${m.kind}] ${m.text || ''}`).join('\\n[[NEXT]]\\n');\nconst t = res.turn || {};\nconst b = t.plan && typeof t.plan === 'object' ? t.plan : null;\nconst plan = !b ? null : b.used ? `${b.stage} — ${b.objective}${b.place_order ? ' · PLACE' : ''}${b.show_summary ? ' · SUMMARY' : ''}` : `(no plan: ${b.error})`;\n\nconst lines = [\n  `${prep.later_hours ? `(${prep.later_hours} hours later) ` : ''}CUSTOMER: ${res.customer ?? cmd.text}`,\n  `AGENT: ${said || `(no reply — ${route && route !== 'agent' ? 'route ' + route : 'see the Main execution'})`}`,\n  '',\n  `${prep.restaurant} · ${prep.status}${res.mode === 'human' ? ' · A PERSON TOOK OVER' : ''} · stage=${t.stage ?? '-'} · ${t.seconds ?? '-'}s · ${t.tokens ?? '-'} tokens`,\n  `tools=${short(t.tools || [])}${(t.tool_problems || []).length ? ' · problems=' + short(t.tool_problems, 400) : ''}`,\n  (t.caught || []).length ? `caught=${short(t.caught, 800)}${t.rewritten ? ' → rewritten' : ''}` : 'caught=none',\n  `plan=${plan ?? '(none)'}`,\n  `branch=${res.branch ?? '-'} · cart=${short(res.cart || [])}`,\n  `details=${short(res.details || {}, 500)}`,\n  res.orders ? `orders=${short(res.orders)}` : '',\n  t.order_placed ? `ORDER PLACED ${t.order_placed} (no ticket sent to the kitchen in a test)` : '',\n  t.handoff && t.handoff.needed ? `HANDOFF: ${t.handoff.reason}` : ''\n].filter(l => l !== '');\nreturn [{ json: { output: lines.join('\\n'), reply: said || null } }];\n"
+        "jsCode": "// =====================================================================\n// EVERWAKE — Test Runner · NODE: Format Test Result\n// What the chat (and whoever is testing) reads back: the reply exactly as\n// the customer would get it, then what the agent did and why.\n// =====================================================================\nconst cmd = $('Read Test Command').first().json;\nconst prep = $('Prepare Test Chat').first().json.r || {};\nconst res = ($input.first().json.r) || {};\nconst short = (v, n = 600) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return !s ? '' : s.length > n ? s.slice(0, n - 1) + '…' : s; };\n\nif (cmd.empty) return [{ json: { output: 'Type a customer message, or /reset, /last, /later 5 <message>, /pin <lat>,<lng>.' } }];\nif (prep.reset) return [{ json: { output: `RESET — ${prep.restaurant}: the test chat ${prep.wa_id} starts from zero (a brand-new customer).` } }];\n\nlet route = null;\ntry { route = $('Run The Agent (Main)').first().json?.r?.route || null; } catch (e) { /* not run */ }\nconst replies = Array.isArray(res.replies) ? res.replies : [];\nconst said = replies.map(m => m.kind === 'text' ? m.text : `[${m.kind}] ${m.text || ''}`).join('\\n[[NEXT]]\\n');\nconst t = res.turn || {};\nconst b = t.plan && typeof t.plan === 'object' ? t.plan : null;\nconst plan = !b ? null : b.used ? `${b.stage} — ${b.objective}${b.place_order ? ' · PLACE' : ''}${b.show_summary ? ' · SUMMARY' : ''}` : `(no plan: ${b.error})`;\n\nconst lines = [\n  `${cmd.last ? '(the latest turn again) ' : ''}${prep.later_hours ? `(${prep.later_hours} hours later) ` : ''}CUSTOMER: ${res.customer ?? cmd.text}`,\n  `AGENT: ${said || `(no reply — ${route && route !== 'agent' ? 'route ' + route : 'see the Main execution'})`}`,\n  '',\n  `${prep.restaurant} · ${prep.status}${res.mode === 'human' ? ' · A PERSON TOOK OVER' : ''} · stage=${t.stage ?? '-'} · ${t.seconds ?? '-'}s · ${t.tokens ?? '-'} tokens`,\n  ...((t.calls || []).length\n    ? t.calls.map(c => `→ ${c.tool} ${short(c.asked, 220)} ⇒ ${c.status || '?'}${(c.problems || []).length ? ' ' + c.problems.join(',') : ''}`)\n    : [`tools=${short(t.tools || [])}`]),\n  (t.tool_problems || []).length ? `problems=${short(t.tool_problems, 400)}` : '',\n  t.agent_error ? `AGENT ERROR: ${t.agent_error}` : '',\n  (t.caught || []).length ? `caught=${short(t.caught, 800)}${t.rewritten ? ' → rewritten' : ''}` : 'caught=none',\n  `plan=${plan ?? '(none)'}`,\n  `branch=${res.branch ?? '-'} · cart=${short(res.cart || [])}`,\n  `details=${short(res.details || {}, 500)}`,\n  res.orders ? `orders=${short(res.orders)}` : '',\n  t.order_placed ? `ORDER PLACED ${t.order_placed} (no ticket sent to the kitchen in a test)` : '',\n  t.handoff && t.handoff.needed ? `HANDOFF: ${t.handoff.reason}` : ''\n].filter(l => l !== '');\nreturn [{ json: { output: lines.join('\\n'), reply: said || null } }];\n"
       },
       "id": "2bacc907-2b5b-5bf9-afad-72aa26c66652"
     }
@@ -224,6 +260,24 @@
         [
           {
             "node": "Fake WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route: Show The Last Turn?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Show The Last Turn?": {
+      "main": [
+        [
+          {
+            "node": "Load The Reply",
             "type": "main",
             "index": 0
           }

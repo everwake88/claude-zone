@@ -22,13 +22,26 @@
 //   EW_PG_CRED_ID       n8n Postgres credential id  (default EVERWAKE_DB)
 //   EW_OPENAI_CRED_ID   n8n OpenAI credential id    (default the Seagull one)
 //   EW_GEOCODE_URL      Google reverse-geocoder (Apps Script) URL
+//
+// n8n-ids.json (optional) holds the ids n8n gave the workflows, so the
+// tool nodes and the Test Runner are linked already after a re-import:
+//   { "main": "…", "cart": "…", "details": "…", "reservation": "…" }
+// (the id is in the workflow's address: …/workflow/<id>)
 // =====================================================================
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
+const IDS = existsSync(join(ROOT, 'n8n-ids.json')) ? JSON.parse(readFileSync(join(ROOT, 'n8n-ids.json'), 'utf8')) : {};
+const WF_KEY = { 'Everwake — Main (Brain + Agent)': 'main', 'Everwake — Tool: manage_cart': 'cart',
+                 'Everwake — Tool: save_customer_details': 'details', 'Everwake — Tool: manage_reservation': 'reservation' };
+const wfRef = (workflowName) => {
+  const id = IDS[WF_KEY[workflowName]];
+  return id ? { __rl: true, value: id, mode: 'list', cachedResultName: workflowName, cachedResultUrl: `/workflow/${id}` }
+            : { __rl: true, value: 'SET_AFTER_IMPORT', mode: 'list', cachedResultName: workflowName };
+};
 const MODEL = process.env.EW_MODEL || 'gpt-5.6-luna';
 const PG = { postgres: { id: process.env.EW_PG_CRED_ID || 'EVERWAKE_DB', name: 'Everwake DB' } };
 const OPENAI = { openAiApi: { id: process.env.EW_OPENAI_CRED_ID || 'CkjJoUDZ38ndmkPM', name: 'OpenAi account' } };
@@ -114,7 +127,7 @@ const tool = (name, workflowName, description, values, pos) => ({
   name, type: '@n8n/n8n-nodes-langchain.toolWorkflow', typeVersion: 2.2, position: pos,
   parameters: {
     description,
-    workflowId: { __rl: true, value: 'SET_AFTER_IMPORT', mode: 'list', cachedResultName: workflowName },
+    workflowId: wfRef(workflowName),
     workflowInputs: { mappingMode: 'defineBelow', value: values, matchingColumns: [], schema: toolInputSchema(Object.keys(values)),
                       attemptToConvertTypes: false, convertFieldsToString: false }
   } });
@@ -452,7 +465,7 @@ function buildTestRunner() {
   w.add(sticky('Sticky — Test Runner', [
     '## Everwake · Test Runner — chat with an agent, nothing goes on WhatsApp',
     'Open the chat (**Open chat** at the bottom) and write as a customer. The real **Main** workflow answers from a pretend number (200000000001), so you test exactly what customers get — but the replies are only recorded, no kitchen ticket is sent, and it works while the restaurant is still onboarding.',
-    '**/reset** a brand-new customer · **/later 5 <message>** 5 hours pass first · **/pin 31.2,29.9** a location pin · **#2 <message>** a second pretend customer · **@slug <message>** another restaurant.',
+    '**/reset** a brand-new customer · **/last** the latest turn again (when a long one timed out) · **/later 5 <message>** 5 hours pass first · **/pin 31.2,29.9** a location pin · **#2 <message>** a second pretend customer · **@slug <message>** another restaurant.',
     'The restaurant to test is set at the top of **Read Test Command** (seagull). The test chat shows in the dashboard inbox as «تجربة»; an order it places shows on the board — **/reset** removes it.',
     '### After import',
     '1. Pick the **Everwake DB** credential on the two Postgres nodes.',
@@ -463,20 +476,22 @@ function buildTestRunner() {
   w.add(code('Read Test Command', 'test_runner/read_command.js', [-40, 0]));
   w.add(pg('Prepare Test Chat', 'select everwake.test_chat_prepare($1::text, $2::text, $3::boolean, $4::numeric) as r;',
            '={{ [ $json.restaurant, $json.wa_id, $json.reset, $json.later_hours ] }}', [180, 0]));
-  w.add(iff('Route: A Message To Send?', "!$('Read Test Command').first().json.reset && !$('Read Test Command').first().json.empty", [400, 0]));
+  w.add(iff('Route: A Message To Send?', "!$('Read Test Command').first().json.reset && !$('Read Test Command').first().json.last && !$('Read Test Command').first().json.empty", [400, 0]));
+  w.add(iff('Route: Show The Last Turn?', "$('Read Test Command').first().json.last === true", [620, 140]));
   w.add(code('Fake WhatsApp Message', 'test_runner/fake_message.js', [620, -100]));
   w.add({ name: 'Run The Agent (Main)', type: 'n8n-nodes-base.executeWorkflow', typeVersion: 1.2, position: [840, -100],
           parameters: {
-            workflowId: { __rl: true, value: 'SET_AFTER_IMPORT', mode: 'list', cachedResultName: 'Everwake — Main (Brain + Agent)' },
+            workflowId: wfRef('Everwake — Main (Brain + Agent)'),
             workflowInputs: { mappingMode: 'defineBelow', value: {}, matchingColumns: [], schema: [], attemptToConvertTypes: false, convertFieldsToString: true },
             options: { waitForSubWorkflow: true } },
           alwaysOutputData: true, onError: 'continueRegularOutput' });
   w.add(pg('Load The Reply', 'select everwake.test_chat_result($1::uuid, $2::text, $3::timestamptz) as r;',
-           "={{ [ $('Prepare Test Chat').first().json.r.tenant_id, $('Prepare Test Chat').first().json.r.wa_id, $('Prepare Test Chat').first().json.r.since ] }}",
+           "={{ [ $('Prepare Test Chat').first().json.r.tenant_id, $('Prepare Test Chat').first().json.r.wa_id, $('Read Test Command').first().json.last ? ($('Prepare Test Chat').first().json.r.last_message_at || $('Prepare Test Chat').first().json.r.since) : $('Prepare Test Chat').first().json.r.since ] }}",
            [1060, -100], { executeOnce: true }));
   w.add(code('Format Test Result', 'test_runner/format_result.js', [1280, 0]));
   w.chain('Chat With The Agent (test)', 'Read Test Command', 'Prepare Test Chat', 'Route: A Message To Send?');
-  w.link('Route: A Message To Send?', 'Fake WhatsApp Message', 0); w.link('Route: A Message To Send?', 'Format Test Result', 1);
+  w.link('Route: A Message To Send?', 'Fake WhatsApp Message', 0); w.link('Route: A Message To Send?', 'Route: Show The Last Turn?', 1);
+  w.link('Route: Show The Last Turn?', 'Load The Reply', 0); w.link('Route: Show The Last Turn?', 'Format Test Result', 1);
   w.chain('Fake WhatsApp Message', 'Run The Agent (Main)', 'Load The Reply', 'Format Test Result');
   return w;
 }

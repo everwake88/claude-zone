@@ -56,6 +56,8 @@ const logRow = {
     brain: d.brain || null,
     tools_used: arr(d.tools_used),
     tool_problems: arr(d.tool_problems).slice(0, 10),
+    tool_calls: arr(d.tool_calls).slice(0, 10),
+    agent_error: d.agent_error || null,
     violations: arr(d.violations),
     repair_source: d.repair_source || null,
     order_placed_no: d.order_placed_no || null,

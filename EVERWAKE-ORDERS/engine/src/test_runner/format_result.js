@@ -8,7 +8,7 @@ const prep = $('Prepare Test Chat').first().json.r || {};
 const res = ($input.first().json.r) || {};
 const short = (v, n = 600) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return !s ? '' : s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
-if (cmd.empty) return [{ json: { output: 'Type a customer message, or /reset, /later 5 <message>, /pin <lat>,<lng>.' } }];
+if (cmd.empty) return [{ json: { output: 'Type a customer message, or /reset, /last, /later 5 <message>, /pin <lat>,<lng>.' } }];
 if (prep.reset) return [{ json: { output: `RESET — ${prep.restaurant}: the test chat ${prep.wa_id} starts from zero (a brand-new customer).` } }];
 
 let route = null;
@@ -20,11 +20,15 @@ const b = t.plan && typeof t.plan === 'object' ? t.plan : null;
 const plan = !b ? null : b.used ? `${b.stage} — ${b.objective}${b.place_order ? ' · PLACE' : ''}${b.show_summary ? ' · SUMMARY' : ''}` : `(no plan: ${b.error})`;
 
 const lines = [
-  `${prep.later_hours ? `(${prep.later_hours} hours later) ` : ''}CUSTOMER: ${res.customer ?? cmd.text}`,
+  `${cmd.last ? '(the latest turn again) ' : ''}${prep.later_hours ? `(${prep.later_hours} hours later) ` : ''}CUSTOMER: ${res.customer ?? cmd.text}`,
   `AGENT: ${said || `(no reply — ${route && route !== 'agent' ? 'route ' + route : 'see the Main execution'})`}`,
   '',
   `${prep.restaurant} · ${prep.status}${res.mode === 'human' ? ' · A PERSON TOOK OVER' : ''} · stage=${t.stage ?? '-'} · ${t.seconds ?? '-'}s · ${t.tokens ?? '-'} tokens`,
-  `tools=${short(t.tools || [])}${(t.tool_problems || []).length ? ' · problems=' + short(t.tool_problems, 400) : ''}`,
+  ...((t.calls || []).length
+    ? t.calls.map(c => `→ ${c.tool} ${short(c.asked, 220)} ⇒ ${c.status || '?'}${(c.problems || []).length ? ' ' + c.problems.join(',') : ''}`)
+    : [`tools=${short(t.tools || [])}`]),
+  (t.tool_problems || []).length ? `problems=${short(t.tool_problems, 400)}` : '',
+  t.agent_error ? `AGENT ERROR: ${t.agent_error}` : '',
   (t.caught || []).length ? `caught=${short(t.caught, 800)}${t.rewritten ? ' → rewritten' : ''}` : 'caught=none',
   `plan=${plan ?? '(none)'}`,
   `branch=${res.branch ?? '-'} · cart=${short(res.cart || [])}`,

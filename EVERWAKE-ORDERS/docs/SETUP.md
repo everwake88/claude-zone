@@ -118,6 +118,7 @@ The workflows are generated. To change the engine:
 3. Re-import the changed workflow.
 
 `EW_MODEL`, `EW_PG_CRED_ID` and `EW_OPENAI_CRED_ID` set the model and credential ids at build time.
+`engine/n8n-ids.json` holds the ids n8n gave Main and the three tools (`{ "main": "…", "cart": "…", "details": "…", "reservation": "…" }`, from each workflow's address). With it, a re-imported Main keeps its tools linked: without it the tool nodes say `SET_AFTER_IMPORT` again and the agent can't touch the cart.
 
 ## 4. Each WhatsApp number (Evolution)
 

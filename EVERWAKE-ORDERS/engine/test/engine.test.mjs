@@ -640,3 +640,23 @@ test('the Test Runner: a pretend customer reaches the agent while onboarding, no
     await db.query(`update everwake.tenants set status = $2 where id = $1`, [tenant, was]);
   }
 });
+
+test('what the stress test caught: Franco gets Arabic, no semicolons, EGP in English, no "تحبّي/تحب", the rewrite knows nothing was added', async () => {
+  const phone = '201099995555';
+  let t = await turn(db, evolutionPayload({ phone, text: '3ayez a3raf el menu w el as3ar' }), async () => ({
+    plan: { read: 'franco', stage: 'discovery', objective: 'answer', actions: [] },
+    reply: quiet('Our grilled chicken is 260ج; delivery is 20ج.', { language: 'en' })
+  }));
+  assert.match(t.brief.facts_text, /Franco-Arabic.*answer in Egyptian Arabic/);
+  assert.deepEqual(t.checked.decision.reply_messages, ['Our grilled chicken is EGP 260. delivery is EGP 20.']);
+
+  t = await turn(db, evolutionPayload({ phone, text: 'عايز رز' }), async () => ({
+    plan: { read: 'rice', stage: 'ordering', objective: 'ask', actions: [] },
+    reply: quiet('تمام، رز سي فود 😊 تحبّي/تحب حاجة تانية؟'),
+    rewrite: ['تحب رز سي فود ولا سادة؟']
+  }));
+  const v = t.nodes['Check Reply'].violations.join('\n');
+  assert.match(v, /two forms with a slash/);
+  assert.match(t.nodes['Build Rewrite Request'].rewrite_prompt, /no tool ran this turn, so nothing was added/);
+  assert.deepEqual(t.checked.decision.reply_messages, ['تحب رز سي فود ولا سادة؟']);
+});

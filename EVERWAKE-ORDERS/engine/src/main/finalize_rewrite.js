@@ -56,16 +56,16 @@ if (!messages.length) { messages = d.decision.reply_messages || []; source = 'or
 // last resort: drop only the lines that still break a rail
 messages = messages.map(m => m.split('\n').filter(line => !badLine(line)).join('\n').replace(/\n{3,}/g, '\n\n').trim()).filter(Boolean);
 if (!messages.length) {
-  const en = /English/.test(d.language_hint || '');
+  const en = /^English/.test(d.language_hint || '');
   messages = [en ? 'One moment please, let me check that for you 🙏' : 'ثانية واحدة أتأكدلك من الحتة دي 🙏'];
   source = 'fallback';
 }
 if (d.pay_link && !messages.join('\n').includes(d.pay_link)) {
-  const en = /English/.test(d.language_hint || '');
+  const en = /^English/.test(d.language_hint || '');
   messages[messages.length - 1] += en ? `\nPayment link: ${d.pay_link}` : `\nلينك الدفع: ${d.pay_link}`;
 }
 if (ref && !messages.join('\n').includes(ref)) {
-  const en = /English/.test(d.language_hint || '');
+  const en = /^English/.test(d.language_hint || '');
   messages[messages.length - 1] += en ? `\nBooking reference: ${ref}` : `\nرقم طلب الحجز: ${ref}`;
 }
 

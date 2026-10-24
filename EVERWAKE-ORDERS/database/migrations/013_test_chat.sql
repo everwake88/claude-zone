@@ -13,7 +13,8 @@
 --                      "/reset" forgets the test chat (as if it never
 --                      wrote), "/later N" moves it N hours into the past
 --   test_chat_result   what the agent did with the last message: its
---                      reply, its plan, the tools, what the checks caught
+--                      reply, its plan, each tool call and its answer,
+--                      what the checks caught
 --
 -- Only the database owner (n8n's connection) can run them.
 -- =====================================================================
@@ -85,7 +86,9 @@ begin
     'tenant_id', t.id, 'restaurant', t.name_ar, 'slug', t.slug, 'status', t.status,
     'instance', ch.instance_name, 'token', ch.webhook_token, 'wa_id', p_wa,
     'reset', coalesce(p_reset, false), 'later_hours', greatest(coalesce(p_later_hours, 0), 0),
-    'since', now());
+    'since', now(),
+    'last_message_at', (select max(created_at) from everwake.messages
+                         where tenant_id = t.id and wa_id = p_wa and direction = 'inbound'));
 end $$;
 
 create or replace function everwake.test_chat_result(p_tenant uuid, p_wa text, p_since timestamptz)
@@ -113,6 +116,7 @@ begin
               'tokens', coalesce(ev.prompt_tokens, 0) + coalesce(ev.completion_tokens, 0),
               'plan', ev.output -> 'brain', 'tools', ev.output -> 'tools_used', 'tool_problems', ev.output -> 'tool_problems',
               'caught', ev.output -> 'violations', 'rewritten', ev.repair_used,
+              'calls', ev.output -> 'tool_calls', 'agent_error', ev.output ->> 'agent_error',
               'order_placed', ev.output ->> 'order_placed_no', 'handoff', ev.output -> 'handoff') end,
     'mode', conv.mode,
     'details', conv.state -> 'customer',

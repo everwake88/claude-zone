@@ -40,6 +40,8 @@ decision = obj(decision);
 // ---- what the tools did ----------------------------------------------------------
 const steps = arr(agent.intermediateSteps ?? agent.intermediate_steps);
 const toolsUsed = [];
+const toolCalls = [];   // for the log: what each call asked and what came back
+const agentError = agent.error ? str(obj(agent.error).message || agent.error).slice(0, 300) : null;
 let placedNo = null, placedTotal = null;
 const toolNumbers = [];
 const toolProblems = [];
@@ -52,8 +54,14 @@ for (const st of steps) {
   let o = obj(st).observation;
   try { o = typeof o === 'string' ? JSON.parse(o) : o; } catch (e) { o = null; }
   if (Array.isArray(o)) o = o[0];
+  if (o && typeof o === 'object' && o.response && typeof o.response === 'string') { try { o = JSON.parse(o.response); } catch (e) {} }
+  if (tool) {
+    const input = obj(obj(st).action).toolInput;
+    toolCalls.push({ tool, asked: (typeof input === 'string' ? input : JSON.stringify(input ?? '')).slice(0, 300),
+                     status: o && typeof o === 'object' ? str(o.status) || null : 'unreadable',
+                     problems: o && typeof o === 'object' ? arr(o.problems).map(p => str(obj(p).code || p)).slice(0, 6) : [] });
+  }
   if (!o || typeof o !== 'object') continue;
-  if (o.response && typeof o.response === 'string') { try { o = JSON.parse(o.response); } catch (e) {} }
   if (tool === 'manage_reservation') {
     // the booking's day, time, guests, phone and reference are facts the host may repeat
     bookingTexts.push(JSON.stringify(o));
@@ -86,9 +94,13 @@ messages = messages.map(m => {
     .replace(/\*\*(.+?)\*\*/g, '*$1*')           // WhatsApp bold is one asterisk
     .replace(/^#{1,6}\s+/gm, '')                  // no markdown headings
     .replace(/\[\[\s*NEXT\s*\]\]/g, '')
+    .replace(/\s*[؛;](?=\s)/g, '.')                // nobody types a semicolon on WhatsApp
     .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }).filter(Boolean);
 if (messages.length > 2) messages = [messages[0], messages.slice(1).join('\n\n')];
+// an English reply says EGP 30, not 30ج
+messages = messages.map(m => /[\u0600-\u06FF]/.test(m.replace(/(\d)\s*ج(?![\u0600-\u06FF])/g, '$1'))
+  ? m : m.replace(/(\d[\d,.]*)\s*ج(?![\u0600-\u06FF])/g, 'EGP $1'));
 
 // ---- facts after the tools ---------------------------------------------------------------
 const state = obj(db.state);
@@ -197,9 +209,11 @@ const leak = joined.match(LEAK);
 if (leak) violations.push(`The reply shows an internal code or word ("${leak[0]}") — say it in plain words for the customer.`);
 
 // sounding like a system, not a person (Arabic words have no \b: letters on either side end the match)
-const SYSTEM_TALK = /(?<!\p{L})(العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
+const SYSTEM_TALK = /(?<!\p{L})(الفريق المختص|طلب نشط|المساعدة الافتراضية|الأسعار الإرشادية|التلامس العرضي|العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
 const sys = joined.match(SYSTEM_TALK);
 if (sys) violations.push(`The reply sounds like a system ("${sys[1]}"). Say it the way a person at the restaurant would on WhatsApp ("الأوردر"، "طلبك"، "كده عندك…"، "أأكدلك الأوردر؟").`);
+const bothForms = joined.match(/[\u0600-\u06FF]\s*\/\s*[\u0600-\u06FF]/);
+if (bothForms) violations.push('The reply writes two forms with a slash (like "تحبّي/تحب"). Pick one: masculine for the customer unless they showed they are a woman.');
 const intlPhone = joined.match(/(?<!\d)\+?201\d{9}(?!\d)/);
 if (intlPhone) violations.push(`Write the phone number the local way: ${intlPhone[0].replace(/^\+?20/, '0')}, not ${intlPhone[0]}.`);
 const decimalKilo = joined.match(/(?<![\d.])0?\.(25|5|75)\s*(كيلو|ك)(?!\p{L})/u);
@@ -286,6 +300,8 @@ return [{
     },
     tools_used: toolsUsed,
     tool_problems: toolProblems,
+    tool_calls: toolCalls,
+    agent_error: agentError,
     order_placed_no: placedNo,
     booking_requested_ref: bookingRef,
     booking_confirmed: confirmedBooking,
