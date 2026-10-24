@@ -488,6 +488,20 @@ if (action === 'apply_code') {
   }
 }
 
+// the same add sent twice in one turn (the model repeating a call) goes in once
+const addSig = action === 'add'
+  ? JSON.stringify(patchItems.map(p => [str(obj(p).menu_id).toUpperCase() || str(obj(p).item_name), num(obj(p).quantity, 1),
+                                        JSON.stringify(obj(p).choices || null), str(obj(p).notes)]))
+  : null;
+const lastLog = prevCartLog[prevCartLog.length - 1];
+if (addSig && lastLog && lastLog.action === 'add' && lastLog.sig === addSig
+    // the same turn: after the last turn ended (state.last_turn_at), so "one more of those" in a new message still adds
+    && (!str(state.last_turn_at) || new Date(str(lastLog.at)) > new Date(str(state.last_turn_at)))
+    && Date.now() - new Date(str(lastLog.at)).getTime() < 3 * 60 * 1000) {
+  cartErrors.push({ code: 'ALREADY_ADDED', note: 'this exact add went in a moment ago — not added twice; the cart below is the truth' });
+  effective = 'summary';
+}
+
 // =========================================================================
 // cart actions
 // =========================================================================
@@ -804,7 +818,7 @@ const ledgerPatch = {
   pending_items: pendingAfter,
   line_seq: lineSeq,
   promo_codes: promoCodes,
-  cart_log: prevCartLog.concat([{ at: nowIso, action, branch: targetBranchId || null, lines: items.length, subtotal }]).slice(-15)
+  cart_log: prevCartLog.concat([{ at: nowIso, action, branch: targetBranchId || null, lines: items.length, subtotal, ...(addSig ? { sig: addSig } : {}) }]).slice(-15)
 };
 const statePatch = {};
 if (branchSetBy) {

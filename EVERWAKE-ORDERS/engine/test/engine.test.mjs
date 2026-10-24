@@ -968,3 +968,29 @@ test('browsing: a few highlights with prices, not the whole section; "كم كي�
   assert.match(t2.nodes['Check Reply'].violations.join('\n'), /without their prices/);
   assert.match(t2.checked.decision.reply_messages.join('\n'), /كام كيلو/);
 });
+
+test('the same add twice in a row goes in once', async () => {
+  const phone = '201099990233';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  const r = await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  assert.equal(r.cart.find(l => l.menu_id === 'M007').quantity, 1, JSON.stringify(r.cart));
+  assert.ok((r.problems || []).some(p => p.code === 'ALREADY_ADDED'));
+  const r2 = await manageCart(db, intake, 'add', [{ menu_id: 'M001', quantity: 0.5 }]);
+  assert.ok(r2.cart.some(l => l.menu_id === 'M001'), 'a different dish still goes in');
+});
+
+test('"one more of the same" in a new message still adds', async () => {
+  const phone = '201099990244';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  // the turn ended
+  await db.query(`update everwake.conversations set state = state || jsonb_build_object('last_turn_at', now()::text)
+                   where wa_id = $1`, [intake.wa_id]);
+  const r = await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  assert.equal(r.cart.find(l => l.menu_id === 'M007').quantity, 2, JSON.stringify(r.cart));
+});
