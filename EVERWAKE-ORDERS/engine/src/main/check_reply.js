@@ -248,7 +248,7 @@ const leak = joined.match(LEAK);
 if (leak) violations.push(`The reply shows an internal code or word ("${leak[0]}") — say it in plain words for the customer.`);
 
 // sounding like a system, not a person (Arabic words have no \b: letters on either side end the match)
-const SYSTEM_TALK = /(?<!\p{L})(لو وُجدت|لو وجدت|إن وجدت|ان وجدت|إن وُجدت|الرسوم المقررة|الخطوة الجاية|الخطوة التالية|بيانات السواق|بيانات الطيار|ظاهر عندي|ظاهرين عندي|ظاهرة عندي|بيانات سواق|بيانات تتبع|الفريق المختص|طلب نشط|المساعدة الافتراضية|الأسعار الإرشادية|التلامس العرضي|العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
+const SYSTEM_TALK = /(?<!\p{L})(لو وُجدت|لو وجدت|إن وجدت|ان وجدت|إن وُجدت|الرسوم المقررة|الخطوة الجاية|الخطوة التالية|بيانات السواق|بيانات الطيار|ظاهر عندي|ظاهرين عندي|ظاهرة عندي|مش ظاهر|مش ظاهرة|مش ظاهر له|مش ظاهر في المنيو|بيانات سواق|بيانات تتبع|الفريق المختص|طلب نشط|المساعدة الافتراضية|الأسعار الإرشادية|التلامس العرضي|العربة|عربة التسوق|السلة|النظام|تم التسجيل|تمت الإضافة|تمت اضافة|تم الحفظ|تم إضافة|تم اضافة|أثبت الأوردر|اثبت الاوردر|أثبت الطلب|اثبت الطلب|تثبيت الطلب|تثبيت الأوردر|تثبيت الاوردر|البيانات المسجلة|رقم الواتساب المسجل)(?!\p{L})/u;
 const sys = joined.match(SYSTEM_TALK);
 if (sys) violations.push(`The reply sounds like a system ("${sys[1]}"). Say it the way a person at the restaurant would on WhatsApp ("الأوردر"، "طلبك"، "كده عندك…"، "أأكدلك الأوردر؟").`);
 // a tool whose last call failed did nothing: the reply must not say it did
@@ -323,7 +323,7 @@ let sendMenu = decision.send_menu_images === true || String(decision.send_menu_i
 if (sendMenu && (joined.match(/\d+(?:\.\d+)?\s*ج/g) || []).length > 4)
   violations.push('The menu pictures are going out with this reply — do not write the menu out again. One short line pointing to them (a highlight or a price range at most) and one question.');
 // VAT is for the summary, not for browsing
-if (decision.showed_order_summary !== true && !items.length && /ضريبة|القيمة المضافة|VAT/i.test(joined) && !/ضريبة|ضرايب|VAT|tax/i.test(str(pre.customer_message)))
+if (decision.showed_order_summary !== true && !placedNo && !/الإجمالي|الاجمالي|total/i.test(joined) && /ضريبة|القيمة المضافة|VAT/i.test(joined) && !/ضريبة|ضرايب|VAT|tax/i.test(str(pre.customer_message)))
   violations.push('Do not bring up VAT while they are choosing — it belongs in the order summary (or when they ask about it).');
 if (sendMenu && !pagesHere) {
   sendMenu = false;

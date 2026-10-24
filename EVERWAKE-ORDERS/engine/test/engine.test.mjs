@@ -907,3 +907,17 @@ test('a dish this branch lacks: other branches are offered only if they can take
   p = r.problems.find(x => x.code === 'NOT_ON_THIS_BRANCH_MENU');
   assert.ok(p.available_at.includes('الزمالك'), JSON.stringify(p));
 });
+
+test('"كاليماري مقلي": no menu talk, no VAT while choosing, even with dishes in', async () => {
+  const phone = '201099990166';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  const t = await turn(db, evolutionPayload({ phone, text: 'وكمان واحدة مقلية' }), async () => ({
+    plan: { read: 'x', stage: 'ordering', objective: 'x', actions: [] },
+    reply: quiet('مقلي مش ظاهر في المنيو. تحب واحدة بـ240ج قبل الضريبة؟'), rewrite: ['حاضر 👌 تحب حاجة تانية؟'] }));
+  const v = t.nodes['Check Reply'].violations.join('\n');
+  assert.match(v, /VAT while they are choosing/);
+  assert.match(v, /مش ظاهر/);
+});
