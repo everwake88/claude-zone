@@ -138,6 +138,16 @@ if (action === 'reorder_last') {
   effective = 'add';
 }
 
+// an add that names the branch while none is set yet: set it in the same call (two calls at
+// once — set_branch and add — would race, and the add would find no branch)
+if (['add', 'replace'].includes(effective) && !targetBranchId && str(db.requested_branch_id)) {
+  const br = branchById(str(db.requested_branch_id));
+  if (br && br.accepting_orders !== false) {
+    targetBranchId = str(br.id);
+    lookup = obj(db.requested_lookup);
+    branchSetBy = 'agent';
+  }
+}
 if (['add', 'update', 'remove', 'replace'].includes(effective) && !targetBranchId) {
   // nothing is priced until the branch is known: each can have its own menu and prices
   const wanted = patchItems.map(p => {

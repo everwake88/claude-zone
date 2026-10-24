@@ -937,3 +937,13 @@ test('"كيلو *كاليماري بالكيلو*" loses the second بالكيل
     reply: quiet('كيلو *كفتة بالكيلو* — 480ج\nنص كيلو *طرب بالكيلو* حار — 260ج') }));
   assert.deepEqual(t2.checked.decision.reply_messages, ['كيلو *كفتة* — 480ج\nنص كيلو *طرب* حار — 260ج']);
 });
+
+test('the first add can carry the branch: one call, no race with set_branch', async () => {
+  const phone = '201099990188';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  const r = await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }], 'المعادي');
+  assert.equal(r.status, 'DONE', JSON.stringify(r));
+  assert.equal(r.branch, 'المعادي');
+  assert.ok(r.cart.some(l => l.menu_id === 'M007'));
+});

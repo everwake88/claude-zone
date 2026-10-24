@@ -240,7 +240,7 @@ function buildMain() {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
     action: "={{ $fromAI('action', 'Exactly one of: add, update, remove, replace, clear, set_branch, reorder_last, apply_code, summary, place_order', 'string') }}",
-    branch: "={{ $fromAI('branch', 'Only for set_branch: the branch code or name from THE BRANCHES. Leave it out for every other action.', 'string', 'none') }}",
+    branch: "={{ $fromAI('branch', 'For set_branch, or with the first add while no branch is set (one call, never set_branch and add at once): the branch code or name from THE BRANCHES. Leave it out otherwise.', 'string', 'none') }}",
     items: "={{ $fromAI('items', 'The dishes this action touches: a list like [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]. For apply_code: [{\"promo_code\":\"THE CODE\"}]. Leave it out (never an empty list) for clear, set_branch, reorder_last and place_order. Never include prices.', 'json', [{}]) }}"
   }, [1560, 720]));
   w.add(tool('save_customer_details', 'Everwake — Tool: save_customer_details', prompt('tool_save_details.md'), {

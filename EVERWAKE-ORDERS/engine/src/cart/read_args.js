@@ -35,6 +35,6 @@ return [{
       const list = Array.isArray(v) ? v : (v && typeof v === 'object' ? [v] : []);
       return JSON.stringify(list.filter(x => x && typeof x === 'object' && Object.keys(x).length));
     })(a.items_json !== undefined ? a.items_json : (t.items_json !== undefined ? t.items_json : '[]')),
-    branch_id: action === 'set_branch' || action === 'reorder_last' ? branch : ''
+    branch_id: ['set_branch', 'reorder_last', 'add', 'replace'].includes(action) ? branch : ''   // an add may carry the branch: one call, no race
   }
 }];
