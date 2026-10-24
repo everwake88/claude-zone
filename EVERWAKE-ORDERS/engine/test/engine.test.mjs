@@ -835,3 +835,21 @@ test('the client\'s test: an empty order is not the moment for name and number; 
   }));
   assert.deepEqual(t2.checked.decision.reply_messages, ['ابعتلي اللوكيشن أو اسم المنطقة']);
 });
+
+test('browsing: the menu is not written out under the pictures; no VAT talk before the summary', async () => {
+  const t = await turn(db, evolutionPayload({ phone: '201099990099', text: 'عندكو ايه؟' }), async (brief) => ({
+    plan: { read: 'menu', stage: 'discovery', objective: 'menu', actions: [] },
+    reply: quiet('الأسعار قبل ضريبة القيمة المضافة 14%:\nكفتة 480ج\nريش 950ج\nفرخة 260ج\nساندوتش 95ج\nبطاطس 35ج'),
+    rewrite: ['ده اللي عندنا 👇 تحب تبدأ بإيه؟']
+  }));
+  assert.match(t.nodes['Check Reply'].violations.join('\n'), /VAT while they are choosing/);
+});
+
+test('no script: the same filler opening two replies in a row is dropped the second time', async () => {
+  const phone = '201099990111';
+  await turn(db, evolutionPayload({ phone, text: 'كيلو كفتة' }), async () => ({
+    plan: { read: 'x', stage: 'ordering', objective: 'x', actions: [] }, reply: quiet('حلو، الكفتة عندك 👌 تحب حاجة تانية؟') }));
+  const t = await turn(db, evolutionPayload({ phone, text: 'بس كده' }), async () => ({
+    plan: { read: 'x', stage: 'details', objective: 'x', actions: [] }, reply: quiet('حلو، نكلمك على نفس الرقم ده؟') }));
+  assert.deepEqual(t.checked.decision.reply_messages, ['نكلمك على نفس الرقم ده؟']);
+});

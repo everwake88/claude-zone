@@ -109,6 +109,14 @@ messages = messages.map(m => {
     .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }).filter(Boolean);
 if (messages.length > 2) messages = [messages[0], messages.slice(1).join('\n\n')];
+// the same filler opening two replies in a row reads like a script: drop it the second time
+{
+  const OPENERS = /^(حلو|تمام|ماشي|أكيد|اكيد|تحت أمرك|على عيني|جميل|طيب)(?=[\s،,!.😊👌🙏])[\s،,!.]*/u;
+  const lastOut = arr(ctx.recent_messages).filter(m => m.direction === 'outbound').map(m => str(m.text || m.body)).pop() || '';
+  const prev = (lastOut.trim().match(OPENERS) || [])[1];
+  const now = messages.length ? (messages[0].match(OPENERS) || [])[1] : null;
+  if (prev && now && prev === now && messages[0].replace(OPENERS, '').trim()) messages[0] = messages[0].replace(OPENERS, '').trim();
+}
 // an English reply says EGP 30, not 30ج
 messages = messages.map(m => /[\u0600-\u06FF]/.test(m.replace(/(\d)\s*ج(?![\u0600-\u06FF])/g, '$1'))
   ? m : m.replace(/(\d[\d,.]*)\s*ج(?![\u0600-\u06FF])/g, 'EGP $1'));
@@ -292,6 +300,12 @@ if (bad.length) violations.push(`These numbers are not prices, totals or details
 const pages = obj(media.menu_pages);
 const pagesHere = branchId ? (num(pages[branchId]) || num(pages.all)) : num(pages.all);
 let sendMenu = decision.send_menu_images === true || String(decision.send_menu_images).toLowerCase() === 'true';
+// the pictures are the menu: the text with them is a line and a question, not the menu again
+if (sendMenu && (joined.match(/\d+(?:\.\d+)?\s*ج/g) || []).length > 4)
+  violations.push('The menu pictures are going out with this reply — do not write the menu out again. One short line pointing to them (a highlight or a price range at most) and one question.');
+// VAT is for the summary, not for browsing
+if (decision.showed_order_summary !== true && !items.length && /ضريبة|القيمة المضافة|VAT/i.test(joined) && !/ضريبة|ضرايب|VAT|tax/i.test(str(pre.customer_message)))
+  violations.push('Do not bring up VAT while they are choosing — it belongs in the order summary (or when they ask about it).');
 if (sendMenu && !pagesHere) {
   sendMenu = false;
   if (/(المنيو|منيو|menu)/i.test(joined) && /(👆|👇|اهو|أهو|اهي|أهي|اتفضل|بعتلك|here)/i.test(joined)) {

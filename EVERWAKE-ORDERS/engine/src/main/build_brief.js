@@ -311,7 +311,7 @@ const isFirstReply = !spokeBefore || (gapH !== null && gapH >= 12);
 // a pin, a voice note or a photo has no words of theirs: "[shared a location pin]"
 // is our marker, not English — the language they used before decides
 const ownWords = customerText.replace(/\[[a-z ]+\]/gi, ' ');
-const earlierWords = ownWords.trim() ? '' : recent.filter(m => m.direction === 'inbound').map(m => str(m.body)).join(' ').replace(/\[[a-z ]+\]/gi, ' ');
+const earlierWords = ownWords.trim() ? '' : recent.filter(m => m.direction === 'inbound').map(m => str(m.text || m.body)).join(' ').replace(/\[[a-z ]+\]/gi, ' ');
 const langText = ownWords.trim() ? ownWords : earlierWords;
 const ar = (langText.match(/[؀-ۿ]/g) || []).length;
 const la = (langText.match(/[A-Za-z]/g) || []).length;
@@ -453,7 +453,9 @@ const business = [
 ].filter(x => x !== '').join('\n');
 
 // ---- MENU ------------------------------------------------------------------------------------------------------
-let menuText = str(ctx.menu_digest);
+// a choice with a preparation charge the branch sets: a marker for the host, not words to read out
+let menuText = str(ctx.menu_digest).replace(/\s*\(\+رسوم تسوية يحددها الفرع\)/g, ' †');
+if (menuText.includes('†')) menuText = '† = a preparation charge the branch sets. Never mention it while they choose; only in the summary, briefly, if they picked it.\n\n' + menuText;
 if (branchId) {
   const here = menuItems;
   const elsewhere = Object.entries(obj(allLookup.items))
