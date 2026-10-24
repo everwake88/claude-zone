@@ -1285,4 +1285,12 @@ export const AR: Record<string, string> = {
   "{a} pages": "{a} صفحات",
   "{a} answers": "{a} إجابات",
   "{a} orders so far": "{a} طلبات لحد دلوقتي",
+  // removing a WhatsApp number
+  "Remove {name}?": "إزالة {name}؟",
+  "Remove the number": "شيل الرقم",
+  "Number removed — chats and orders are kept": "اتشال الرقم — المحادثات والطلبات محفوظة",
+  "Customers who write to this number will no longer reach the agent, and nothing more is sent from it.": "العملاء اللي هيكلموا الرقم ده مش هيوصلوا للمساعد، ومفيش حاجة هتتبعت منه تاني.",
+  "Kept: every chat, order and message. Replies still waiting to be sent go out from your other number, if you have one.": "هيفضل محفوظ: كل المحادثات والطلبات والرسايل. والردود اللي لسه مستنية تتبعت هتطلع من رقمك التاني، لو عندك.",
+  "This is your only number and you are live: after this, the agent answers no one on WhatsApp until you connect a number again.": "ده رقمك الوحيد وانت شغّال: بعد كده المساعد مش هيرد على حد على الواتساب لحد ما توصّل رقم تاني.",
+  "The number stays linked in Evolution (instance {instance}). To stop it completely, delete the instance or its webhook there too.": "الرقم هيفضل مربوط في Evolution (الـ instance {instance}). عشان توقفه خالص، امسح الـ instance أو الـ webhook بتاعه من هناك كمان.",
 };

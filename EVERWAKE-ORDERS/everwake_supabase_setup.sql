@@ -3680,6 +3680,31 @@ begin
                             'has_api_key', c.api_key is not null, 'status', c.status);
 end $$;
 
+-- remove a WhatsApp number. Chats, orders and messages stay (they only lose the
+-- link to it); replies still waiting to be sent go out from the restaurant's
+-- other number, if it has one. Messages arriving later for its instance are ignored.
+create or replace function everwake.remove_channel(p_channel uuid)
+returns jsonb language plpgsql security definer set search_path = everwake, pg_temp as $$
+declare
+  c       everwake.whatsapp_channels%rowtype;
+  v_other uuid;
+  n       int := 0;
+begin
+  select * into c from everwake.whatsapp_channels where id = p_channel;
+  if not found then raise exception 'number not found'; end if;
+  perform everwake.require_role(c.tenant_id, array['owner', 'manager']);
+  select id into v_other from everwake.whatsapp_channels
+   where tenant_id = c.tenant_id and id <> c.id and is_active
+   order by created_at limit 1;
+  if v_other is not null then
+    update everwake.outbox set channel_id = v_other where channel_id = c.id and status = 'queued';
+    get diagnostics n = row_count;
+  end if;
+  delete from everwake.whatsapp_channels where id = c.id;
+  return jsonb_build_object('removed', c.id, 'instance_name', c.instance_name,
+                            'other_number', v_other is not null, 'queued_moved', n);
+end $$;
+
 -- the webhook token is needed once, to paste the webhook URL into Evolution
 create or replace function everwake.channel_webhook_token(p_channel uuid)
 returns text language plpgsql stable security definer set search_path = everwake, pg_temp as $$
@@ -3899,7 +3924,7 @@ grant execute on function
   everwake.onboarding_checklist(uuid), everwake.go_live(uuid, boolean),
   everwake.publish_menu(uuid, jsonb, text, uuid, uuid), everwake.save_item_choices(uuid, jsonb),
   everwake.analytics(uuid, timestamptz, timestamptz),
-  everwake.save_channel(uuid, jsonb), everwake.channel_webhook_token(uuid),
+  everwake.save_channel(uuid, jsonb), everwake.remove_channel(uuid), everwake.channel_webhook_token(uuid),
   everwake.invite_member(uuid, text, text, uuid[]), everwake.accept_invites(),
   everwake.update_member(uuid, uuid, text, uuid[], text), everwake.remove_member(uuid, uuid),
   everwake.set_agent_enabled(uuid, boolean, text, boolean), everwake.pause_status(uuid),

@@ -97,7 +97,7 @@ grant execute on function
   everwake.onboarding_checklist(uuid), everwake.go_live(uuid, boolean),
   everwake.publish_menu(uuid, jsonb, text, uuid, uuid), everwake.save_item_choices(uuid, jsonb),
   everwake.analytics(uuid, timestamptz, timestamptz),
-  everwake.save_channel(uuid, jsonb), everwake.channel_webhook_token(uuid),
+  everwake.save_channel(uuid, jsonb), everwake.remove_channel(uuid), everwake.channel_webhook_token(uuid),
   everwake.invite_member(uuid, text, text, uuid[]), everwake.accept_invites(),
   everwake.update_member(uuid, uuid, text, uuid[], text), everwake.remove_member(uuid, uuid),
   everwake.set_agent_enabled(uuid, boolean, text, boolean), everwake.pause_status(uuid),

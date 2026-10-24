@@ -1,5 +1,5 @@
 'use client';
-import { Copy, Plug, Plus, QrCode, RefreshCw, Send, Webhook } from 'lucide-react';
+import { Copy, Plug, Plus, QrCode, RefreshCw, Send, Trash2, Webhook } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Card, Empty, Field, Input, Modal, Select, Spinner, useAction, useToast } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
@@ -20,6 +20,7 @@ export default function WhatsAppSettings() {
   const [qr, setQr] = useState<{ img: string | null; code: string | null } | null>(null);
   const [testFor, setTestFor] = useState<Channel | null>(null);
   const [testNo, setTestNo] = useState('');
+  const [removing, setRemoving] = useState<Channel | null>(null);
   const { busy, run } = useAction();
   const t = useT();
 
@@ -52,6 +53,14 @@ export default function WhatsAppSettings() {
     setEdit(null); await load();
   }, t('Saved'));
 
+  // remove a number: chats and orders stay; waiting replies go out from another number if there is one
+  const remove = (c: Channel) => run(async () => {
+    const { data, error } = await sb().rpc('remove_channel', { p_channel: c.id });
+    if (error) throw new Error(error.message);
+    setRemoving(null); await load();
+    return data as { other_number: boolean; queued_moved: number };
+  }, t('Number removed — chats and orders are kept'));
+
   if (!can.edit) return <p className="text-sm text-muted">{t('Only owners and managers can manage the WhatsApp number.')}</p>;
   if (!list) return <Spinner />;
 
@@ -62,7 +71,10 @@ export default function WhatsAppSettings() {
       {list.map(c => (
         <Card key={c.id} title={<span className="flex items-center gap-2">{c.label || c.phone_number || c.instance_name}
           <Badge tone={c.status === 'connected' ? 'positive' : c.status === 'pending' ? 'caution' : 'critical'}>{t(c.status)}</Badge></span>}
-          action={<Button size="sm" variant="ghost" onClick={() => setEdit({ ...c })}>{t('Edit')}</Button>}>
+          action={<span className="flex items-center gap-1">
+            <Button size="sm" variant="ghost" onClick={() => setEdit({ ...c })}>{t('Edit')}</Button>
+            <Button size="sm" variant="ghost" className="text-critical" onClick={() => setRemoving(c)}><Trash2 className="size-4" aria-hidden /> {t('Remove')}</Button>
+          </span>}>
           <div className="space-y-3 text-sm">
             <p className="text-muted">{t('Instance')} <span className="font-mono">{c.instance_name}</span> · <span dir="ltr">{c.base_url}</span>{c.last_inbound_at ? ' · ' + t('last message {when}', { when: timeAgo(c.last_inbound_at) }) : ' · ' + t('no messages yet')}</p>
             <div>
@@ -103,6 +115,21 @@ export default function WhatsAppSettings() {
                 </Select>
               </Field>
             )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!removing} onClose={() => setRemoving(null)} title={t('Remove {name}?', { name: removing?.label || removing?.phone_number || removing?.instance_name || '' })}
+        footer={<><Button variant="outline" onClick={() => setRemoving(null)}>{t('Cancel')}</Button>
+          <Button variant="danger" busy={busy} onClick={() => removing && remove(removing)}><Trash2 className="size-4" aria-hidden /> {t('Remove the number')}</Button></>}>
+        {removing && (
+          <div className="space-y-3 text-sm">
+            <p>{t('Customers who write to this number will no longer reach the agent, and nothing more is sent from it.')}</p>
+            <p className="text-muted">{t('Kept: every chat, order and message. Replies still waiting to be sent go out from your other number, if you have one.')}</p>
+            {list.length === 1 && tenant.status === 'live' && (
+              <p className="rounded-lg bg-critical-wash px-3 py-2 text-critical">{t('This is your only number and you are live: after this, the agent answers no one on WhatsApp until you connect a number again.')}</p>
+            )}
+            <p className="text-muted">{t('The number stays linked in Evolution (instance {instance}). To stop it completely, delete the instance or its webhook there too.', { instance: removing.instance_name || '—' })}</p>
           </div>
         )}
       </Modal>
