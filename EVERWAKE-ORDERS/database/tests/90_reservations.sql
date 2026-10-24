@@ -32,7 +32,7 @@ begin
   r := everwake.reservation_tool(t, wa, 'update', jsonb_build_object('branch', 'الزمالك', 'date', tomorrow, 'time', '21:00',
                                                                      'guests', 4, 'occasion', 'عيد ميلاد')::text);
   assert r ->> 'status' = 'SAVED' and (r -> 'missing') = '["full_name"]'::jsonb, r::text;
-  assert r -> 'reservation' ->> 'phone' = '01444000001' and r -> 'reservation' ->> 'time_ar' = '9:00 بالليل', r::text;
+  assert r -> 'reservation' ->> 'phone' = '01444000001' and r -> 'reservation' ->> 'time_ar' = '9:00 مساءً', r::text;
   assert not (r ->> 'ready_for_summary')::boolean;
   r := everwake.reservation_tool(t, wa, 'summary', '');
   assert r ->> 'error' = 'NOT_READY';
@@ -45,7 +45,7 @@ begin
   r := everwake.reservation_tool(t, wa, 'summary', '');
   assert r ->> 'status' = 'SUMMARY_READY', r::text;
   msg := r ->> 'summary_text';
-  assert msg like 'تفاصيل الحجز:%🏪 الفرع: الزمالك%الساعة 9:00 بالليل%👥 4 أشخاص%🎉 المناسبة: عيد ميلاد%👤 باسم: منى · 📞 01444000001%📝 طلبات خاصة: كرسي أطفال', msg;
+  assert msg like 'تفاصيل الحجز:%🏪 الفرع: الزمالك%الساعة 9:00 مساءً%👥 4 أشخاص%🎉 المناسبة: عيد ميلاد%👤 باسم: منى · 📞 01444000001%📝 طلبات خاصة: كرسي أطفال', msg;
 
   -- a change after the summary: the summary must be shown again
   r := everwake.reservation_tool(t, wa, 'update', '{"guests": 5}');

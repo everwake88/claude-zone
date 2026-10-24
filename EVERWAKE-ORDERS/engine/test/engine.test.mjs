@@ -363,7 +363,7 @@ test('a table booking: asked in two natural steps, a summary, sent to the branch
     };
   });
   assert.deepEqual(t.steps[0].result.missing, ['full_name']);
-  assert.equal(t.steps[0].result.reservation.time_ar, '9:00 بالليل');
+  assert.equal(t.steps[0].result.reservation.time_ar, '9:00 مساءً');
   assert.deepEqual(t.checked.violations, []);
 
   // 3. the name and a request: the summary, shown as the tool wrote it
@@ -396,7 +396,7 @@ test('a table booking: asked in two natural steps, a summary, sent to the branch
 
   // 5. "is it confirmed?" — it is not, and a reply that says so is rewritten
   t = await turn(db, evolutionPayload({ phone, text: 'هو الحجز اتأكد؟' }), async (brief) => {
-    assert.match(brief.facts_text, new RegExp(`THEIR BOOKINGS:\\n  ${ref} · الزمالك · .* 9:00 بالليل · 4 guests · عيد ميلاد · REQUESTED`));
+    assert.match(brief.facts_text, new RegExp(`THEIR BOOKINGS:\\n  ${ref} · الزمالك · .* 9:00 مساءً · 4 guests · عيد ميلاد · REQUESTED`));
     assert.doesNotMatch(brief.facts_text, /BOOKING IN PROGRESS/);
     return { plan: { stage: 'reservation' }, reply: quiet('أيوه حجزك اتأكد ✅ مستنيينك بكرة!'),
              rewrite: [`لسه الفرع هيكلمك يأكد الحجز ${ref} — أول ما يأكدوا هيوصلك تأكيد هنا.`] };

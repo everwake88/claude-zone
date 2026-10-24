@@ -128,7 +128,7 @@ begin
   prep2 := everwake.payment_prepare(t, no);
   r := everwake.payment_link_saved((prep2 ->> 'payment_id')::bigint, 'https://eg.checkout.paymob.com/?publicKey=x&clientSecret=y', 'pi_test_1', 777001, false);
   assert (select status from everwake.payments where id = (prep ->> 'payment_id')::bigint) = 'replaced', 'a link that works replaces the old one';
-  assert r ->> 'status' = 'LINK_READY' and r ->> 'link' = prep2 ->> 'short_url' and r ->> 'valid_until' ~ '(الصبح|الضهر|العصر|بالليل)$', r::text;
+  assert r ->> 'status' = 'LINK_READY' and r ->> 'link' = prep2 ->> 'short_url' and r ->> 'valid_until' like '%مساءً' or r ->> 'valid_until' like '%صباحاً', r::text;
   assert (select payment_status from everwake.orders where order_no = no) = 'pending';
   v_ref := prep2 ->> 'ref';
 
