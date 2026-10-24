@@ -167,9 +167,19 @@ function branchesThatCanTakeIt(codes) {
   const area = normalizeArabic(str(customer.address_area));
   return codes.map(c => branchByCode(c)).filter(b => b && str(b.id) !== str(targetBranchId)
     && b.accepting_orders !== false && !['not_accepting', 'closed', 'paused'].includes(str(branchStates[b.id])))
-    .filter(b => !delivery || (!area && !zone) || arr(all.zones).some(z => str(z.branch_id) === str(b.id)
-      && ((zone && str(z.id) === str(zone.id)) || (area && arr(z.areas).some(a => normalizeArabic(str(a)) === area)))))
+    .filter(b => !delivery || ((area || zone)
+      ? arr(all.zones).some(z => str(z.branch_id) === str(b.id)
+          && ((zone && str(z.id) === str(zone.id)) || (area && arr(z.areas).some(a => normalizeArabic(str(a)) === area))))
+      // where they are isn't saved yet: only branches near this one (same city), never across the country
+      : nearKm(b, branchById(targetBranchId)) <= 25))
     .map(b => str(b.name_ar));
+}
+function nearKm(a, b) {
+  const [la1, lo1, la2, lo2] = [obj(a).lat, obj(a).lng, obj(b).lat, obj(b).lng].map(v => (v == null || v === "" ? NaN : num(v, NaN)));
+  if ([la1, lo1, la2, lo2].some(Number.isNaN)) return Infinity;
+  const r = Math.PI / 180, dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;
+  const h = Math.sin(dLa / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dLo / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
 }
 
 function findIn(items, text) {
