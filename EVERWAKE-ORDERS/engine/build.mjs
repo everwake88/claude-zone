@@ -121,8 +121,11 @@ const model = (name, maxTokens, effort, timeout, pos) => ({
 const chain = (name, textExpr, system, pos) => ({
   name, type: '@n8n/n8n-nodes-langchain.chainLlm', typeVersion: 1.5, position: pos, onError: 'continueRegularOutput',
   parameters: { promptType: 'define', text: textExpr, messages: { messageValues: [{ message: system }] } } });
+// the agent fills one JSON object per call ($fromAI type json): a list
+// typed into a "string" field made n8n refuse the call and stop the turn
+const ANY = ['request', 'details'];
 const toolInputSchema = (ids) => ids.map(id => ({ id, displayName: id, required: false, defaultMatch: false, display: true,
-                                                  canBeUsedToMatch: true, type: 'string' }));
+                                                  canBeUsedToMatch: true, type: ANY.includes(id) ? 'any' : 'string' }));
 const tool = (name, workflowName, description, values, pos) => ({
   name, type: '@n8n/n8n-nodes-langchain.toolWorkflow', typeVersion: 2.2, position: pos,
   parameters: {
@@ -133,7 +136,7 @@ const tool = (name, workflowName, description, values, pos) => ({
   } });
 const trigger = (name, inputs, pos) => ({
   name, type: 'n8n-nodes-base.executeWorkflowTrigger', typeVersion: 1.1, position: pos,
-  parameters: { workflowInputs: { values: inputs.map(n => ({ name: n })) } } });
+  parameters: { workflowInputs: { values: inputs.map(n => ANY.includes(n) ? { name: n, type: 'any' } : { name: n }) } } });
 
 const I = "$('Intake').first().json.r";
 const TEST = "$('Normalize Inbound').first().json.is_test === true";
@@ -246,20 +249,17 @@ function buildMain() {
   w.add(tool('manage_cart', 'Everwake — Tool: manage_cart', prompt('tool_manage_cart.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    action: "={{ $fromAI('action', 'Exactly one of: add, update, remove, replace, clear, set_branch, reorder_last, apply_code, place_order', 'string') }}",
-    items_json: "={{ $fromAI('items_json', 'A JSON array (as a string) of the dishes this action touches, e.g. [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]. For apply_code: [{\"promo_code\":\"THE CODE\"}]. Use [] for clear, set_branch, reorder_last and place_order. Never include prices.', 'string') }}",
-    branch_id: "={{ $fromAI('branch_id', 'Only for set_branch: the branch code or name from THE BRANCHES. Empty string for every other action.', 'string') }}"
+    request: "={{ $fromAI('request', 'One JSON object. action: exactly one of add, update, remove, replace, clear, set_branch, reorder_last, apply_code, place_order. items: the dishes this action touches, e.g. [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]; for apply_code [{\"promo_code\":\"THE CODE\"}]; left out for clear, set_branch, reorder_last and place_order. branch: only for set_branch, the branch code or name. Never include prices. Examples: {\"action\":\"set_branch\",\"branch\":\"gleem\"} · {\"action\":\"add\",\"items\":[{\"menu_id\":\"M013\",\"quantity\":1}]} · {\"action\":\"place_order\"}', 'json') }}"
   }, [1560, 720]));
   w.add(tool('save_customer_details', 'Everwake — Tool: save_customer_details', prompt('tool_save_details.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    details_json: "={{ $fromAI('details_json', 'A JSON object (as a string) with only the customer details that are new or changed in this turn, e.g. {\"full_name\":\"أحمد\",\"address_area\":\"المعادي\"}. Add \"reset_address\":true when they give a different address; \"use_saved_address\":\"<number>\" to reuse a saved one.', 'string') }}"
+    details: "={{ $fromAI('details', 'A JSON object with only the customer details that are new or changed in this turn, e.g. {\"full_name\":\"أحمد\",\"address_area\":\"المعادي\"}. Add \"reset_address\":true when they give a different address; \"use_saved_address\":\"<number>\" to reuse a saved one.', 'json') }}"
   }, [1720, 720]));
   w.add(tool('manage_reservation', 'Everwake — Tool: manage_reservation', prompt('tool_manage_reservation.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
-    action: "={{ $fromAI('action', 'Exactly one of: update, summary, submit, cancel, status', 'string') }}",
-    details_json: "={{ $fromAI('details_json', 'Only for update (and cancel when they have several bookings): a JSON object (as a string) with only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}. date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Empty string for summary, submit and status.', 'string') }}"
+    request: "={{ $fromAI('request', 'One JSON object. action: exactly one of update, summary, submit, cancel, status. details: only for update (and cancel when they have several bookings), only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4,\"occasion\":\"عيد ميلاد\"}; date is YYYY-MM-DD, time is HH:MM on the 24-hour clock. Examples: {\"action\":\"update\",\"details\":{\"guests\":4}} · {\"action\":\"summary\"}', 'json') }}"
   }, [1880, 900]));
 
   w.add(pg('Read Back State', 'select everwake.read_back($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [1840, 460]));
@@ -347,7 +347,7 @@ function buildCart() {
     'A placed order the customer pays **online** gets its Paymob payment link from the dashboard (**Create Payment Link**, header auth *Everwake Outbox Secret*), so the agent sends it in the same reply.',
     'Every call first re-checks the cart against the live menu, so a dish switched off in the dashboard is never sold.'
   ].join('\n'), [0, 0], 1200, 220, 5));
-  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'action', 'items_json', 'branch_id'], [0, 320]));
+  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'request', 'action', 'items_json', 'branch_id'], [0, 320]));
   w.add(code('Read Args', 'cart/read_args.js', [220, 320]));
   w.add(pg('Load Cart + Menu', 'select everwake.cart_context($1::uuid, $2::text, $3::text) as r;',
            "={{ [ $json.tenant_id, $json.wa_id, $json.branch_id || '' ] }}", [440, 320]));
@@ -386,7 +386,7 @@ function buildDetails() {
     '## Everwake · save_customer_details',
     'Called BY THE AGENT the same turn the customer gives any detail. Whitelists fields, normalises enums, keeps the ledger so nothing is asked twice. `reset_address` wipes the old address + pin; `use_saved_address` reuses one from a previous order. A typed area is matched to a delivery zone; a typed phone is remembered for customers WhatsApp hides.'
   ].join('\n'), [0, 0], 1000, 200, 5));
-  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'details_json'], [0, 320]));
+  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'details', 'details_json'], [0, 320]));
   w.add(pg('Load Customer State', 'select everwake.details_context($1::uuid, $2::text) as r;', '={{ [ $json.tenant_id, $json.wa_id ] }}', [220, 320]));
   w.add(code('Validate + Patch', 'details/validate_patch.js', [440, 320]));
   w.add(iff('Valid?', '$json.ok', [660, 320]));
@@ -410,7 +410,7 @@ function buildReservation() {
     '**actions** **update** (any of branch, date, time, guests, name, phone, occasion, special requests — every value is checked: in the future, not too far ahead, while the branch is open, not more guests than it seats) · **summary** (the text the customer confirms) · **submit** (only a summary they agreed to, unchanged since: the branch\'s operations WhatsApp gets the ticket with the customer\'s details, and the dashboard\'s Reservations page shows it) · **cancel** · **status**.',
     'The team calls the customer and presses Confirm on the dashboard — that is when the customer hears it is confirmed.'
   ].join('\n'), [0, 0], 1200, 240, 5));
-  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'action', 'details_json'], [0, 320]));
+  w.add(trigger('Tool Called By Agent', ['tenant_id', 'wa_id', 'request', 'action', 'details_json'], [0, 320]));
   w.add(code('Read Args', 'reservation/read_args.js', [220, 320]));
   w.add(pg('Booking', "select everwake.reservation_tool($1::uuid, $2::text, $3::text, convert_from(decode($4::text, 'base64'), 'UTF8')) as r;",
            '={{ [ $json.tenant_id, $json.wa_id, $json.action, $json.details_b64 ] }}', [440, 320]));

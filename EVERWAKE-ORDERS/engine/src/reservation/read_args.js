@@ -6,7 +6,11 @@
 // =====================================================================
 const t = $input.first().json || {};
 let a = t;
-if (t.action === undefined && t.input !== undefined) {
+let req = t.request;
+if (typeof req === 'string') { try { req = JSON.parse(req); } catch (e) { req = null; } }
+if (req && typeof req === 'object' && !Array.isArray(req)) {
+  a = { action: req.action, details_json: req.details !== undefined ? req.details : (req.details_json ?? '') };
+} else if (t.action === undefined && t.input !== undefined) {
   try { a = typeof t.input === 'string' ? JSON.parse(t.input) : (t.input || {}); } catch (e) { a = {}; }
   if (typeof a === 'string') { try { a = JSON.parse(a); } catch (e) { a = {}; } }
 }

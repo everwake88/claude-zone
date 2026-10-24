@@ -660,3 +660,36 @@ test('what the stress test caught: Franco gets Arabic, no semicolons, EGP in Eng
   assert.match(t.nodes['Build Rewrite Request'].rewrite_prompt, /no tool ran this turn, so nothing was added/);
   assert.deepEqual(t.checked.decision.reply_messages, ['تحب رز سي فود ولا سادة؟']);
 });
+
+test('tool inputs: one JSON object from the agent (a list where text was expected stopped the turn)', async () => {
+  const cart = (await runCode('cart/read_args.js', { input: { tenant_id: 't', wa_id: 'w',
+    request: { action: 'add', items: [{ menu_id: 'M013', quantity: 1 }] } } }))[0];
+  assert.equal(cart.action, 'add');
+  assert.deepEqual(JSON.parse(cart.items_json), [{ menu_id: 'M013', quantity: 1 }]);
+  const branch = (await runCode('cart/read_args.js', { input: { request: '{"action":"set_branch","branch":"gleem"}' } }))[0];
+  assert.equal(branch.branch_id, 'gleem');
+  assert.equal(branch.items_json, '[]');
+  const old = (await runCode('cart/read_args.js', { input: { action: 'add', items_json: '[{"menu_id":"M001"}]', branch_id: '' } }))[0];
+  assert.equal(old.items_json, '[{"menu_id":"M001"}]');
+  const rsv = (await runCode('reservation/read_args.js', { input: { request: { action: 'update', details: { guests: 4 } } } }))[0];
+  assert.equal(rsv.action, 'update');
+  assert.deepEqual(JSON.parse(Buffer.from(rsv.details_b64, 'base64').toString()), { guests: 4 });
+
+  const phone = '201099996666';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  const ctx = await sql(db, 'select everwake.details_context($1::uuid, $2::text) as r', [intake.tenant_id, intake.wa_id]);
+  const v = (await runCode('details/validate_patch.js', { input: ctx,
+    nodes: { 'Tool Called By Agent': { tenant_id: intake.tenant_id, wa_id: intake.wa_id, details: { full_name: 'كريم' } } } }))[0];
+  assert.equal(v.ok, true, JSON.stringify(v).slice(0, 300));
+});
+
+test('a pin with no words is not English; "هل" and "مساءً" are tidied away', async () => {
+  const phone = '201099997777';
+  const t = await turn(db, evolutionPayload({ phone, location: ZAMALEK_PIN }), async () => ({
+    plan: { read: 'pin', stage: 'discovery', objective: 'welcome', actions: [] },
+    reply: quiet('أهلاً بيك 😊 هل الأوردر دليفري ولا استلام؟ الفرع مفتوح لحد 11 مساءً.')
+  }), { geo: { street: 'شارع حسن صبري', district: 'الزمالك' } });
+  assert.match(t.brief.facts_text, /Their latest message is in: Arabic$/m);
+  assert.deepEqual(t.checked.decision.reply_messages, ['أهلاً بيك 😊 الأوردر دليفري ولا استلام؟ الفرع مفتوح لحد 11 بالليل.']);
+});

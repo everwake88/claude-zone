@@ -95,6 +95,9 @@ messages = messages.map(m => {
     .replace(/^#{1,6}\s+/gm, '')                  // no markdown headings
     .replace(/\[\[\s*NEXT\s*\]\]/g, '')
     .replace(/\s*[؛;](?=\s)/g, '.')                // nobody types a semicolon on WhatsApp
+    .replace(/(^|[\s،.؟!(])هل\s+/g, '$1')           // "هل الطلب دليفري؟" is MSA: Egyptians ask "الطلب دليفري؟"
+    .replace(/(\d{1,2}(?::\d{2})?)\s*مساءً?(?![\u0600-\u06FF])/g, '$1 بالليل')
+    .replace(/(\d{1,2}(?::\d{2})?)\s*صباحاً?(?![\u0600-\u06FF])/g, '$1 الصبح')
     .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }).filter(Boolean);
 if (messages.length > 2) messages = [messages[0], messages.slice(1).join('\n\n')];

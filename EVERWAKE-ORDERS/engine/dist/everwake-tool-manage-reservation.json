@@ -35,6 +35,10 @@
               "name": "wa_id"
             },
             {
+              "name": "request",
+              "type": "any"
+            },
+            {
               "name": "action"
             },
             {
@@ -54,7 +58,7 @@
         320
       ],
       "parameters": {
-        "jsCode": "// =====================================================================\n// EVERWAKE — Tool: manage_reservation · NODE: Read Args\n// Normalises what n8n hands over: details_json may arrive as a string or\n// as an object; it reaches the database as base64 so no quote or comma\n// in a name or a special request can break the query.\n// =====================================================================\nconst t = $input.first().json || {};\nlet a = t;\nif (t.action === undefined && t.input !== undefined) {\n  try { a = typeof t.input === 'string' ? JSON.parse(t.input) : (t.input || {}); } catch (e) { a = {}; }\n  if (typeof a === 'string') { try { a = JSON.parse(a); } catch (e) { a = {}; } }\n}\nconst s = (v) => String(v == null ? '' : v).trim();\nlet details = a.details_json !== undefined ? a.details_json : t.details_json;\nif (details && typeof details === 'object') details = JSON.stringify(details);\ndetails = s(details);\n\nreturn [{\n  json: {\n    tenant_id: s(t.tenant_id || a.tenant_id),\n    wa_id: s(t.wa_id || a.wa_id),\n    action: s(a.action !== undefined ? a.action : t.action).toLowerCase(),\n    details_b64: Buffer.from(details, 'utf8').toString('base64')\n  }\n}];\n"
+        "jsCode": "// =====================================================================\n// EVERWAKE — Tool: manage_reservation · NODE: Read Args\n// Normalises what n8n hands over: details_json may arrive as a string or\n// as an object; it reaches the database as base64 so no quote or comma\n// in a name or a special request can break the query.\n// =====================================================================\nconst t = $input.first().json || {};\nlet a = t;\nlet req = t.request;\nif (typeof req === 'string') { try { req = JSON.parse(req); } catch (e) { req = null; } }\nif (req && typeof req === 'object' && !Array.isArray(req)) {\n  a = { action: req.action, details_json: req.details !== undefined ? req.details : (req.details_json ?? '') };\n} else if (t.action === undefined && t.input !== undefined) {\n  try { a = typeof t.input === 'string' ? JSON.parse(t.input) : (t.input || {}); } catch (e) { a = {}; }\n  if (typeof a === 'string') { try { a = JSON.parse(a); } catch (e) { a = {}; } }\n}\nconst s = (v) => String(v == null ? '' : v).trim();\nlet details = a.details_json !== undefined ? a.details_json : t.details_json;\nif (details && typeof details === 'object') details = JSON.stringify(details);\ndetails = s(details);\n\nreturn [{\n  json: {\n    tenant_id: s(t.tenant_id || a.tenant_id),\n    wa_id: s(t.wa_id || a.wa_id),\n    action: s(a.action !== undefined ? a.action : t.action).toLowerCase(),\n    details_b64: Buffer.from(details, 'utf8').toString('base64')\n  }\n}];\n"
       },
       "id": "e7e166fa-42e3-5391-a517-07e06393eb5d"
     },

@@ -140,7 +140,7 @@ const pinAddress = hasPin && str(details.address_source) === 'pin';
 const pinAddressUnconfirmed = pinAddress && str(details.address_confirmed) !== 'yes';
 if (pinAddressUnconfirmed && mode !== 'pickup') missing.push('confirm_pin_address');
 const LABEL = {
-  phone_confirmed: 'confirm their WhatsApp number is the order number', full_name: 'name',
+  phone_confirmed: 'whether we call them on this same number (ask it lightly: "نكلمك على نفس الرقم ده؟")', full_name: 'name',
   phone: 'a phone number for the order (WhatsApp hides their number — ask them to type it)',
   delivery_method: 'delivery or pickup', payment_method: 'payment method', branch: 'branch',
   address_area: 'area/district', address_street: 'street', address_building: 'building no.',
@@ -298,14 +298,20 @@ const spokeBefore = recent.some(m => m.direction === 'outbound');
 let gapH = null;
 if (str(state.last_turn_at)) gapH = (Date.now() - new Date(str(state.last_turn_at)).getTime()) / 3600000;
 const isFirstReply = !spokeBefore || (gapH !== null && gapH >= 12);
-const ar = (customerText.match(/[؀-ۿ]/g) || []).length;
-const la = (customerText.match(/[A-Za-z]/g) || []).length;
+// a pin, a voice note or a photo has no words of theirs: "[shared a location pin]"
+// is our marker, not English — the language they used before decides
+const ownWords = customerText.replace(/\[[a-z ]+\]/gi, ' ');
+const earlierWords = ownWords.trim() ? '' : recent.filter(m => m.direction === 'inbound').map(m => str(m.body)).join(' ').replace(/\[[a-z ]+\]/gi, ' ');
+const langText = ownWords.trim() ? ownWords : earlierWords;
+const ar = (langText.match(/[؀-ۿ]/g) || []).length;
+const la = (langText.match(/[A-Za-z]/g) || []).length;
 // Franco: Egyptian Arabic typed in Latin letters ("3ayez", "a7la", "ezayak") — an Egyptian, answered in Egyptian Arabic
 const FRANCO = /[a-z][2357689]|[2357689][a-z]|\b(ana|enta|enty|ezay|ezayak|3ayez|3ayza|3awz|3awza|keda|kda|leh|eh|feen|fen|emta|bekam|b kam|kam|el|fe|mesh|msh|momken|tab|ya3ni|yaany|ba2a|delwa2ty|dlw2ty|lazem|3ala|3and|3ando|3andko|ma3a|wala|aw|ah|aywa|la2|shokran|7aga|7elw|tamam)\b/gi;
-const francoHits = (customerText.match(FRANCO) || []).length;
+const francoHits = (langText.match(FRANCO) || []).length;
 const franco = !ar && la && francoHits >= 2;
 const lang = franco ? 'Franco-Arabic — Egyptian Arabic typed in Latin letters: answer in Egyptian Arabic (Arabic letters), never in English'
   : ar && la ? (ar >= la ? 'Arabic (some English words)' : 'English (some Arabic words)') : (la ? 'English' : 'Arabic');
+// nothing in words at all (a first message that is only a pin) → Egyptian Arabic, the default here
 
 const clip = (s, n) => { s = str(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const who = (m) => m.direction === 'inbound' ? 'customer: '

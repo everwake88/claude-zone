@@ -21,7 +21,9 @@ const t = $('Tool Called By Agent').first().json || {};
 const db = row($input.first().json);
 
 let args = t;
-if (t.details_json === undefined && t.input !== undefined) {
+// the agent's one JSON object (details), or the older details_json string
+if (t.details !== undefined && t.details !== null && t.details !== '') args = { details_json: t.details };
+else if (t.details_json === undefined && t.input !== undefined) {
   try { args = typeof t.input === 'string' ? JSON.parse(t.input) : (t.input || {}); } catch (e) { args = {}; }
   if (typeof args === 'string') { try { args = JSON.parse(args); } catch (e) { args = {}; } }
 }

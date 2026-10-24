@@ -181,6 +181,10 @@ function resolveMenuItem(p) {
     else if (ls.some(n => n.length >= 3 && (n.includes(target) || target.includes(n)))) partial.push({ id: key, entry: e });
   }
   if (exact.length === 1) return exact[0];
+  // a dish the restaurant has but this branch doesn't sell: never swap in a
+  // look-alike ("جمبري وسط" → "جمبري وسط قزاز" is another dish at another
+  // price) — the customer is told and chooses
+  if (id && allItems[id] && !p.item_name) return exact.length > 1 ? { ambiguous: exact.slice(0, 6) } : null;
   const pool = exact.length ? exact : partial;
   if (pool.length === 1) return { ...pool[0], inexact: true };
   if (pool.length > 1) return { ambiguous: pool.slice(0, 6) };
