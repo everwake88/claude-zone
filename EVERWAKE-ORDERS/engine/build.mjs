@@ -22,7 +22,8 @@
 //   EW_PG_CRED_ID       n8n Postgres credential id  (default EVERWAKE_DB)
 //   EW_OPENAI_CRED_ID   n8n OpenAI credential id    (default the Seagull one)
 //   EW_GEOCODE_URL      Google reverse-geocoder (Apps Script) URL
-//   EW_BRAIN_EFFORT     the Brain's reasoning effort (default high): it thinks and runs the tools
+//   EW_BRAIN_EFFORT     the Brain's reasoning effort (default medium — it thinks again after every tool
+//                       round, so high makes a turn of several rounds slow): it thinks and runs the tools
 //   EW_WRITER_EFFORT    the Writer's reasoning effort (default medium): it only writes, but well
 //
 // n8n-ids.json (optional) holds the ids n8n gave the workflows, so the
@@ -45,7 +46,7 @@ const wfRef = (workflowName) => {
             : { __rl: true, value: 'SET_AFTER_IMPORT', mode: 'list', cachedResultName: workflowName };
 };
 const MODEL = process.env.EW_MODEL || 'gpt-5.6-luna';
-const BRAIN_EFFORT = process.env.EW_BRAIN_EFFORT || 'high';
+const BRAIN_EFFORT = process.env.EW_BRAIN_EFFORT || 'medium';
 const WRITER_EFFORT = process.env.EW_WRITER_EFFORT || 'medium';
 const PG = { postgres: { id: process.env.EW_PG_CRED_ID || 'EVERWAKE_DB', name: 'Everwake DB' } };
 const OPENAI = { openAiApi: { id: process.env.EW_OPENAI_CRED_ID || 'CkjJoUDZ38ndmkPM', name: 'OpenAi account' } };
@@ -204,7 +205,7 @@ function buildMain() {
            `={{ [ ${I}.tenant_id, ${I}.wa_id, $('Normalize Inbound').first().json.run_id, String(${I}.buffer_id) ] }}`,
            [-900, 460], { alwaysOutputData: true }));
   w.add(iff('Route: Won The Window?', '$json.r.is_newest === true && $json.r.lock_acquired === true', [-700, 460]));
-  w.add(iff('Route: Retry Or Exit?', '$json.r.is_newest === true && !$json.r.blocked_reason && $runIndex < 8', [-700, 680]));
+  w.add(iff('Route: Retry Or Exit?', '$json.r.is_newest === true && !$json.r.blocked_reason && $runIndex < 60', [-700, 680]));
   w.add(wait('Retry Backoff 3s', 3, [-480, 800]));
   w.add(noop('Exit: Superseded', [-480, 640]));
 

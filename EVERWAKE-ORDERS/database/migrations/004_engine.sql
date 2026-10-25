@@ -439,7 +439,7 @@ begin
   end if;
 
   insert into everwake.conversation_locks as l (tenant_id, wa_id, run_id, locked_at, expires_at)
-  values (p_tenant, p_wa, p_run, now(), now() + interval '120 seconds')
+  values (p_tenant, p_wa, p_run, now(), now() + interval '300 seconds')
   on conflict (tenant_id, wa_id) do update
     set run_id = excluded.run_id, locked_at = now(), expires_at = excluded.expires_at
     where l.expires_at < now()
