@@ -22,9 +22,9 @@
 //   EW_PG_CRED_ID       n8n Postgres credential id  (default EVERWAKE_DB)
 //   EW_OPENAI_CRED_ID   n8n OpenAI credential id    (default the Seagull one)
 //   EW_GEOCODE_URL      Google reverse-geocoder (Apps Script) URL
-//   EW_BRAIN            'on' puts the separate planning Brain back in front of the Agent (default off:
-//                       the Agent reads the whole situation and thinks for itself)
-//   EW_AGENT_EFFORT     the Agent's reasoning effort (default medium)
+//   EW_BRAIN            'off' drops the planning Brain: the Agent then reads the whole situation and
+//                       thinks for itself (default on: the Brain thinks, the Agent writes)
+//   EW_AGENT_EFFORT     the Agent's reasoning effort (default low behind the Brain, medium alone)
 //
 // n8n-ids.json (optional) holds the ids n8n gave the workflows, so the
 // tool nodes and the Test Runner are linked already after a re-import:
@@ -46,8 +46,8 @@ const wfRef = (workflowName) => {
             : { __rl: true, value: 'SET_AFTER_IMPORT', mode: 'list', cachedResultName: workflowName };
 };
 const MODEL = process.env.EW_MODEL || 'gpt-5.6-luna';
-const USE_BRAIN = process.env.EW_BRAIN === 'on';
-const AGENT_EFFORT = process.env.EW_AGENT_EFFORT || 'medium';
+const USE_BRAIN = process.env.EW_BRAIN !== 'off';
+const AGENT_EFFORT = process.env.EW_AGENT_EFFORT || (USE_BRAIN ? 'low' : 'medium');
 const PG = { postgres: { id: process.env.EW_PG_CRED_ID || 'EVERWAKE_DB', name: 'Everwake DB' } };
 const OPENAI = { openAiApi: { id: process.env.EW_OPENAI_CRED_ID || 'CkjJoUDZ38ndmkPM', name: 'OpenAi account' } };
 const GEOCODE_URL = process.env.EW_GEOCODE_URL
