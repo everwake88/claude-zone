@@ -936,3 +936,14 @@ test('"Pickup" and "Here\'s your order 👇" are not a promised photo', async ()
   }));
   assert.ok(!t.nodes['Check Reply'].violations.some(v => /photo/.test(v)), t.nodes['Check Reply'].violations.join('\n'));
 });
+
+test('a summary while a detail is still open says it cannot be placed yet', async () => {
+  const phone = '201099990422';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  await manageCart(db, intake, 'set_branch', [], 'المعادي');
+  await manageCart(db, intake, 'add', [{ menu_id: 'M007', quantity: 1 }]);
+  const s = await manageCart(db, intake, 'summary');
+  assert.ok(s.missing_details_for_order.length, JSON.stringify(s).slice(0, 300));
+  assert.match(s.fact, /can't be placed yet/);
+});

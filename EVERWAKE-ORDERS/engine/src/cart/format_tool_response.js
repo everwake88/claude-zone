@@ -156,7 +156,10 @@ return out({
   optional_choices_available: optionalOpen,
   problems,
   missing_details_for_order: arr(r.missing_details),
-  fact: problems.some(x => x.code !== 'MATCHED_AS')
+  fact: (problems.some(x => x.code !== 'MATCHED_AS')
     ? 'The cart is saved as listed. Items in problems (other than MATCHED_AS) were NOT added; WHICH_ONE means ask the customer which of the candidates they mean.'
-    : 'The cart is saved exactly as listed.'
+    : 'The cart is saved exactly as listed.')
+    + (r.action === 'summary' && arr(r.missing_details).length
+      ? ` It can't be placed yet: ${arr(r.missing_details).join(', ')} still open — ask that first, in a few words; a "yes" to a summary now would place nothing.`
+      : '')
 });
