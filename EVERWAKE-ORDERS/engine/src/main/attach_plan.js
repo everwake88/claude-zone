@@ -48,7 +48,8 @@ if (!plan || typeof plan !== 'object') {
   });
   let sendMenu = bool(plan.send_menu_images);
   let menuNote = '';
-  if (sendMenu && !b.menu_pages_available) {
+  // a branch found this turn (from their area) may have its own pages — Check Reply decides with that branch
+  if (sendMenu && !b.menu_pages_available && !b.menu_pages_by_branch) {
     sendMenu = false;
     menuNote = ' (no menu pictures are uploaded — offer the dishes in text)';
   }

@@ -947,3 +947,28 @@ test('a summary while a detail is still open says it cannot be placed yet', asyn
   assert.ok(s.missing_details_for_order.length, JSON.stringify(s).slice(0, 300));
   assert.match(s.fact, /can't be placed yet/);
 });
+
+test('menu pictures that exist only per branch: before the branch she knows they come with it, and they go out the turn their area finds it', async () => {
+  const phone = '201099990433';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  const maadi = (await sql(db, `select id as r from everwake.branches where tenant_id = $1 and name_ar = 'المعادي'`, [intake.tenant_id])).r;
+  // like a restaurant whose pictures are per branch only: the shared pages are switched off for this test
+  await sql(db, `update everwake.menu_media set is_active = false where tenant_id = $1 and branch_id is null returning 1 as r`, [intake.tenant_id]);
+  await sql(db, `insert into everwake.menu_media (tenant_id, branch_id, url) values ($1, $2, 'https://example.com/maadi-menu.jpg') returning 1 as r`, [intake.tenant_id, maadi]);
+  await sql(db, `select everwake.rebuild_snapshot($1::uuid) as r`, [intake.tenant_id]);
+  try {
+    const t = await turn(db, evolutionPayload({ phone, text: 'ابعتلي المنيو' }), async () => ({
+      plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [{ tool: 'save_customer_details', do: 'address_area دجلة' }], send_menu_images: true },
+      tools: [{ tool: 'save_customer_details', details: { delivery_method: 'delivery', address_area: 'دجلة' } }],
+      reply: quiet('ده منيو فرع المعادي 👇', { send_menu_images: true }),
+    }));
+    assert.match(t.brief.facts_text, /each branch has its own menu pictures \(.*المعادي/);
+    assert.equal(t.nodes['Attach Plan'].brain.send_menu_images, true, 'the plan keeps the pictures');
+    assert.equal(t.nodes['Check Reply'].decision.send_menu_images, true, 'the branch found this turn has pages, so they go out');
+  } finally {
+    await sql(db, `delete from everwake.menu_media where tenant_id = $1 and branch_id = $2 returning 1 as r`, [intake.tenant_id, maadi]);
+    await sql(db, `update everwake.menu_media set is_active = true where tenant_id = $1 and branch_id is null returning 1 as r`, [intake.tenant_id]);
+    await sql(db, `select everwake.rebuild_snapshot($1::uuid) as r`, [intake.tenant_id]);
+  }
+});

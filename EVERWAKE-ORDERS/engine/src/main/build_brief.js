@@ -332,9 +332,13 @@ const pages = obj(media.menu_pages);
 const pageCount = branchId ? num(pages[branchId]) || num(pages.all) : num(pages.all);
 const menuSentFor = arr(ledger.menu_sent_branches).map(str);
 const menuKey = branchId || 'all';
+// pictures uploaded per branch only: before the branch is known there is nothing to send yet, but there will be
+const branchesWithPages = arr(allLookup.branches).filter(b => num(pages[b.id])).map(b => b.name_ar);
 const menuPics = pageCount
   ? `${pageCount} page(s) available${branchId ? ' for ' + (branch ? branch.name_ar : '') : ''}; already sent to this customer: ${menuSentFor.includes(menuKey) ? 'YES' : 'no'}`
-  : 'none uploaded — describe the dishes in text';
+  : (!branchId && branchesWithPages.length)
+    ? `each branch has its own menu pictures (${branchesWithPages.join('، ')}) — the menu and prices differ by branch, so once you know their area or branch, that branch's pictures can be sent`
+    : 'none uploaded — describe the dishes in text';
 const photoCodes = arr(media.items_with_photos);
 const photosSent = arr(ledger.photos_sent).map(str);
 
@@ -482,6 +486,7 @@ return [{
     summary_status: summaryStatus,
     menu_version: str(ctx.menu_version),
     menu_pages_available: pageCount,
+    menu_pages_by_branch: branchesWithPages.length,   // pictures exist per branch: sendable once this turn finds theirs
     menu_already_sent: menuSentFor.includes(menuKey),
     photo_codes: photoCodes,
     reservations_on_whatsapp: rsvWa.length > 0,
