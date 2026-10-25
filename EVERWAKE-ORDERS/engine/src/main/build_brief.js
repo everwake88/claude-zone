@@ -439,7 +439,9 @@ const business = [
   'THE BRANCHES:',
   branchBlock || '- (none)',
   zonesDrawn ? '\nDELIVERY ZONES:\n' + zoneBlock : '',
-  knowledge.length ? '\nANSWERS THE RESTAURANT GAVE (use them as they are):\n' + knowledge.join('\n') : ''
+  knowledge.length ? '\nANSWERS THE RESTAURANT GAVE (use them as they are):\n' + knowledge.join('\n') : '',
+  // the owner's own replies: the voice of this restaurant — how it sounds, never lines to copy
+  str(profile.voice_sample) ? '\nHOW WE SOUND — replies the owner wrote the way they answer customers. This is the voice to write in: the warmth, the length, the words people here use. Never copy a line; every chat is different.\n' + str(profile.voice_sample).slice(0, 3000) : ''
 ].filter(x => x !== '').join('\n');
 
 // ---- MENU ------------------------------------------------------------------------------------------------------

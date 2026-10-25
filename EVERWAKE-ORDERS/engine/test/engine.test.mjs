@@ -975,3 +975,21 @@ test('formatting slips are tidied: no short vowel marks, no stray letters from a
   }));
   assert.deepEqual(t.checked.decision.reply_messages, ['أهلاً بيك، معاك نور 😊 grilled chicken (Dي) شكرًا']);
 });
+
+test('the owner\'s own replies are the voice: both the Brain and the host read them, as a voice, not lines', async () => {
+  const phone = '201099990514';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  const was = (await sql(db, `select profile as r from everwake.tenants where id = $1`, [intake.tenant_id])).r;
+  await sql(db, `update everwake.tenants set profile = profile || '{"voice_sample":"تمام، ضيفتلك الكفتة 👌 تحب معاها رز؟"}'::jsonb where id = $1 returning 1 as r`, [intake.tenant_id]);
+  try {
+    const t = await turn(db, evolutionPayload({ phone, text: 'عايز كفتة' }), async (brief) => {
+      assert.match(brief.business_text, /HOW WE SOUND — replies the owner wrote[\s\S]*Never copy a line[\s\S]*تمام، ضيفتلك الكفتة/);
+      assert.match(brief.brief, /HOW WE SOUND/, 'the Brain reads it');
+      return { plan: { read: 'x', stage: 'discovery', objective: 'x' }, reply: quiet('تحب الكفتة دليفري ولا استلام؟') };
+    });
+    assert.match(t.nodes['Attach Plan'].agent_prompt, /HOW WE SOUND/, 'and so does the host');
+  } finally {
+    await sql(db, `update everwake.tenants set profile = $2::jsonb where id = $1 returning 1 as r`, [intake.tenant_id, JSON.stringify(was)]);
+  }
+});

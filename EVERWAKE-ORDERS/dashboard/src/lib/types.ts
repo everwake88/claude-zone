@@ -16,6 +16,7 @@ export interface Tenant extends Omit<TenantSummary, 'role' | 'currency_symbol'> 
 export interface Profile {
   agent_name?: { ar?: string; en?: string };
   about_ar?: string; about_en?: string; cuisine?: string; tone?: string;
+  voice_sample?: string;   // a few replies written the way the owner answers customers: the agent's voice
   brand_facts?: string[];
   contacts?: { hotline?: string; complaints?: string; whatsapp?: string; email?: string };
   website?: string; instagram?: string; facebook?: string; tiktok?: string; google_maps_url?: string;
