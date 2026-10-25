@@ -174,7 +174,7 @@ if (hasPin) {
 }
 let areaLine;
 if (!zonesDrawn) areaLine = 'no delivery zones are drawn — delivery goes by distance from the branch' + (zone ? ` (pin is ${zone.km} km from ${zone.branch_name})` : '');
-else if (zoneHere) areaLine = `INSIDE the delivery zone "${zoneHere.name}" of ${zoneHere.branch_name} (from ${zoneHere.source === 'pin' ? 'their pin' : zoneHere.source === 'saved_address' ? 'their saved address' : 'the area they typed: ' + (zoneHere.matched || '')}) · delivery fee ${zoneHere.delivery_fee == null ? 'confirmed by the branch' : money$(zoneHere.delivery_fee)}${zoneHere.min_order ? ' · minimum ' + money$(zoneHere.min_order) : ''}${eta ? ' · usually ' + eta : ''} (for you: the fee is worth telling them once; the minimum only matters if their order is under it; the time when they ask or at the end)`;
+else if (zoneHere) areaLine = `INSIDE the delivery zone "${zoneHere.name}" of ${zoneHere.branch_name} (from ${zoneHere.source === 'pin' ? 'their pin' : zoneHere.source === 'saved_address' ? 'their saved address' : 'the area they typed: ' + (zoneHere.matched || '')}) · delivery fee ${zoneHere.delivery_fee == null ? 'confirmed by the branch' : money$(zoneHere.delivery_fee)}${zoneHere.min_order ? ' · minimum ' + money$(zoneHere.min_order) : ''}${eta ? ' · usually ' + eta : ''}`;
 else if (zoneElsewhere) areaLine = `their location is in the zone "${zoneElsewhere.name}", served by ${zoneElsewhere.branch_name} — NOT the branch chosen now (${branch ? branch.name_ar : '?'}). For delivery, ${zoneElsewhere.branch_name} is the branch that delivers there.`;
 else if (hasPin && location.in_delivery_area === false) areaLine = 'their pin is OUTSIDE every delivery zone — delivery is not possible there; pickup is (say which branch is nearest)';
 else areaLine = 'unknown yet — a location pin (or the area name) decides the zone, the fee and the branch';
@@ -391,9 +391,8 @@ const facts = [
   '',
   // the state of the order, as facts: what is still needed to place it, or that nothing is in it yet
   (cartItems.length || pending.length)
-    ? `STILL MISSING TO PLACE AN ORDER (asked once they're done choosing — you read that from the chat): ${missing.length ? missing.map(f => LABEL[f] || f).join(' · ') : 'nothing — details complete'}`
-    : `THE ORDER IS STILL EMPTY — first: ${missing.filter(f => ['delivery_method', 'branch', 'delivery_area'].includes(f)).map(f => LABEL[f] || f).join(' · ') || 'nothing — help them choose what to eat'}`
-      + ' · then helping them choose. Nothing is ordered yet, so there is nothing to take their name, number or address for (anything they give on their own is still saved).',
+    ? `STILL MISSING TO PLACE AN ORDER: ${missing.length ? missing.map(f => LABEL[f] || f).join(' · ') : 'nothing — details complete'}`
+    : `THE ORDER IS EMPTY · not known yet: ${missing.filter(f => ['delivery_method', 'branch', 'delivery_area'].includes(f)).map(f => LABEL[f] || f).join(' · ') || 'nothing'}`,
   `ORDER SUMMARY: ${cartItems.length ? summaryStatus : 'n/a (cart empty)'}`,
   `OFFERS RUNNING NOW:\n${offerLines.length ? offerLines.join('\n') : '- none'}`,
   `MENU PICTURES: ${menuPics}`,

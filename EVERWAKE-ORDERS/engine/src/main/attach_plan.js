@@ -11,12 +11,15 @@
 //   · dish photos are kept only for dishes that have one
 // If the Brain failed or timed out, the Agent gets no plan and decides
 // the move herself — the turn never stalls on the Brain.
+// Without a Brain in the workflow (the default) the input is the brief
+// itself: there is no plan, and the Agent thinks the turn through alone.
 // =====================================================================
 // @include shared/basics.js
 
 const b = $('Build Brief').first().json;
 const raw = $input.first().json || {};
-const text = String(raw.text ?? raw.output ?? raw.response ?? '').trim();
+const noBrain = raw.facts_text !== undefined;          // the input is Build Brief's own output
+const text = noBrain ? '' : String(raw.text ?? raw.output ?? raw.response ?? '').trim();
 
 const clip = (v, n) => { const s = String(v ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const list = (v) => (Array.isArray(v) ? v : (v ? [v] : [])).map(x => typeof x === 'string' ? clip(x, 220) : clip(JSON.stringify(x), 260)).filter(Boolean);
@@ -36,8 +39,8 @@ const CODE = /\bM\d{3,5}\b/g;
 
 let planText, brain;
 if (!plan || typeof plan !== 'object') {
-  planText = 'PLAN\n(no plan this turn — read everything and make the best move yourself)';
-  brain = { used: false, error: brainError || (text ? 'unreadable plan' : 'empty plan'), raw: text.slice(0, 500) };
+  planText = noBrain ? '' : 'PLAN\n(no plan this turn — read everything and make the best move yourself)';
+  brain = noBrain ? { used: false } : { used: false, error: brainError || (text ? 'unreadable plan' : 'empty plan'), raw: text.slice(0, 500) };
 } else {
   const menuIds = new Set(b.menu_text.match(CODE) || []);
   const actions = (Array.isArray(plan.actions) ? plan.actions : []).map(a => {
@@ -89,7 +92,7 @@ planText = safe(planText);
 const agentPrompt = [
   b.facts_text, '', b.business_text, '',
   '================ MENU ================', b.menu_text, '',
-  '================ ' + planText.split('\n')[0] + ' ================', planText.split('\n').slice(1).join('\n'), '',
+  ...(planText ? ['================ ' + planText.split('\n')[0] + ' ================', planText.split('\n').slice(1).join('\n'), ''] : []),
   '================ THE CHAT SO FAR (oldest first) ================', b.history_text || '(this is the first message)', '',
   '================ THE CUSTOMER\'S LATEST MESSAGE ================', b.latest_text
 ].join('\n');

@@ -22,6 +22,9 @@
 //   EW_PG_CRED_ID       n8n Postgres credential id  (default EVERWAKE_DB)
 //   EW_OPENAI_CRED_ID   n8n OpenAI credential id    (default the Seagull one)
 //   EW_GEOCODE_URL      Google reverse-geocoder (Apps Script) URL
+//   EW_BRAIN            'on' puts the separate planning Brain back in front of the Agent (default off:
+//                       the Agent reads the whole situation and thinks for itself)
+//   EW_AGENT_EFFORT     the Agent's reasoning effort (default medium)
 //
 // n8n-ids.json (optional) holds the ids n8n gave the workflows, so the
 // tool nodes and the Test Runner are linked already after a re-import:
@@ -43,6 +46,8 @@ const wfRef = (workflowName) => {
             : { __rl: true, value: 'SET_AFTER_IMPORT', mode: 'list', cachedResultName: workflowName };
 };
 const MODEL = process.env.EW_MODEL || 'gpt-5.6-luna';
+const USE_BRAIN = process.env.EW_BRAIN === 'on';
+const AGENT_EFFORT = process.env.EW_AGENT_EFFORT || 'medium';
 const PG = { postgres: { id: process.env.EW_PG_CRED_ID || 'EVERWAKE_DB', name: 'Everwake DB' } };
 const OPENAI = { openAiApi: { id: process.env.EW_OPENAI_CRED_ID || 'CkjJoUDZ38ndmkPM', name: 'OpenAi account' } };
 const GEOCODE_URL = process.env.EW_GEOCODE_URL
@@ -152,13 +157,13 @@ function buildMain() {
   w.add(sticky('Sticky — Overview', [
     '## EVERWAKE — one WhatsApp ordering engine for every restaurant',
     'The Seagull pipeline, multi-restaurant. **Intake** finds the restaurant from the Evolution instance (and its webhook token), the customer from any identity (number or private id), and routes the message: **agent** · **human** (a person took over — the inbox shows it) · **paused** (the agent is OFF: one warm apology, remembered for "we\'re back") · **not live** (still onboarding: only test numbers) · **from the phone** (logged so the agent sees what staff wrote).',
-    '**Build Brief** turns the restaurant\'s rows into FACTS only. **Brain** (high reasoning) plans; **Agent** (low reasoning) runs the tools and writes; **Check Reply** enforces hard rails; one **Rewrite** if needed. Pictures (menu pages, dish photos) go before the text.',
+    (USE_BRAIN ? '**Build Brief** turns the restaurant\'s rows into FACTS only. **Brain** (high reasoning) plans; **Agent** runs the tools and writes; ' : '**Build Brief** turns the restaurant\'s rows into FACTS only. **Agent** reads the whole situation, thinks, runs the tools and writes; ') + '**Check Reply** enforces hard rails; one **Rewrite** if needed. Pictures (menu pages, dish photos) go before the text.',
     'Webhook: **POST /webhook/everwake-evo?token=<channel webhook token>** — set it on every Evolution instance (Settings → WhatsApp in the dashboard shows the exact URL).'
   ].join('\n'), [-2400, 120], 2400, 330));
   w.add(sticky('Sticky — Setup', [
     '### After import',
     '1. Pick the **Everwake DB** Postgres credential on every Postgres node (Supabase: Settings → Database → connection string, port 5432).',
-    '2. Pick your OpenAI credential on Brain Model, Agent Model and Rewrite Model.',
+    (USE_BRAIN ? '2. Pick your OpenAI credential on Brain Model, Agent Model and Rewrite Model.' : '2. Pick your OpenAI credential on Agent Model and Rewrite Model.'),
     '3. Import the three tool workflows, then set them on **manage_cart**, **save_customer_details** and **manage_reservation** (they show SET_AFTER_IMPORT).',
     '4. In **Everwake — Tool: manage_cart**, pick the *Everwake Outbox Secret* credential on **Create Payment Link** (it asks the dashboard for Paymob payment links).',
     '5. Activate. Nothing here is per restaurant: a new restaurant is a row in the database.'
@@ -227,13 +232,15 @@ function buildMain() {
 
   w.add(pg('Load Turn Context', 'select everwake.turn_context($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [620, 460]));
   w.add(code('Build Brief', 'main/build_brief.js', [840, 460]));
-  w.add(chain('Brain', '={{ $json.brief }}', prompt('brain.md'), [1060, 460]));
-  w.add(model('Brain Model', 16000, 'high', 90000, [1060, 700]));
+  if (USE_BRAIN) {
+    w.add(chain('Brain', '={{ $json.brief }}', prompt('brain.md'), [1060, 460]));
+    w.add(model('Brain Model', 16000, 'high', 90000, [1060, 700]));
+  }
   w.add(code('Attach Plan', 'main/attach_plan.js', [1300, 460]));
   w.add({ name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent', typeVersion: 3.1, position: [1520, 460], onError: 'continueRegularOutput',
           parameters: { promptType: 'define', text: '={{ $json.agent_prompt }}', hasOutputParser: false,
                         options: { systemMessage: prompt('agent.md'), maxIterations: 10, returnIntermediateSteps: true, enableStreaming: false } } });
-  w.add(model('Agent Model', 6000, 'low', 90000, [1400, 720]));
+  w.add(model('Agent Model', 12000, AGENT_EFFORT, 120000, [1400, 720]));
   // no strict output parser: one formatting slip threw a good reply away ("Model output doesn't fit
   // required format"); Check Reply reads the JSON and repairs the usual slips itself
   w.add(tool('manage_cart', 'Everwake — Tool: manage_cart', prompt('tool_manage_cart.md'), {
@@ -305,8 +312,12 @@ function buildMain() {
   w.chain('Reverse Geocode (Google)', 'Route: Geocode OK?');
   w.link('Route: Geocode OK?', 'Resolve Location', 0); w.link('Route: Geocode OK?', 'Reverse Geocode (OSM)', 1);
   w.chain('Reverse Geocode (OSM)', 'Resolve Location', 'Save Pin + Zone', 'Load Turn Context');
-  w.chain('Load Turn Context', 'Build Brief', 'Brain', 'Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Rewrite?');
-  w.link('Brain Model', 'Brain', 0, 'ai_languageModel');
+  if (USE_BRAIN) {
+    w.chain('Load Turn Context', 'Build Brief', 'Brain', 'Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Rewrite?');
+    w.link('Brain Model', 'Brain', 0, 'ai_languageModel');
+  } else {
+    w.chain('Load Turn Context', 'Build Brief', 'Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Rewrite?');
+  }
   w.link('Agent Model', 'Agent', 0, 'ai_languageModel');
   w.link('manage_cart', 'Agent', 0, 'ai_tool');
   w.link('save_customer_details', 'Agent', 0, 'ai_tool');

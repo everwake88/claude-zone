@@ -21,9 +21,7 @@ const msg = [
   '================ THE DRAFT REPLY ================',
   (d.decision.reply_messages || []).join('\n[[NEXT]]\n'),
   '',
-  '================ WHAT THE HEAD HOST PLANNED FOR THIS REPLY ================',
-  d.plan_text || '(no plan)',
-  '',
+  ...(d.plan_text ? ['================ WHAT THE HEAD HOST PLANNED FOR THIS REPLY ================', d.plan_text, ''] : []),
   '================ WHAT THE TOOLS DID THIS TURN ================',
   (d.tool_calls || []).length
     ? d.tool_calls.map(c => `- ${c.tool}: ${c.status || 'no status'}${(c.problems || []).length ? ' (problems: ' + c.problems.join(', ') + ')' : ''}`).join('\n')
