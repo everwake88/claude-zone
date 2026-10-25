@@ -17,7 +17,7 @@ const replies = Array.isArray(res.replies) ? res.replies : [];
 const said = replies.map(m => m.kind === 'text' ? m.text : `[${m.kind}] ${m.text || ''}`).join('\n[[NEXT]]\n');
 const t = res.turn || {};
 const b = t.plan && typeof t.plan === 'object' ? t.plan : null;
-const plan = !b ? null : b.used ? `${b.stage} — ${b.objective}${b.place_order ? ' · PLACE' : ''}${b.show_summary ? ' · SUMMARY' : ''}` : `(no plan: ${b.error})`;
+const plan = !b ? null : b.used ? `${b.stage} — ${b.objective}${b.show_summary ? ' · SUMMARY' : ''}${b.send_menu_images ? ' · MENU PICTURES' : ''}` : `(no plan: ${b.error})`;
 
 const lines = [
   `${cmd.last ? '(the latest turn again) ' : ''}${prep.later_hours ? `(${prep.later_hours} hours later) ` : ''}CUSTOMER: ${res.customer ?? cmd.text}`,
@@ -33,12 +33,13 @@ const lines = [
   `plan=${plan ?? '(none)'}`,
   ...(b && b.used && b.read ? [
     `  read: ${b.read}`,
+    b.other_readings ? `  other readings: ${b.other_readings}` : '',
     `  move: ${b.move}`,
-    `  planned actions: ${(b.planned || []).length ? b.planned.join(' | ') : 'none'}`,
-    `  end with: ${b.end_with || '-'} · language: ${b.language || '-'}`,
+    `  say: ${(b.say || []).join(' | ') || '-'}`,
+    `  end with: ${b.end_with || '-'} · language: ${b.language || '-'} · customer: ${b.customer || '-'}`,
     `  already known: ${(b.already_known || []).join(' · ') || '-'}`,
     `  avoid: ${(b.avoid || []).join(' · ') || '-'}`
-  ] : []),
+  ].filter(Boolean) : []),
   `branch=${res.branch ?? '-'} · cart=${short(res.cart || [])}`,
   `details=${short(res.details || {}, 500)}`,
   res.orders ? `orders=${short(res.orders)}` : '',

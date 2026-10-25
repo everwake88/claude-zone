@@ -1,13 +1,13 @@
 // =====================================================================
-// EVERWAKE — Main · NODE: Finalize Rewrite
-// Takes the rewrite, re-checks the same hard rails once, and if it is
-// STILL broken, removes only the offending lines. No further model
-// calls — this path is bounded on purpose.
+// EVERWAKE — Main · NODE: Check Second Draft
+// Takes the Writer's second draft, re-checks the same hard rails once, and
+// if it is STILL broken, removes only the offending lines. No further
+// model calls — this path is bounded on purpose.
 // =====================================================================
 // @include shared/basics.js
 // @include shared/arabic.js
 
-const d = $('Build Rewrite Request').first().json;
+const d = $('Build Second Draft Request').first().json;
 const res = $input.first().json || {};
 const r2 = (n) => Math.round(Number(n) * 100) / 100;
 
@@ -50,7 +50,7 @@ function badLine(s) {
   return false;
 }
 
-let source = 'rewrite';
+let source = 'second_draft';
 const ref = d.booking_requested_ref;
 if (!messages.length) { messages = d.decision.reply_messages || []; source = 'original'; }
 // last resort: drop only the lines that still break a rail
@@ -75,7 +75,7 @@ return [{
     decision: { ...d.decision, reply_messages: messages },
     repair_used: true,
     repair_source: source,
-    needs_rewrite: false,
-    rewrite_ms: d.rewrite_started_at ? Date.now() - new Date(d.rewrite_started_at).getTime() : 0
+    needs_second_draft: false,
+    second_draft_ms: d.second_started_at ? Date.now() - new Date(d.second_started_at).getTime() : 0
   }
 }];

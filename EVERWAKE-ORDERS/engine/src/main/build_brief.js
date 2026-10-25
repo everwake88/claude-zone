@@ -360,11 +360,11 @@ const facts = [
   `BRANCH: ${branch
     ? `${branch.name_ar} (code ${branch.code}) — chosen ${SOURCE_TEXT[branchSource] || 'earlier'} · ${bStatus.text}`
       + ` · delivery ${branch.delivery_enabled === false ? 'NOT offered' : 'yes'} · pickup ${branch.pickup_enabled === false ? 'NOT offered' : 'yes'
-        + (num(branch.prep_minutes) ? ` (usually ready about ${num(branch.prep_minutes)} min after it is placed)` : ' (no set ready time — it goes to the kitchen the moment it is placed, and they get a WhatsApp message when it is ready)')}`
+        + (num(branch.prep_minutes) ? ` (usually ready about ${num(branch.prep_minutes)} min after it is placed)` : ' (no set ready time — a WhatsApp message tells them when it is ready)')}`
       + (seating(branch) ? ' · ' + seating(branch) : '')
       + ` · delivery fee: ${fee == null ? 'not set — the branch confirms it' : money$(fee)}${minOrder ? ' · minimum order ' + money$(minOrder) : ''}`
       + (bStatus.state === 'closed' && settings.accept_orders_when_closed ? ' · orders taken now are prepared when it opens' : '')
-      + (bStatus.state === 'closed' && !settings.accept_orders_when_closed ? ' · orders cannot be PLACED until it opens (choosing, prices and putting the order together all work now — only sending it waits) — and nothing places it later by itself: their order stays here, and it goes in when they message again once it is open' : '')
+      + (bStatus.state === 'closed' && !settings.accept_orders_when_closed ? ' · an order can be put together now but only PLACED once it opens' : '')
     : (branches.length ? 'NOT CHOSEN YET — nothing can be priced or added until it is (each branch can have its own menu and prices)' : 'the restaurant has no branch set up')}`,
   branch && branch.price_note_ar ? `  prices at this branch (for you; tell the customer only if they ask about prices or fees): ${branch.price_note_ar}` : '',
   `ORDER TYPE: ${mode === 'delivery' ? 'delivery' : (mode === 'pickup' ? 'pickup from the branch' : 'not chosen yet — delivery or pickup')}`,

@@ -106,14 +106,14 @@ test('a new customer: pin → zone → cart with offers → details → summary 
   assert.equal(Number(o.total), 590);
   assert.match(o.address_text, /عمارة 5، الدور 2، شقة 4/);
 
-  // 5. a made-up price is caught, and the rewrite fixes it
+  // 5. a made-up price is caught, and the Writer's second draft fixes it
   t = await turn(db, evolutionPayload({ phone, text: 'بكام كيلو الكفتة؟' }), async () => ({
     plan: { stage: 'support' },
     reply: quiet('كيلو الكفتة بـ 999ج'),
     rewrite: ['كيلو الكفتة بـ 480ج']
   }));
   assert.equal(t.checked.repair_used, true);
-  assert.equal(t.checked.repair_source, 'rewrite');
+  assert.equal(t.checked.repair_source, 'second_draft');
   assert.equal(t.outbound[0].text, 'كيلو الكفتة بـ 480ج');
 });
 
@@ -637,7 +637,7 @@ test('the Test Runner: a pretend customer reaches the agent while onboarding, no
   }
 });
 
-test('an English reply shows EGP; a rewrite knows that no tool ran this turn', async () => {
+test('an English reply shows EGP; a second draft knows that no tool ran this turn', async () => {
   const phone = '201099995555';
   let t = await turn(db, evolutionPayload({ phone, text: 'what do you have and how much' }), async () => ({
     plan: { read: 'prices', stage: 'discovery', objective: 'answer', actions: [] },
@@ -651,7 +651,7 @@ test('an English reply shows EGP; a rewrite knows that no tool ran this turn', a
     rewrite: ['تحب رز بسمتي ولا بالخلطة؟']
   }));
   assert.match(t.nodes['Check Reply'].violations.join('\n'), /not prices, totals/);
-  assert.match(t.nodes['Build Rewrite Request'].rewrite_prompt, /no tool ran this turn, so nothing was added/);
+  assert.match(t.nodes['Build Second Draft Request'].second_prompt, /no tool ran this turn, so nothing was added/);
   assert.deepEqual(t.checked.decision.reply_messages, ['تحب رز بسمتي ولا بالخلطة؟']);
 });
 
@@ -964,11 +964,57 @@ test('menu pictures that exist only per branch: before the branch she knows they
       reply: quiet('ده منيو فرع المعادي 👇', { send_menu_images: true }),
     }));
     assert.match(t.brief.facts_text, /each branch has its own menu pictures \(.*المعادي/);
-    assert.equal(t.nodes['Attach Plan'].brain.send_menu_images, true, 'the plan keeps the pictures');
+    assert.equal(t.nodes['Build Writer Request'].brain.send_menu_images, true, 'the plan keeps the pictures');
     assert.equal(t.nodes['Check Reply'].decision.send_menu_images, true, 'the branch found this turn has pages, so they go out');
   } finally {
     await sql(db, `delete from everwake.menu_media where tenant_id = $1 and branch_id = $2 returning 1 as r`, [intake.tenant_id, maadi]);
     await sql(db, `update everwake.menu_media set is_active = true where tenant_id = $1 and branch_id is null returning 1 as r`, [intake.tenant_id]);
     await sql(db, `select everwake.rebuild_snapshot($1::uuid) as r`, [intake.tenant_id]);
   }
+});
+
+test('the Writer sees the order as the Brain left it, with the exact numbers and none of the notes meant for the Brain', async () => {
+  const phone = '201099990511';
+  const t = await turn(db, evolutionPayload({ phone, text: 'عايز فرخة مشوية من الزمالك' }), async () => ({
+    plan: { read: 'orders a chicken', stage: 'building_cart', objective: 'add it and ask if anything else',
+            say: ['the grilled chicken went in — no read-back'], ask: 'anything else with it', language: 'ar', customer: 'man',
+            already_known: ['wants grilled chicken'], avoid: ['reading the order back'] },
+    tools: [{ tool: 'manage_cart', action: 'add', branch: 'zamalek', items: [{ menu_id: 'M001', quantity: 1 }] }],
+    reply: quiet('تحب حاجة معاها؟')
+  }));
+  const req = t.nodes['Build Writer Request'];
+  assert.match(t.brief.facts_text, /BRANCH: NOT CHOSEN YET/, 'before the Brain acted, no branch');
+  assert.match(req.writer_prompt, /BRANCH: الزمالك/, 'the Writer sees the branch the Brain just set');
+  const tools = req.writer_prompt.split('WHAT THE TOOLS DID')[1].split('THE CHAT SO FAR')[0];
+  assert.match(tools, /- manage_cart: status: DONE · branch: الزمالك · cart: \[name: كفتة مشوية, quantity: 1, unit: كيلو, say: كيلو, line total: 480\]/);
+  assert.match(tools, /total: 577\.2/);
+  assert.doesNotMatch(tools, /fact:|M001|L1/, 'no notes meant for the Brain, no codes');
+  assert.doesNotMatch(req.writer_prompt, /================ MENU/, 'no menu: the Writer says what the brief says');
+  assert.match(req.writer_prompt, /End with: anything else with it/);
+  assert.match(req.writer_prompt, /the customer is a man/);
+  assert.equal(req.brain.used, true);
+  assert.deepEqual(t.checked.violations, []);
+  assert.deepEqual(t.checked.decision.reply_messages, ['تحب حاجة معاها؟']);
+});
+
+test('a Brain that failed: the Writer still answers, claims nothing, and sends nothing extra', async () => {
+  const phone = '201099990512';
+  const t = await turn(db, evolutionPayload({ phone, text: 'السلام عليكم' }), async () => ({
+    brainRaw: '', reply: quiet('وعليكم السلام 😊 معاك نور من مشويات النيل، تحب أساعدك في إيه؟')
+  }));
+  const req = t.nodes['Build Writer Request'];
+  assert.equal(req.brain.used, false);
+  assert.match(req.writer_prompt, /NO BRIEF THIS TURN/);
+  assert.equal(t.checked.decision.send_menu_images, false);
+  assert.equal(t.checked.decision.showed_order_summary, false);
+  assert.deepEqual(t.checked.violations, []);
+});
+
+test('formatting slips are tidied: no short vowel marks, no stray letters from another alphabet', async () => {
+  const phone = '201099990513';
+  const t = await turn(db, evolutionPayload({ phone, text: 'hi' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'greet' },
+    reply: quiet('أهلاً بيكِ، معاكِ نور 😊 grilled chicken (Dนي) شكرًا')
+  }));
+  assert.deepEqual(t.checked.decision.reply_messages, ['أهلاً بيك، معاك نور 😊 grilled chicken (Dي) شكرًا']);
 });

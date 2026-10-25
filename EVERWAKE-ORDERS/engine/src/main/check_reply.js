@@ -1,11 +1,11 @@
 // =====================================================================
 // EVERWAKE — Main · NODE: Check Reply
 //
-// NEVER rewrites the host's words and never polices her style: how she
+// NEVER rewrites the Writer's words and never polices her style: how she
 // talks is her understanding (the prompts), not fences here. It checks
 // only hard truth, the same for every restaurant, and a broken rail sends
-// the draft to one rewrite (no tools — nothing can be added to the cart
-// twice) with the exact reason:
+// the draft back to the same Writer once (no tools — nothing can be added
+// to the cart twice) with the exact reason:
 //   · a number that is not a real price / total / fee / detail on file
 //   · saying the order is placed when place_order did not return PLACED
 //   · saying a tool call worked when it failed
@@ -22,17 +22,18 @@
 // @include shared/basics.js
 // @include shared/arabic.js
 
-const pre = $('Attach Plan').first().json;
-const agent = $('Agent').first().json || {};
+const pre = $('Build Writer Request').first().json;
+const agent = $('Brain').first().json || {};          // the tools ran in the Brain
+const writer = $input.first().json || {};
 const ctx = row($('Load Turn Context').first().json);
-const db = row($input.first().json);
+const db = row($('Read Back State').first().json);
 
 const r2 = (n) => Math.round(num(n) * 100) / 100;
 
-// ---- the decision ------------------------------------------------------------
-let decision = agent.output ?? agent.response ?? agent.text ?? null;
+// ---- the reply ---------------------------------------------------------------
+let decision = writer.text ?? writer.output ?? writer.response ?? null;
 if (decision && typeof decision === 'object' && decision.output && typeof decision.output === 'object') decision = decision.output;
-// the agent writes its JSON itself (no strict parser to throw a good reply away): read it, and
+// the Writer writes its JSON itself (no strict parser to throw a good reply away): read it, and
 // repair the usual slips — a code fence, raw line breaks inside a string, a trailing comma
 function readDecision(raw) {
   const s = raw.replace(/^\s*```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
@@ -52,6 +53,8 @@ function readDecision(raw) {
 }
 if (typeof decision === 'string') decision = readDecision(decision);
 decision = obj(decision);
+// what goes with the words — pictures, the summary, a handoff, a note to remember — is the Brain's call
+const plan = obj(pre.plan);
 
 // ---- what the tools did ----------------------------------------------------------
 const steps = arr(agent.intermediateSteps ?? agent.intermediate_steps);
@@ -113,6 +116,9 @@ messages = messages.map(m => m
   .replace(/\*\*(.+?)\*\*/g, '*$1*')           // WhatsApp bold is one asterisk
   .replace(/^#{1,6}\s+/gm, '')                  // no markdown headings on WhatsApp
   .replace(/\[\[\s*NEXT\s*\]\]/g, '')
+  .replace(/[\u064E-\u0650\u0652]/g, '')                  // no short vowel marks (tanween and shadda stay: أهلاً، شكرًا)
+  .replace(/(?:(?![\p{Script=Arabic}\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}])\p{L})+/gu, '')   // a stray letter from another alphabet is a slip
+  .replace(/\(\s*\)/g, '')
   .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()).filter(Boolean);
 if (messages.length > 2) messages = [messages[0], messages.slice(1).join('\n\n')];
 // an English reply shows money as EGP 30, not 30ج (the currency's format, not the host's words)
@@ -178,7 +184,7 @@ for (const a of arr(ctx.saved_addresses)) addDigits(a.text);
 [100, 200, 250, 500, 750, 1000, 1500, 2000].forEach(add);
 const textPool = [pre.customer_message, pre.history_text, JSON.stringify(state.customer || {}), str(obj(db.last_placed).order_no),
                   placedNo, pre.wa_id, JSON.stringify(ctx.last_orders || null), JSON.stringify(ctx.customer || null),
-                  pre.facts_text, JSON.stringify(ctx.reservation || null), JSON.stringify(ctx.reservations_upcoming || null),
+                  pre.facts_text, pre.facts_text_after, JSON.stringify(ctx.reservation || null), JSON.stringify(ctx.reservations_upcoming || null),
                   ...bookingTexts].map(toWesternDigits).join(' ');
 for (const m of textPool.match(/\d+(?:\.\d+)?/g) || []) add(Number(m));
 
@@ -292,7 +298,7 @@ if (bad.length) violations.push(`These numbers are not prices, totals or details
 // menu pictures
 const pages = obj(media.menu_pages);
 const pagesHere = branchId ? (num(pages[branchId]) || num(pages.all)) : num(pages.all);
-let sendMenu = decision.send_menu_images === true || String(decision.send_menu_images).toLowerCase() === 'true';
+let sendMenu = plan.send_menu_images === true;
 if (sendMenu && !pagesHere) {
   sendMenu = false;
   if (/(المنيو|منيو|menu)/i.test(joined) && /(👆|👇|اهو|أهو|اهي|أهي|اتفضل|بعتلك|here)/i.test(joined)) {
@@ -302,7 +308,7 @@ if (sendMenu && !pagesHere) {
 
 // dish photos: only dishes that have one, at most three
 const photoCodes = new Set(arr(media.items_with_photos).map(str));
-let photos = arr(decision.send_item_photos).map(x => (String(x).toUpperCase().match(/\bM\d{3,5}\b/) || [])[0]).filter(Boolean);
+let photos = arr(plan.send_item_photos).map(x => (String(x).toUpperCase().match(/\bM\d{3,5}\b/) || [])[0]).filter(Boolean);
 photos = [...new Set(photos.filter(c => photoCodes.has(c)))].slice(0, 3);
 if (!photos.length && !sendMenu && /(صور[هةت]|الصوره|الصورة|\b(photos?|pictures?|pics?)\b)/i.test(joined) && /(👆|👇|اهي|أهي|اهو|أهو|اتفضل|بعتلك|\bhere\b)/i.test(joined)) {
   violations.push('The reply says a photo is attached, but no photo is being sent (there may be none for that dish). Describe the dish instead.');
@@ -312,7 +318,7 @@ if (!photos.length && !sendMenu && /(صور[هةت]|الصوره|الصورة|\b
 if (joined.length > 2400) violations.push(`The reply is ${joined.length} characters — far too long for WhatsApp. Say less, or two short messages.`);
 
 // summary flag only means something with a real cart
-let showedSummary = decision.showed_order_summary === true || String(decision.showed_order_summary).toLowerCase() === 'true';
+let showedSummary = plan.show_summary === true;
 if (showedSummary && (!items.length || pending.length || placedNo)) showedSummary = false;
 
 // a placement always carries its number
@@ -333,7 +339,7 @@ if (bookingRef && !joined.includes(bookingRef) && messages.length) {
   messages[messages.length - 1] += (en ? `\nBooking reference: ${bookingRef}` : `\nرقم طلب الحجز: ${bookingRef}`);
 }
 
-const handoff = obj(decision.handoff);
+const handoff = obj(plan.handoff);
 return [{
   json: {
     ...pre,
@@ -343,8 +349,8 @@ return [{
       send_item_photos: photos,
       showed_order_summary: showedSummary,
       handoff: { needed: handoff.needed === true || String(handoff.needed) === 'true', reason: str(handoff.reason) },
-      language: str(decision.language) || null,
-      memory_note: str(decision.memory_note)
+      language: str(plan.language) || str(decision.language) || null,
+      memory_note: str(plan.memory_note)
     },
     tools_used: toolsUsed,
     tool_problems: toolProblems,
@@ -361,7 +367,7 @@ return [{
     allowed_numbers: [...allowed],
     allowed_links: allowedLinks,
     violations,
-    needs_rewrite: violations.length > 0,
+    needs_second_draft: violations.length > 0,
     agent_tokens: obj(agent.tokenUsage)
   }
 }];
