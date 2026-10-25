@@ -140,7 +140,7 @@ const pinAddress = hasPin && str(details.address_source) === 'pin';
 const pinAddressUnconfirmed = pinAddress && str(details.address_confirmed) !== 'yes';
 if (pinAddressUnconfirmed && mode !== 'pickup') missing.push('confirm_pin_address');
 const LABEL = {
-  phone_confirmed: 'whether we call them on this same number (ask it lightly: "نكلمك على نفس الرقم ده؟")', full_name: 'name',
+  phone_confirmed: 'whether this same WhatsApp number is the one to call', full_name: 'name',
   phone: 'a phone number for the order (WhatsApp hides their number — ask them to type it)',
   delivery_method: 'delivery or pickup', payment_method: 'payment method', branch: 'branch',
   address_area: 'area/district', address_street: 'street', address_building: 'building no.',
