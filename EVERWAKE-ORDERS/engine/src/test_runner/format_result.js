@@ -31,6 +31,14 @@ const lines = [
   t.agent_error ? `AGENT ERROR: ${t.agent_error}` : '',
   (t.caught || []).length ? `caught=${short(t.caught, 800)}${t.rewritten ? ' → rewritten' : ''}` : 'caught=none',
   `plan=${plan ?? '(none)'}`,
+  ...(b && b.used && b.read ? [
+    `  read: ${b.read}`,
+    `  move: ${b.move}`,
+    `  planned actions: ${(b.planned || []).length ? b.planned.join(' | ') : 'none'}`,
+    `  end with: ${b.end_with || '-'} · language: ${b.language || '-'}`,
+    `  already known: ${(b.already_known || []).join(' · ') || '-'}`,
+    `  avoid: ${(b.avoid || []).join(' · ') || '-'}`
+  ] : []),
   `branch=${res.branch ?? '-'} · cart=${short(res.cart || [])}`,
   `details=${short(res.details || {}, 500)}`,
   res.orders ? `orders=${short(res.orders)}` : '',

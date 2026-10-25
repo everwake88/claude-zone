@@ -82,6 +82,8 @@ if (!plan || typeof plan !== 'object') {
   ].join('\n');
   brain = {
     used: true, stage: clip(plan.stage, 60), objective: clip(plan.objective, 260),
+    read: clip(plan.read, 400), move: clip(plan.move, 800), end_with: clip(plan.end_with, 240),
+    planned: actions, already_known: list(plan.already_known), avoid: list(plan.avoid), language: clip(plan.language, 10),
     actions: actions.length, show_summary: bool(plan.show_summary), place_order: bool(plan.place_order),
     send_menu_images: sendMenu, send_item_photos: photosOk, handoff: bool(handoff.needed)
   };
