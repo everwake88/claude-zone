@@ -393,8 +393,6 @@ export const AR: Record<string, string> = {
   "Customers see it in the first reply.": "العملاء بيشوفوه في أول رد.",
   "Its name (English)": "اسمه (إنجليزي)",
   "Tone and house style": "الأسلوب وطريقة الكلام",
-  "How the agent sounds — replies in your own words": "صوت المساعد — ردود بكلامك إنت",
-  "Write a few replies the way you would answer customers yourself (a greeting, a suggestion, asking for the address…). The agent learns the voice from them — it never copies them word for word.": "اكتب كام رد بالطريقة اللي إنت بترد بيها على العملاء (ترحيب، ترشيح، طلب العنوان…). المساعد بيتعلم منها الأسلوب — ومش بينقلها كلمة بكلمة.",
   "How it should sound — e.g. warm Egyptian host, short replies, proud of the charcoal grill.": "يتكلم إزاي — مثلاً مضيف مصري ودود، ردود قصيرة، فخور بالمشويات على الفحم.",
   "Language for customers who have not written yet": "اللغة للعملاء اللي لسه ما كتبوش",
   "Arabic": "العربي",

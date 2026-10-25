@@ -34,9 +34,6 @@ export default function AgentSettings() {
           <Field label={t('Tone and house style')} hint={t('How it should sound — e.g. warm Egyptian host, short replies, proud of the charcoal grill.')} className="sm:col-span-2">
             <Textarea disabled={ro} rows={2} value={p.tone || ''} onChange={e => setP({ ...p, tone: e.target.value })} />
           </Field>
-          <Field label={t('How the agent sounds — replies in your own words')} hint={t('Write a few replies the way you would answer customers yourself (a greeting, a suggestion, asking for the address…). The agent learns the voice from them — it never copies them word for word.')} className="sm:col-span-2">
-            <Textarea dir="rtl" disabled={ro} rows={8} value={p.voice_sample || ''} onChange={e => setP({ ...p, voice_sample: e.target.value })} />
-          </Field>
           <Field label={t('Language for customers who have not written yet')}>
             <Select disabled={ro} value={names.default_language} onChange={e => setNames({ ...names, default_language: e.target.value as 'ar' | 'en' })}>
               <option value="ar">{t('Arabic')}</option><option value="en">{t('English')}</option>
