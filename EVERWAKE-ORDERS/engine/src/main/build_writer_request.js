@@ -79,8 +79,9 @@ const briefText = !hasPlan
       `What is going on: ${clip(plan.read, 500)}`,
       `This reply must: ${clip(plan.objective, 300)}`,
       `The move: ${clip(plan.move, 900)}`,
-      'Say (each point once, in your own words — and nothing that is not here):',
+      'The substance (notes for you, not sentences — every fact the reply states comes from here, FACTS or the tools):',
       say.length ? say.map(s => '- ' + s).join('\n') : '- (nothing beyond the move)',
+      `The moment: ${clip(plan.moment, 300) || '-'}`,
       `End with: ${clip(plan.ask ?? plan.end_with, 300) || '(no question needed)'}`,
       `The full order summary goes in this reply: ${bool(plan.show_summary) ? 'YES' : 'no'}`,
       `The menu pictures go with this reply: ${sendMenu ? 'YES — a few words with them, never an offer to send them' : 'no'}`,
@@ -103,7 +104,7 @@ const writerPrompt = [
 const brain = !hasPlan ? { used: false, error: brainError || (out ? 'unreadable plan' : 'empty plan'), raw: clip(out, 400) } : {
   used: true, stage: clip(plan.stage, 60), objective: clip(plan.objective, 300),
   read: clip(plan.read, 500), other_readings: clip(plan.other_readings, 400), move: clip(plan.move, 900),
-  say, end_with: clip(plan.ask ?? plan.end_with, 300), already_known: list(plan.already_known), avoid: list(plan.avoid),
+  say, moment: clip(plan.moment, 300), end_with: clip(plan.ask ?? plan.end_with, 300), already_known: list(plan.already_known), avoid: list(plan.avoid),
   language: clip(plan.language, 10), customer: clip(plan.customer, 20),
   show_summary: bool(plan.show_summary), send_menu_images: sendMenu, send_item_photos: photos, handoff: bool(handoff.needed),
   actions: steps.length

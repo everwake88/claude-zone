@@ -23,7 +23,7 @@
 //   EW_OPENAI_CRED_ID   n8n OpenAI credential id    (default the Seagull one)
 //   EW_GEOCODE_URL      Google reverse-geocoder (Apps Script) URL
 //   EW_BRAIN_EFFORT     the Brain's reasoning effort (default high): it thinks and runs the tools
-//   EW_WRITER_EFFORT    the Writer's reasoning effort (default low): it only writes
+//   EW_WRITER_EFFORT    the Writer's reasoning effort (default medium): it only writes, but well
 //
 // n8n-ids.json (optional) holds the ids n8n gave the workflows, so the
 // tool nodes and the Test Runner are linked already after a re-import:
@@ -46,7 +46,7 @@ const wfRef = (workflowName) => {
 };
 const MODEL = process.env.EW_MODEL || 'gpt-5.6-luna';
 const BRAIN_EFFORT = process.env.EW_BRAIN_EFFORT || 'high';
-const WRITER_EFFORT = process.env.EW_WRITER_EFFORT || 'low';
+const WRITER_EFFORT = process.env.EW_WRITER_EFFORT || 'medium';
 const PG = { postgres: { id: process.env.EW_PG_CRED_ID || 'EVERWAKE_DB', name: 'Everwake DB' } };
 const OPENAI = { openAiApi: { id: process.env.EW_OPENAI_CRED_ID || 'CkjJoUDZ38ndmkPM', name: 'OpenAi account' } };
 const GEOCODE_URL = process.env.EW_GEOCODE_URL

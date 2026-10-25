@@ -36,6 +36,7 @@ const lines = [
     b.other_readings ? `  other readings: ${b.other_readings}` : '',
     `  move: ${b.move}`,
     `  say: ${(b.say || []).join(' | ') || '-'}`,
+    b.moment ? `  moment: ${b.moment}` : '',
     `  end with: ${b.end_with || '-'} · language: ${b.language || '-'} · customer: ${b.customer || '-'}`,
     `  already known: ${(b.already_known || []).join(' · ') || '-'}`,
     `  avoid: ${(b.avoid || []).join(' · ') || '-'}`
