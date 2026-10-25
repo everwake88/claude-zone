@@ -295,11 +295,15 @@ if (bad.length) violations.push(`These numbers are not prices, totals or details
 const pages = obj(media.menu_pages);
 const pagesHere = branchId ? (num(pages[branchId]) || num(pages.all)) : num(pages.all);
 let sendMenu = decision.send_menu_images === true || String(decision.send_menu_images).toLowerCase() === 'true';
+let menuUnsendable = false;
 if (sendMenu && !pagesHere) {
+  // she meant to send the pictures and there are none to send (often: no branch set yet, and the
+  // pictures are per branch) — whatever she says about them can't go out as if they were here
   sendMenu = false;
-  if (/(المنيو|منيو|menu)/i.test(joined) && /(👆|👇|اهو|أهو|اهي|أهي|اتفضل|بعتلك|here)/i.test(joined)) {
-    violations.push('There are no menu pictures to send — do not say they were sent; offer the dishes in text instead.');
-  }
+  menuUnsendable = true;
+  violations.push(branchId || !Object.keys(pages).length
+    ? 'There are no menu pictures to send — do not say they were sent; offer the dishes in text instead.'
+    : 'The menu pictures are per branch and no branch is set, so none were sent — do not say they were.');
 }
 
 // dish photos: only dishes that have one, at most three
@@ -363,6 +367,7 @@ return [{
     allowed_numbers: [...allowed],
     allowed_links: allowedLinks,
     violations,
+    menu_unsendable: menuUnsendable,
     needs_rewrite: violations.length > 0,   // read by Route: Needs Repair?
     agent_tokens: obj(agent.tokenUsage)
   }

@@ -975,3 +975,41 @@ test('formatting slips are tidied: no short vowel marks, no stray letters from a
   }));
   assert.deepEqual(t.checked.decision.reply_messages, ['أهلاً بيك، معاك نور 😊 grilled chicken (Dي) شكرًا']);
 });
+
+test('pictures per branch: naming the branch lets them go out; without a branch, a promise of them never goes out', async () => {
+  const phone = '201099990515';
+  const intake = (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js',
+    { input: evolutionPayload({ phone, text: 'hi' }) }))[0].b64_intake)).r;
+  const maadi = (await sql(db, `select id as r from everwake.branches where tenant_id = $1 and name_ar = 'المعادي'`, [intake.tenant_id])).r;
+  await sql(db, `update everwake.menu_media set is_active = false where tenant_id = $1 and branch_id is null returning 1 as r`, [intake.tenant_id]);
+  await sql(db, `insert into everwake.menu_media (tenant_id, branch_id, url) values ($1, $2, 'https://example.com/maadi-menu.jpg') returning 1 as r`, [intake.tenant_id, maadi]);
+  await sql(db, `select everwake.rebuild_snapshot($1::uuid) as r`, [intake.tenant_id]);
+  try {
+    // no branch set, but she says the menu is here: that line is dropped, the rest goes out
+    let t = await turn(db, evolutionPayload({ phone, text: 'المعادي' }), async () => ({
+      plan: { read: 'x', stage: 'discovery', objective: 'x' },
+      reply: quiet('دي منيو فرع المعادي 😊\nلو محتار قولي كام فرد', { send_menu_images: true })
+    }));
+    assert.equal(t.checked.decision.send_menu_images, false);
+    assert.deepEqual(t.checked.decision.reply_messages, ['لو محتار قولي كام فرد']);
+    // nothing else to say: an honest question instead of a promise
+    t = await turn(db, evolutionPayload({ phone, text: 'المنيو' }), async () => ({
+      plan: { read: 'x', stage: 'discovery', objective: 'x' },
+      reply: quiet('اتفضل المنيو 👇', { send_menu_images: true })
+    }));
+    assert.deepEqual(t.checked.decision.reply_messages, ['المنيو بيختلف حسب الفرع 😊 تحب منيو أنهي فرع؟']);
+    // the branch is set as they name it: the pictures go out with the reply
+    t = await turn(db, evolutionPayload({ phone, text: 'فرع المعادي' }), async () => ({
+      plan: { read: 'x', stage: 'discovery', objective: 'x', actions: [{ tool: 'manage_cart', do: 'set_branch maadi' }] },
+      tools: [{ tool: 'manage_cart', action: 'set_branch', branch: 'maadi' }],
+      reply: quiet('اتفضل منيو فرع المعادي 👇', { send_menu_images: true })
+    }));
+    assert.deepEqual(t.checked.violations, []);
+    assert.equal(t.checked.decision.send_menu_images, true);
+    assert.ok(t.outbound.some(o => o.kind === 'image'), JSON.stringify(t.outbound.map(o => o.kind)));
+  } finally {
+    await sql(db, `delete from everwake.menu_media where tenant_id = $1 and branch_id = $2 returning 1 as r`, [intake.tenant_id, maadi]);
+    await sql(db, `update everwake.menu_media set is_active = true where tenant_id = $1 and branch_id is null returning 1 as r`, [intake.tenant_id]);
+    await sql(db, `select everwake.rebuild_snapshot($1::uuid) as r`, [intake.tenant_id]);
+  }
+});

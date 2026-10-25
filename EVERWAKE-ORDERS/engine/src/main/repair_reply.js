@@ -23,6 +23,7 @@ const PAID = /(تم|اتم)\s*(استلام\s*)?الدفع|الدفع\s*(وصل|
 
 function badLine(s) {
   if (LEAK.test(s)) return true;
+  if (d.menu_unsendable && /(المنيو|منيو|menu)/i.test(s)) return true;   // pictures she meant to send but none went
   if (!d.order_placed_no && !BOOKING_WORDS.test(s) && CLAIM.test(s)) return true;
   if (!d.booking_confirmed && BOOKED.test(s) && !NOT_YET.test(s)) return true;
   if (!d.paid_now && PAID.test(s) && !NOT_YET.test(s)) return true;
@@ -48,7 +49,9 @@ if (toolFailed) { messages = []; source = 'fallback'; }
 messages = messages.map(m => m.split('\n').filter(line => !badLine(line)).join('\n').replace(/\n{3,}/g, '\n\n').trim()).filter(Boolean);
 if (!messages.length) {
   const en = str(d.decision && d.decision.language) === 'en';
-  messages = [en ? 'One moment please, let me check that for you 🙏' : 'ثانية واحدة أتأكدلك من الحتة دي 🙏'];
+  messages = d.menu_unsendable && !d.branch_after
+    ? [en ? 'The menu differs a little by branch 😊 which branch would you like it for?' : 'المنيو بيختلف حسب الفرع 😊 تحب منيو أنهي فرع؟']
+    : [en ? 'One moment please, let me check that for you 🙏' : 'ثانية واحدة أتأكدلك من الحتة دي 🙏'];
   source = 'fallback';
 }
 if (d.pay_link && !messages.join('\n').includes(d.pay_link)) {
