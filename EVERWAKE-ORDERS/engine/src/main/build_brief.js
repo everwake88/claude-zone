@@ -366,7 +366,7 @@ const facts = [
       + (bStatus.state === 'closed' && settings.accept_orders_when_closed ? ' · orders taken now are prepared when it opens' : '')
       + (bStatus.state === 'closed' && !settings.accept_orders_when_closed ? ' · an order can be put together now but only PLACED once it opens' : '')
     : (branches.length ? 'NOT CHOSEN YET — nothing can be priced or added until it is (each branch can have its own menu and prices)' : 'the restaurant has no branch set up')}`,
-  branch && branch.price_note_ar ? `  prices at this branch (for you; tell the customer only if they ask about prices or fees): ${branch.price_note_ar}` : '',
+  branch && branch.price_note_ar ? `  prices at this branch: ${branch.price_note_ar} — the summary adds it, so it's never mentioned before then unless they ask` : '',
   `ORDER TYPE: ${mode === 'delivery' ? 'delivery' : (mode === 'pickup' ? 'pickup from the branch' : 'not chosen yet — delivery or pickup')}`,
   `DELIVERY AREA: ${areaLine}`,
   '',
