@@ -45,9 +45,9 @@ const logRow = {
   cart_action: arr(d.tools_used).filter(t => t === 'manage_cart').length ? 'tool_call' : 'none',
   qa_passed: !arr(d.violations).length,
   repair_used: d.repair_used === true,
-  llm_calls: 1 + arr(d.tools_used).length + 1 + (d.repair_used ? 1 : 0),   // the Brain (once per tool round), the Writer, a second draft
+  llm_calls: (d.brain && d.brain.used ? 1 : 0) + 1 + arr(d.tools_used).length + (d.repair_used ? 1 : 0),
   duration_total_ms: durationTotal,
-  duration_llm_ms: d.brain_started_at ? Date.now() - new Date(d.brain_started_at).getTime() : 0,
+  duration_llm_ms: d.agent_started_at ? Date.now() - new Date(d.brain_started_at || d.agent_started_at).getTime() : 0,
   prompt_tokens: Number(tokens.promptTokens || 0),
   completion_tokens: Number(tokens.completionTokens || 0),
   input: { message: d.customer_message, buffered_count: d.buffered_count, has_location: d.has_location, branch: d.branch_id },
@@ -65,8 +65,7 @@ const logRow = {
     send_menu_images: !!dec.send_menu_images,
     send_item_photos: arr(dec.send_item_photos),
     handoff,
-    brain_ms: d.brain_started_at && d.writer_started_at ? new Date(d.writer_started_at).getTime() - new Date(d.brain_started_at).getTime() : 0,
-    brief_chars: d.brief_chars, writer_prompt_chars: d.writer_prompt_chars
+    brief_chars: d.brief_chars, agent_prompt_chars: d.agent_prompt_chars
   }
 };
 

@@ -1,11 +1,10 @@
 // =====================================================================
 // EVERWAKE — Main · NODE: Check Reply
 //
-// NEVER rewrites the Writer's words and never polices her style: how she
+// NEVER rewrites the host's words and never polices her style: how she
 // talks is her understanding (the prompts), not fences here. It checks
 // only hard truth, the same for every restaurant, and a broken rail sends
-// the draft back to the same Writer once (no tools — nothing can be added
-// to the cart twice) with the exact reason:
+// the reply to Repair Reply, which drops only the lines that break it:
 //   · a number that is not a real price / total / fee / detail on file
 //   · saying the order is placed when place_order did not return PLACED
 //   · saying a tool call worked when it failed
@@ -22,18 +21,17 @@
 // @include shared/basics.js
 // @include shared/arabic.js
 
-const pre = $('Build Writer Request').first().json;
-const agent = $('Brain').first().json || {};          // the tools ran in the Brain
-const writer = $input.first().json || {};
+const pre = $('Attach Plan').first().json;
+const agent = $('Agent').first().json || {};
 const ctx = row($('Load Turn Context').first().json);
-const db = row($('Read Back State').first().json);
+const db = row($input.first().json);
 
 const r2 = (n) => Math.round(num(n) * 100) / 100;
 
-// ---- the reply ---------------------------------------------------------------
-let decision = writer.text ?? writer.output ?? writer.response ?? null;
+// ---- the decision ------------------------------------------------------------
+let decision = agent.output ?? agent.response ?? agent.text ?? null;
 if (decision && typeof decision === 'object' && decision.output && typeof decision.output === 'object') decision = decision.output;
-// the Writer writes its JSON itself (no strict parser to throw a good reply away): read it, and
+// the agent writes its JSON itself (no strict parser to throw a good reply away): read it, and
 // repair the usual slips — a code fence, raw line breaks inside a string, a trailing comma
 function readDecision(raw) {
   const s = raw.replace(/^\s*```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
@@ -53,8 +51,6 @@ function readDecision(raw) {
 }
 if (typeof decision === 'string') decision = readDecision(decision);
 decision = obj(decision);
-// what goes with the words — pictures, the summary, a handoff, a note to remember — is the Brain's call
-const plan = obj(pre.plan);
 
 // ---- what the tools did ----------------------------------------------------------
 const steps = arr(agent.intermediateSteps ?? agent.intermediate_steps);
@@ -184,7 +180,7 @@ for (const a of arr(ctx.saved_addresses)) addDigits(a.text);
 [100, 200, 250, 500, 750, 1000, 1500, 2000].forEach(add);
 const textPool = [pre.customer_message, pre.history_text, JSON.stringify(state.customer || {}), str(obj(db.last_placed).order_no),
                   placedNo, pre.wa_id, JSON.stringify(ctx.last_orders || null), JSON.stringify(ctx.customer || null),
-                  pre.facts_text, pre.facts_text_after, JSON.stringify(ctx.reservation || null), JSON.stringify(ctx.reservations_upcoming || null),
+                  pre.facts_text, JSON.stringify(ctx.reservation || null), JSON.stringify(ctx.reservations_upcoming || null),
                   ...bookingTexts].map(toWesternDigits).join(' ');
 for (const m of textPool.match(/\d+(?:\.\d+)?/g) || []) add(Number(m));
 
@@ -298,7 +294,7 @@ if (bad.length) violations.push(`These numbers are not prices, totals or details
 // menu pictures
 const pages = obj(media.menu_pages);
 const pagesHere = branchId ? (num(pages[branchId]) || num(pages.all)) : num(pages.all);
-let sendMenu = plan.send_menu_images === true;
+let sendMenu = decision.send_menu_images === true || String(decision.send_menu_images).toLowerCase() === 'true';
 if (sendMenu && !pagesHere) {
   sendMenu = false;
   if (/(المنيو|منيو|menu)/i.test(joined) && /(👆|👇|اهو|أهو|اهي|أهي|اتفضل|بعتلك|here)/i.test(joined)) {
@@ -308,7 +304,7 @@ if (sendMenu && !pagesHere) {
 
 // dish photos: only dishes that have one, at most three
 const photoCodes = new Set(arr(media.items_with_photos).map(str));
-let photos = arr(plan.send_item_photos).map(x => (String(x).toUpperCase().match(/\bM\d{3,5}\b/) || [])[0]).filter(Boolean);
+let photos = arr(decision.send_item_photos).map(x => (String(x).toUpperCase().match(/\bM\d{3,5}\b/) || [])[0]).filter(Boolean);
 photos = [...new Set(photos.filter(c => photoCodes.has(c)))].slice(0, 3);
 if (!photos.length && !sendMenu && /(صور[هةت]|الصوره|الصورة|\b(photos?|pictures?|pics?)\b)/i.test(joined) && /(👆|👇|اهي|أهي|اهو|أهو|اتفضل|بعتلك|\bhere\b)/i.test(joined)) {
   violations.push('The reply says a photo is attached, but no photo is being sent (there may be none for that dish). Describe the dish instead.');
@@ -318,7 +314,7 @@ if (!photos.length && !sendMenu && /(صور[هةت]|الصوره|الصورة|\b
 if (joined.length > 2400) violations.push(`The reply is ${joined.length} characters — far too long for WhatsApp. Say less, or two short messages.`);
 
 // summary flag only means something with a real cart
-let showedSummary = plan.show_summary === true;
+let showedSummary = decision.showed_order_summary === true || String(decision.showed_order_summary).toLowerCase() === 'true';
 if (showedSummary && (!items.length || pending.length || placedNo)) showedSummary = false;
 
 // a placement always carries its number
@@ -339,7 +335,7 @@ if (bookingRef && !joined.includes(bookingRef) && messages.length) {
   messages[messages.length - 1] += (en ? `\nBooking reference: ${bookingRef}` : `\nرقم طلب الحجز: ${bookingRef}`);
 }
 
-const handoff = obj(plan.handoff);
+const handoff = obj(decision.handoff);
 return [{
   json: {
     ...pre,
@@ -349,8 +345,8 @@ return [{
       send_item_photos: photos,
       showed_order_summary: showedSummary,
       handoff: { needed: handoff.needed === true || String(handoff.needed) === 'true', reason: str(handoff.reason) },
-      language: str(plan.language) || str(decision.language) || null,
-      memory_note: str(plan.memory_note)
+      language: str(decision.language) || null,
+      memory_note: str(decision.memory_note)
     },
     tools_used: toolsUsed,
     tool_problems: toolProblems,
@@ -367,7 +363,7 @@ return [{
     allowed_numbers: [...allowed],
     allowed_links: allowedLinks,
     violations,
-    needs_second_draft: violations.length > 0,
+    needs_rewrite: violations.length > 0,   // read by Route: Needs Repair?
     agent_tokens: obj(agent.tokenUsage)
   }
 }];

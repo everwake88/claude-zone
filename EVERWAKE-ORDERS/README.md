@@ -5,7 +5,7 @@ restaurant's WhatsApp as they do today. An AI host takes the order: the
 menu, choices, weights, the delivery zone, offers, the address, payment.
 The restaurant runs everything from a dashboard.
 
-It is the Seagull engine — Brain (thinks and runs the tools), Writer, Check Reply —
+It is the Seagull engine — Brain, Agent, tools, Check Reply —
 rebuilt so **one engine serves every restaurant**. A new restaurant is
 rows in the database, not a copy of the workflows.
 

@@ -1,27 +1,15 @@
 // =====================================================================
-// EVERWAKE — Main · NODE: Check Second Draft
-// Takes the Writer's second draft, re-checks the same hard rails once, and
-// if it is STILL broken, removes only the offending lines. No further
-// model calls — this path is bounded on purpose.
+// EVERWAKE — Main · NODE: Repair Reply
+// Only runs when Check Reply found a hard truth broken (a number that is
+// not real, a placement that didn't happen, a leaked code, a link that
+// isn't ours). No model rewrites her words: the lines that break a rail
+// are dropped and everything else she wrote goes out as she wrote it.
 // =====================================================================
 // @include shared/basics.js
 // @include shared/arabic.js
 
-const d = $('Build Second Draft Request').first().json;
-const res = $input.first().json || {};
+const d = $input.first().json;
 const r2 = (n) => Math.round(Number(n) * 100) / 100;
-
-let text = str(res.text ?? res.output ?? res.response ?? '');
-let messages = [];
-try {
-  const s = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
-  const a = s.indexOf('{'), z = s.lastIndexOf('}');
-  const parsed = a !== -1 && z > a ? JSON.parse(s.slice(a, z + 1)) : null;
-  messages = arr(parsed && parsed.reply_messages).map(str).filter(Boolean);
-} catch (e) { messages = []; }
-if (!messages.length && text && !/^\s*\{/.test(text)) messages = [text];
-messages = messages.flatMap(m => m.split(/^\s*\[\[\s*NEXT\s*\]\]\s*$/m).map(x => x.trim()).filter(Boolean)).slice(0, 2)
-  .map(m => m.replace(/\*\*(.+?)\*\*/g, '*$1*').replace(/^#{1,6}\s+/gm, '').trim());
 
 const allowed = new Set((d.allowed_numbers || []).map(Number));
 const LEAK = /\bM\d{3,5}\b|\bP\d+-M\d{3,5}\b|\b[0-9a-f]{8}-[0-9a-f]{4}-|manage_cart|save_customer_details|manage_reservation|summary_text|ref_no|pending_id|line_id|menu_id|set_branch|place_order|reorder_last|apply_code|saved_address/i;
@@ -50,9 +38,12 @@ function badLine(s) {
   return false;
 }
 
-let source = 'second_draft';
+let source = 'lines_dropped';
 const ref = d.booking_requested_ref;
-if (!messages.length) { messages = d.decision.reply_messages || []; source = 'original'; }
+let messages = arr(d.decision && d.decision.reply_messages).map(str).filter(Boolean);
+// a tool that failed changed nothing: whatever she said about it can't go out — an honest moment instead
+const toolFailed = arr(d.violations).some(v => /^These tool calls FAILED/.test(str(v)));
+if (toolFailed) { messages = []; source = 'fallback'; }
 // last resort: drop only the lines that still break a rail
 messages = messages.map(m => m.split('\n').filter(line => !badLine(line)).join('\n').replace(/\n{3,}/g, '\n\n').trim()).filter(Boolean);
 if (!messages.length) {
@@ -75,7 +66,6 @@ return [{
     decision: { ...d.decision, reply_messages: messages },
     repair_used: true,
     repair_source: source,
-    needs_second_draft: false,
-    second_draft_ms: d.second_started_at ? Date.now() - new Date(d.second_started_at).getTime() : 0
+    needs_rewrite: false
   }
 }];

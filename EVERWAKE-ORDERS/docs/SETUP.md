@@ -102,14 +102,14 @@ here for the credentials and workflows.
    4. `everwake-outbox.json`
    5. `everwake-main.json`
    6. `everwake-test-runner.json` (optional: chat with an agent without WhatsApp, below)
-3. **In "Everwake — Main (Brain + Writer)":**
+3. **In "Everwake — Main (Brain + Agent)":**
    - Open the **manage_cart**, **save_customer_details** and **manage_reservation** tool nodes, which show `SET_AFTER_IMPORT`, and pick the three tool workflows you just imported.
-   - Pick the **Everwake DB** credential on every Postgres node, and your OpenAI credential on Brain Model and Writer Model. n8n lists the nodes missing a credential.
+   - Pick the **Everwake DB** credential on every Postgres node, and your OpenAI credential on Brain Model and Agent Model. n8n lists the nodes missing a credential.
 4. **In "Everwake — Outbox + Housekeeping":** pick **Everwake DB** on the Postgres nodes and **Everwake Outbox Secret** on *Ping From Dashboard*.
    **In "Everwake — Tool: manage_cart":** pick **Everwake Outbox Secret** on *Create Payment Link* too (it asks the dashboard for Paymob links).
 5. **Activate** Main and Outbox. The three tools are called by Main and need no activation.
    Each tool workflow has one Postgres node: pick **Everwake DB** on it too.
-6. **The Test Runner** (optional): pick **Everwake DB** on its two Postgres nodes and *Everwake — Main (Brain + Writer)* on **Run The Agent (Main)**, then **Open chat**. Write as a customer; the real Main answers from a pretend number (200000000001), records the replies and sends nothing on WhatsApp — no kitchen ticket either — and it works while a restaurant is still onboarding. `/reset` starts a brand-new customer, `/later 5 <message>` lets 5 hours pass first, `/pin <lat>,<lng>` sends a location pin, `#2 <message>` is a second pretend customer, `@slug <message>` tests another restaurant (the default is set at the top of *Read Test Command*). Its orders show on the board until `/reset` removes them. Needs the database patch `2026-10-24_test_chat.sql` on an existing install.
+6. **The Test Runner** (optional): pick **Everwake DB** on its two Postgres nodes and *Everwake — Main (Brain + Agent)* on **Run The Agent (Main)**, then **Open chat**. Write as a customer; the real Main answers from a pretend number (200000000001), records the replies and sends nothing on WhatsApp — no kitchen ticket either — and it works while a restaurant is still onboarding. `/reset` starts a brand-new customer, `/later 5 <message>` lets 5 hours pass first, `/pin <lat>,<lng>` sends a location pin, `#2 <message>` is a second pretend customer, `@slug <message>` tests another restaurant (the default is set at the top of *Read Test Command*). Its orders show on the board until `/reset` removes them. Needs the database patch `2026-10-24_test_chat.sql` on an existing install.
 7. *(Busy platform)* Run n8n in **queue mode** with a couple of workers once you pass a handful of restaurants. The debounce and conversation locks already make concurrent runs safe.
 
 The workflows are generated. To change the engine:
@@ -204,7 +204,7 @@ clear yes to that summary sends it. Sending it:
 
 The team calls the customer and presses **Confirm**: that is when the customer
 hears on WhatsApp that the table is theirs. The agent never says a booking is
-confirmed before that (a rail in Check Reply sends a reply that does back to the Writer).
+confirmed before that (a rail in Check Reply drops a line that does).
 **Decline** (with an optional reason) offers them another time; after the day,
 mark **Arrived** or **Did not come**. A customer can cancel on WhatsApp, and the
 branch is told. **Booking rules** on that page sets the largest group, how far

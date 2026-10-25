@@ -6,7 +6,7 @@
 // prompts in prompts/. This script assembles them into six workflows
 // you import into n8n (dist/*.json):
 //
-//   Everwake — Main (Brain + Writer)            the WhatsApp webhook, every restaurant
+//   Everwake — Main (Brain + Agent)            the WhatsApp webhook, every restaurant
 //   Everwake — Tool: manage_cart               called by the Agent
 //   Everwake — Tool: save_customer_details     called by the Agent
 //   Everwake — Tool: manage_reservation        called by the Agent (table bookings)
@@ -22,9 +22,10 @@
 //   EW_PG_CRED_ID       n8n Postgres credential id  (default EVERWAKE_DB)
 //   EW_OPENAI_CRED_ID   n8n OpenAI credential id    (default the Seagull one)
 //   EW_GEOCODE_URL      Google reverse-geocoder (Apps Script) URL
-//   EW_BRAIN_EFFORT     the Brain's reasoning effort (default medium — it thinks again after every tool
-//                       round, so high makes a turn of several rounds slow): it thinks and runs the tools
-//   EW_WRITER_EFFORT    the Writer's reasoning effort (default medium): it only writes, but well
+//   EW_BRAIN            'off' drops the planning Brain: the Agent then reads the whole situation and
+//                       thinks for itself (default on: the Brain thinks, the Agent writes)
+//   EW_AGENT_EFFORT     the Agent's reasoning effort (default low behind the Brain, medium alone)
+//   (no Rewrite model: a reply that breaks a hard rail has only the offending lines dropped)
 //
 // n8n-ids.json (optional) holds the ids n8n gave the workflows, so the
 // tool nodes and the Test Runner are linked already after a re-import:
@@ -38,7 +39,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const IDS = existsSync(join(ROOT, 'n8n-ids.json')) ? JSON.parse(readFileSync(join(ROOT, 'n8n-ids.json'), 'utf8')) : {};
-const WF_KEY = { 'Everwake — Main (Brain + Writer)': 'main', 'Everwake — Tool: manage_cart': 'cart',
+const WF_KEY = { 'Everwake — Main (Brain + Agent)': 'main', 'Everwake — Tool: manage_cart': 'cart',
                  'Everwake — Tool: save_customer_details': 'details', 'Everwake — Tool: manage_reservation': 'reservation' };
 const wfRef = (workflowName) => {
   const id = IDS[WF_KEY[workflowName]];
@@ -46,8 +47,8 @@ const wfRef = (workflowName) => {
             : { __rl: true, value: 'SET_AFTER_IMPORT', mode: 'list', cachedResultName: workflowName };
 };
 const MODEL = process.env.EW_MODEL || 'gpt-5.6-luna';
-const BRAIN_EFFORT = process.env.EW_BRAIN_EFFORT || 'medium';
-const WRITER_EFFORT = process.env.EW_WRITER_EFFORT || 'medium';
+const USE_BRAIN = process.env.EW_BRAIN !== 'off';
+const AGENT_EFFORT = process.env.EW_AGENT_EFFORT || (USE_BRAIN ? 'low' : 'medium');
 const PG = { postgres: { id: process.env.EW_PG_CRED_ID || 'EVERWAKE_DB', name: 'Everwake DB' } };
 const OPENAI = { openAiApi: { id: process.env.EW_OPENAI_CRED_ID || 'CkjJoUDZ38ndmkPM', name: 'OpenAi account' } };
 const GEOCODE_URL = process.env.EW_GEOCODE_URL
@@ -153,17 +154,17 @@ const TEST = "$('Normalize Inbound').first().json.is_test === true";
 // Main
 // =========================================================================
 function buildMain() {
-  const w = new Workflow('Everwake — Main (Brain + Writer)');
+  const w = new Workflow('Everwake — Main (Brain + Agent)');
   w.add(sticky('Sticky — Overview', [
     '## EVERWAKE — one WhatsApp ordering engine for every restaurant',
     'The Seagull pipeline, multi-restaurant. **Intake** finds the restaurant from the Evolution instance (and its webhook token), the customer from any identity (number or private id), and routes the message: **agent** · **human** (a person took over — the inbox shows it) · **paused** (the agent is OFF: one warm apology, remembered for "we\'re back") · **not live** (still onboarding: only test numbers) · **from the phone** (logged so the agent sees what staff wrote).',
-    '**Build Brief** turns the restaurant\'s rows into FACTS only. Two models: the **Brain** (high reasoning) reads the turn, thinks, runs the tools and decides what the reply must carry; the **Writer** (no tools) writes it in the host\'s voice from the FACTS as they are after the Brain\'s actions. **Check Reply** checks hard truth only; if one breaks, the same Writer writes it once more. Pictures (menu pages, dish photos) go before the text.',
+    (USE_BRAIN ? '**Build Brief** turns the restaurant\'s rows into FACTS only. **Brain** (high reasoning) plans; **Agent** runs the tools and writes; ' : '**Build Brief** turns the restaurant\'s rows into FACTS only. **Agent** reads the whole situation, thinks, runs the tools and writes; ') + '**Check Reply** enforces hard rails; a line that breaks one is dropped (**Repair Reply**, no model). Pictures (menu pages, dish photos) go before the text.',
     'Webhook: **POST /webhook/everwake-evo?token=<channel webhook token>** — set it on every Evolution instance (Settings → WhatsApp in the dashboard shows the exact URL).'
   ].join('\n'), [-2400, 120], 2400, 330));
   w.add(sticky('Sticky — Setup', [
     '### After import',
     '1. Pick the **Everwake DB** Postgres credential on every Postgres node (Supabase: Settings → Database → connection string, port 5432).',
-    '2. Pick your OpenAI credential on Brain Model and Writer Model.',
+    (USE_BRAIN ? '2. Pick your OpenAI credential on Brain Model and Agent Model.' : '2. Pick your OpenAI credential on Agent Model.'),
     '3. Import the three tool workflows, then set them on **manage_cart**, **save_customer_details** and **manage_reservation** (they show SET_AFTER_IMPORT).',
     '4. In **Everwake — Tool: manage_cart**, pick the *Everwake Outbox Secret* credential on **Create Payment Link** (it asks the dashboard for Paymob payment links).',
     '5. Activate. Nothing here is per restaurant: a new restaurant is a row in the database.'
@@ -232,44 +233,41 @@ function buildMain() {
 
   w.add(pg('Load Turn Context', 'select everwake.turn_context($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [620, 460]));
   w.add(code('Build Brief', 'main/build_brief.js', [840, 460]));
-  // the Brain thinks AND acts: it runs the tools itself, so it decides with the real results
-  // (the zone and branch an area finds, a branch's real prices) instead of guessing them
-  w.add({ name: 'Brain', type: '@n8n/n8n-nodes-langchain.agent', typeVersion: 3.1, position: [1080, 460], onError: 'continueRegularOutput',
-          parameters: { promptType: 'define', text: '={{ $json.brief }}', hasOutputParser: false,
-                        options: { systemMessage: prompt('brain.md'), maxIterations: 12, returnIntermediateSteps: true, enableStreaming: false } } });
-  w.add(model('Brain Model', 16000, BRAIN_EFFORT, 150000, [960, 720]));
+  if (USE_BRAIN) {
+    w.add(chain('Brain', '={{ $json.brief }}', prompt('brain.md'), [1060, 460]));
+    w.add(model('Brain Model', 16000, 'high', 90000, [1060, 700]));
+  }
+  w.add(code('Attach Plan', 'main/attach_plan.js', [1300, 460]));
+  w.add({ name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent', typeVersion: 3.1, position: [1520, 460], onError: 'continueRegularOutput',
+          parameters: { promptType: 'define', text: '={{ $json.agent_prompt }}', hasOutputParser: false,
+                        options: { systemMessage: prompt('agent.md'), maxIterations: 10, returnIntermediateSteps: true, enableStreaming: false } } });
+  w.add(model('Agent Model', 6000, AGENT_EFFORT, 90000, [1400, 720]));
+  // no strict output parser: one formatting slip threw a good reply away ("Model output doesn't fit
+  // required format"); Check Reply reads the JSON and repairs the usual slips itself
   w.add(tool('manage_cart', 'Everwake — Tool: manage_cart', prompt('tool_manage_cart.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
     action: "={{ $fromAI('action', 'Exactly one of: add, update, remove, replace, clear, set_branch, reorder_last, apply_code, summary, quote, place_order', 'string') }}",
     branch: "={{ $fromAI('branch', 'For set_branch, or with the first add or a quote while no branch is set (one call, never set_branch and add at once): the branch code or name from THE BRANCHES. Leave it out otherwise.', 'string', 'none') }}",
     items: "={{ $fromAI('items', 'The dishes this action touches: a list like [{\"menu_id\":\"M003\",\"quantity\":1,\"choices\":[{\"level\":1,\"selected\":[\"فرخة كاملة\"]}],\"notes\":null}]. For apply_code: [{\"promo_code\":\"THE CODE\"}]. Leave it out (never an empty list) for clear, set_branch, reorder_last and place_order. Never include prices.', 'json', [{}]) }}"
-  }, [1120, 720]));
+  }, [1560, 720]));
   w.add(tool('save_customer_details', 'Everwake — Tool: save_customer_details', prompt('tool_save_details.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
     details: "={{ $fromAI('details', 'An object (not text in quotes) with only the customer details that are new or changed in this turn, e.g. {\"full_name\":\"أحمد\",\"address_area\":\"المعادي\"}. Add \"reset_address\":true when they give a different address; \"use_saved_address\":\"<number>\" to reuse a saved one.', 'json') }}"
-  }, [1280, 720]));
+  }, [1720, 720]));
   w.add(tool('manage_reservation', 'Everwake — Tool: manage_reservation', prompt('tool_manage_reservation.md'), {
     tenant_id: `={{ ${I}.tenant_id }}`,
     wa_id: `={{ ${I}.wa_id }}`,
     action: "={{ $fromAI('action', 'Exactly one of: update, summary, submit, cancel, status', 'string') }}",
     details: "={{ $fromAI('details', 'Only for update (and cancel when they have several bookings): only what is new or changed, e.g. {\"branch\":\"zamalek\",\"date\":\"2026-10-23\",\"time\":\"21:00\",\"guests\":4}. date is YYYY-MM-DD and time is HH:MM on the 24-hour clock. Leave it out for summary, submit and status.', 'json', {\"none\":true}) }}"
-  }, [1440, 720]));
+  }, [1880, 900]));
 
-  w.add(pg('Read Back State', 'select everwake.read_back($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [1400, 460]));
-  // the FACTS again, as they are after the Brain's actions — what the Writer sees
-  w.add(pg('Reload Turn Context', 'select everwake.turn_context($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [1600, 460]));
-  w.add(code('Refresh Facts', 'main/build_brief.js', [1800, 460]));
-  w.add(code('Build Writer Request', 'main/build_writer_request.js', [2000, 460]));
-  w.add(chain('Writer', '={{ $json.writer_prompt }}', prompt('writer.md'), [2200, 460]));
-  w.add(model('Writer Model', 6000, WRITER_EFFORT, 90000, [2320, 720]));
-  w.add(code('Check Reply', 'main/check_reply.js', [2420, 460]));
-  w.add(iff('Route: Second Draft?', '$json.needs_second_draft', [2620, 460]));
-  w.add(code('Build Second Draft Request', 'main/build_second_draft.js', [2820, 260]));
-  w.add(chain('Writer — Second Try', '={{ $json.second_prompt }}', prompt('writer.md'), [3000, 260]));
-  w.add(code('Check Second Draft', 'main/check_second_draft.js', [3180, 260]));
-  w.add(code('Build Persist Payload', 'main/build_persist_payload.js', [3360, 460]));
+  w.add(pg('Read Back State', 'select everwake.read_back($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [1840, 460]));
+  w.add(code('Check Reply', 'main/check_reply.js', [2060, 460]));
+  w.add(iff('Route: Needs Repair?', '$json.needs_rewrite', [2280, 460]));
+  w.add(code('Repair Reply', 'main/repair_reply.js', [2500, 260]));
+  w.add(code('Build Persist Payload', 'main/build_persist_payload.js', [3140, 460]));
   w.add(pg('Persist Turn + Unlock', b64sql('persist_turn'), '={{ [ $json.b64_persist ] }}', [3360, 460]));
   w.add(pg('Load Reply Media', b64sql('reply_media'), "={{ [ $('Build Persist Payload').first().json.b64_media ] }}", [3580, 360],
            { alwaysOutputData: true }));
@@ -312,17 +310,18 @@ function buildMain() {
   w.chain('Reverse Geocode (Google)', 'Route: Geocode OK?');
   w.link('Route: Geocode OK?', 'Resolve Location', 0); w.link('Route: Geocode OK?', 'Reverse Geocode (OSM)', 1);
   w.chain('Reverse Geocode (OSM)', 'Resolve Location', 'Save Pin + Zone', 'Load Turn Context');
-  w.chain('Load Turn Context', 'Build Brief', 'Brain', 'Read Back State', 'Reload Turn Context', 'Refresh Facts',
-          'Build Writer Request', 'Writer', 'Check Reply', 'Route: Second Draft?');
-  w.link('Brain Model', 'Brain', 0, 'ai_languageModel');
-  w.link('manage_cart', 'Brain', 0, 'ai_tool');
-  w.link('save_customer_details', 'Brain', 0, 'ai_tool');
-  w.link('manage_reservation', 'Brain', 0, 'ai_tool');
-  // one Writer model writes both drafts
-  w.link('Writer Model', 'Writer', 0, 'ai_languageModel');
-  w.link('Writer Model', 'Writer — Second Try', 0, 'ai_languageModel');
-  w.link('Route: Second Draft?', 'Build Second Draft Request', 0); w.link('Route: Second Draft?', 'Build Persist Payload', 1);
-  w.chain('Build Second Draft Request', 'Writer — Second Try', 'Check Second Draft', 'Build Persist Payload');
+  if (USE_BRAIN) {
+    w.chain('Load Turn Context', 'Build Brief', 'Brain', 'Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Repair?');
+    w.link('Brain Model', 'Brain', 0, 'ai_languageModel');
+  } else {
+    w.chain('Load Turn Context', 'Build Brief', 'Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Repair?');
+  }
+  w.link('Agent Model', 'Agent', 0, 'ai_languageModel');
+  w.link('manage_cart', 'Agent', 0, 'ai_tool');
+  w.link('save_customer_details', 'Agent', 0, 'ai_tool');
+  w.link('manage_reservation', 'Agent', 0, 'ai_tool');
+  w.link('Route: Needs Repair?', 'Repair Reply', 0); w.link('Route: Needs Repair?', 'Build Persist Payload', 1);
+  w.chain('Repair Reply', 'Build Persist Payload');
   w.chain('Build Persist Payload', 'Persist Turn + Unlock', 'Load Reply Media', 'Prepare Outbound Messages', 'Outbound Loop');
   w.link('Persist Turn + Unlock', 'Route: Order Placed?');
   w.link('Outbound Loop', 'Turn Complete', 0); w.link('Outbound Loop', 'Route: Test Chat?', 1);
@@ -473,7 +472,7 @@ function buildTestRunner() {
     'The restaurant to test is set at the top of **Read Test Command** (seagull). The test chat shows in the dashboard inbox as «تجربة»; an order it places shows on the board — **/reset** removes it.',
     '### After import',
     '1. Pick the **Everwake DB** credential on the two Postgres nodes.',
-    '2. On **Run The Agent (Main)** pick *Everwake — Main (Brain + Writer)* (it shows SET_AFTER_IMPORT).'
+    '2. On **Run The Agent (Main)** pick *Everwake — Main (Brain + Agent)* (it shows SET_AFTER_IMPORT).'
   ].join('\n'), [-300, -420], 1500, 380, 6));
   w.add({ name: 'Chat With The Agent (test)', type: '@n8n/n8n-nodes-langchain.chatTrigger', typeVersion: 1.1, position: [-260, 0],
           parameters: { options: {} } });
@@ -485,7 +484,7 @@ function buildTestRunner() {
   w.add(code('Fake WhatsApp Message', 'test_runner/fake_message.js', [620, -100]));
   w.add({ name: 'Run The Agent (Main)', type: 'n8n-nodes-base.executeWorkflow', typeVersion: 1.2, position: [840, -100],
           parameters: {
-            workflowId: wfRef('Everwake — Main (Brain + Writer)'),
+            workflowId: wfRef('Everwake — Main (Brain + Agent)'),
             workflowInputs: { mappingMode: 'defineBelow', value: {}, matchingColumns: [], schema: [], attemptToConvertTypes: false, convertFieldsToString: true },
             options: { waitForSubWorkflow: true } },
           alwaysOutputData: true, onError: 'continueRegularOutput' });

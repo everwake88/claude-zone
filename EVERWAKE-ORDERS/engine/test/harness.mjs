@@ -1,6 +1,6 @@
 // Runs the engine's n8n Code nodes exactly as n8n does ($input, $('Node'),
 // $runIndex, Buffer), against a real database built from the migrations.
-// The two model calls (Brain, Writer) are scripted by each test, so every
+// The two model calls (Brain, Agent) are scripted by each test, so every
 // other step — SQL, code, tools — is the real thing.
 import { readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -119,8 +119,7 @@ export async function manageReservation(db, intake, action, details = '') {
 }
 
 // ---- one whole turn of the Main workflow ----------------------------------------
-// script(brief) → { plan, tools, reply, rewrite } — the Brain's decision, the calls it makes, the Writer's
-// reply, and the Writer's second draft when a hard rail breaks
+// script(brief) → { plan, tools: async (call) => [...steps], reply }
 export async function turn(db, payload, script, opts = {}) {
   const nodes = {};
   const norm = (await runCode('main/normalize_inbound.js', { input: payload }))[0];
@@ -150,11 +149,13 @@ export async function turn(db, payload, script, opts = {}) {
   nodes['Build Brief'] = brief;
 
   const s = await script(brief, r);
+  const plan = (await runCode('main/attach_plan.js', { input: { text: JSON.stringify(s.plan || {}) }, nodes }))[0];
+  nodes['Attach Plan'] = plan;
 
-  // the Brain: the scripted tool calls run through the real tool workflows
+  // the Agent: the scripted tool calls run through the real tool workflows
   const steps = [];
   for (const call of s.tools || []) {
-    // a call n8n refused or the tool workflow failed on: the Brain sees {"error": …}
+    // a call n8n refused or the tool workflow failed on: the agent sees {"error": …}
     const result = call.fail ? { error: call.fail }
       : call.tool === 'manage_cart'
       ? await manageCart(db, r, call.action, call.items || [], call.branch || '')
@@ -164,32 +165,13 @@ export async function turn(db, payload, script, opts = {}) {
     steps.push({ action: { tool: call.tool }, observation: JSON.stringify(result), result });
   }
   const reply = typeof s.reply === 'function' ? s.reply(steps) : s.reply;
-  // what goes with the words (pictures, the summary, a handoff, a note) is the Brain's call; a test may
-  // still script it on the reply, the way the host used to say it
-  const plan = { ...(s.plan || {}) };
-  if (reply && typeof reply === 'object') {
-    if (plan.show_summary === undefined && reply.showed_order_summary !== undefined) plan.show_summary = reply.showed_order_summary;
-    for (const k of ['send_menu_images', 'send_item_photos', 'handoff', 'memory_note', 'language'])
-      if (plan[k] === undefined && reply[k] !== undefined) plan[k] = reply[k];
-  }
-  nodes.Brain = { output: s.brainRaw ?? JSON.stringify(plan), intermediateSteps: steps.map(({ action, observation }) => ({ action, observation })),
+  nodes.Agent = { output: reply, intermediateSteps: steps.map(({ action, observation }) => ({ action, observation })),
                   tokenUsage: { promptTokens: 1000, completionTokens: 200 } };
   const readBack = await sql(db, 'select everwake.read_back($1::uuid, $2::text) as r', [r.tenant_id, r.wa_id]);
   nodes['Read Back State'] = readBack;
-  const reload = await sql(db, 'select everwake.turn_context($1::uuid, $2::text) as r', [r.tenant_id, r.wa_id]);
-  nodes['Reload Turn Context'] = reload;
-  nodes['Refresh Facts'] = (await runCode('main/build_brief.js', { input: reload, nodes }))[0];
-  const writerRequest = (await runCode('main/build_writer_request.js', { input: nodes['Refresh Facts'], nodes }))[0];
-  nodes['Build Writer Request'] = writerRequest;
-  // the Writer: the scripted reply
-  nodes.Writer = { text: typeof reply === 'string' ? reply : JSON.stringify(reply) };
-  let checked = (await runCode('main/check_reply.js', { input: nodes.Writer, nodes }))[0];
+  let checked = (await runCode('main/check_reply.js', { input: readBack, nodes }))[0];
   nodes['Check Reply'] = checked;
-  if (checked.needs_second_draft) {
-    const req = (await runCode('main/build_second_draft.js', { input: checked, nodes }))[0];
-    nodes['Build Second Draft Request'] = req;
-    checked = (await runCode('main/check_second_draft.js', { input: { text: JSON.stringify({ reply_messages: s.rewrite || [] }) }, nodes }))[0];
-  }
+  if (checked.needs_rewrite) checked = (await runCode('main/repair_reply.js', { input: checked, nodes }))[0];
   const persistPayload = (await runCode('main/build_persist_payload.js', { input: checked, nodes }))[0];
   nodes['Build Persist Payload'] = persistPayload;
   if (s.beforePersist) await s.beforePersist();
@@ -209,5 +191,5 @@ export async function turn(db, payload, script, opts = {}) {
     const rec = (await runCode('main/record_reply_send.js', { input: { body: { key: { id: 'OUT' + Math.random().toString(36).slice(2, 10) } } }, nodes }))[0];
     await callB64(db, 'log_outbound', rec.b64_log);
   }
-  return { route: 'agent', intake: r, brief, plan: writerRequest, steps, checked, persisted: persisted.r, outbound, ticket, nodes };
+  return { route: 'agent', intake: r, brief, plan, steps, checked, persisted: persisted.r, outbound, ticket, nodes };
 }
