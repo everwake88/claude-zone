@@ -214,7 +214,7 @@ const payLine = (o) => {
 const UNIT_EN = { kg: 'kg', piece: 'pcs', person: 'ppl' };
 // what a status means, the way the host would put it
 const ORDER_STATUS = {
-  placed: 'sent to the branch, waiting for them to start it', accepted: 'the branch accepted it, being prepared in the kitchen',
+  placed: 'at the branch, the kitchen is getting it going', accepted: 'the branch accepted it, being prepared in the kitchen',
   preparing: 'being prepared in the kitchen', ready: 'ready at the branch', out_for_delivery: 'with the driver, on the way',
   delivered: 'delivered', picked_up: 'picked up', cancelled: 'cancelled'
 };
