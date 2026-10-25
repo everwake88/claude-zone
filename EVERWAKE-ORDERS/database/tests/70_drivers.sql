@@ -129,7 +129,7 @@ begin
   r := everwake.driver_action(tok, oid, 'pick_up');
   assert (select status from everwake.orders where id = oid) = 'out_for_delivery';
   select o.body into msg from everwake.outbox o where o.wa_id = '201555000111' and o.purpose = 'order_status' order by o.id desc limit 1;
-  assert msg like 'طلبك رقم % خرج مع الطيار وفي الطريق ليك 🛵%الطيار: أحمد — 01012345678 · هيوصلك خلال حوالي % دقيقة', msg;
+  assert msg like 'طلبك رقم % خرج مع مندوب التوصيل وفي الطريق ليك 🛵%مندوب التوصيل: أحمد — 01012345678 · هيوصلك خلال حوالي % دقيقة', msg;
   assert (select by_role from everwake.order_events where order_id = oid order by id desc limit 1) = 'driver';
 
   -- the ride: tracked, and the customer hears once when it is ~5 minutes away
@@ -139,7 +139,7 @@ begin
   assert (select delivery_km_left from everwake.orders where id = oid) > 1;
   r := everwake.driver_ping(tok, 30.0625, 31.2215, 10);
   assert (r ->> 'notified')::int = 1, r::text;
-  assert exists (select 1 from everwake.outbox where wa_id = '201555000111' and body like '🛵 الطيار أحمد قرّب يوصلك%');
+  assert exists (select 1 from everwake.outbox where wa_id = '201555000111' and body like '🛵 مندوب التوصيل أحمد قرّب يوصلك%');
   r := everwake.driver_ping(tok, 30.0615, 31.2205, 10);
   assert (r ->> 'notified')::int = 0, 'only once';
 

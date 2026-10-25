@@ -119,7 +119,7 @@ returns jsonb language sql immutable as $$
       'status_accepted_en', 'Great 👨‍🍳 Your order {order_no} is confirmed by our {branch} branch and is being prepared now.{eta}',
       'status_ready_ar', 'طلبك رقم {order_no} جاهز للاستلام من فرع {branch} ✅',
       'status_ready_en', 'Your order {order_no} is ready for pickup at our {branch} branch ✅',
-      'status_out_for_delivery_ar', 'طلبك رقم {order_no} خرج مع الطيار وفي الطريق ليك 🛵',
+      'status_out_for_delivery_ar', 'طلبك رقم {order_no} خرج مع مندوب التوصيل وفي الطريق ليك 🛵',
       'status_out_for_delivery_en', 'Your order {order_no} is out for delivery and on its way to you 🛵',
       'status_delivered_ar', 'بالهنا والشفا! لو احتجت أي حاجة إحنا هنا.',
       'status_delivered_en', 'Enjoy your meal! If you need anything, we are right here.',

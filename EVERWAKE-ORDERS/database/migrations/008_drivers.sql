@@ -148,7 +148,7 @@ begin
     return 'Your driver: ' || d.name || ' — ' || v_local
            || case when e is not null then ' · about ' || (e ->> 'min') || ' min away' else '' end;
   end if;
-  return 'الطيار: ' || d.name || ' — ' || v_local
+  return 'مندوب التوصيل: ' || d.name || ' — ' || v_local
          || case when e is not null then ' · هيوصلك خلال حوالي ' || (e ->> 'min') || ' دقيقة' else '' end;
 end $$;
 
@@ -424,7 +424,7 @@ begin
         v_lang := everwake.customer_language(o.tenant_id, o.wa_id);
         perform everwake.queue_customer_message(o.tenant_id, o.wa_id, 'order_status',
           case when v_lang = 'en' then '🛵 ' || d.name || ' is almost there — about ' || (e ->> 'min') || ' min away.'
-               else '🛵 الطيار ' || d.name || ' قرّب يوصلك — حوالي ' || (e ->> 'min') || ' دقايق.' end);
+               else '🛵 مندوب التوصيل ' || d.name || ' قرّب يوصلك — حوالي ' || (e ->> 'min') || ' دقايق.' end);
         n := n + 1;
       end if;
     end if;
