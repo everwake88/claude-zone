@@ -33,6 +33,7 @@ const lines = [
   `plan=${plan ?? '(none)'}`,
   ...(b && b.used && b.read ? [
     `  read: ${b.read}`,
+    ...(b.other_readings ? [`  other readings: ${b.other_readings}`] : []),
     `  move: ${b.move}`,
     `  planned actions: ${(b.planned || []).length ? b.planned.join(' | ') : 'none'}`,
     `  end with: ${b.end_with || '-'} · language: ${b.language || '-'}`,
