@@ -115,7 +115,6 @@ messages = messages.map(m => m
   .replace(/[\u064E-\u0650\u0652]/g, '')                  // no short vowel marks (tanween and shadda stay: أهلاً، شكرًا)
   .replace(/(?:(?![\p{Script=Arabic}\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}])\p{L})+/gu, '')   // a stray letter from another alphabet is a slip
   .replace(/\(\s*\)/g, '')
-  .replace(/(اسم|رقم|عنوان)ه(?=\s+حضرتك)/g, '$1')        // "اسم حضرتك", never "اسمه حضرتك"
   .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()).filter(Boolean);
 if (messages.length > 2) messages = [messages[0], messages.slice(1).join('\n\n')];
 // an English reply shows money as EGP 30, not 30ج (the currency's format, not the host's words)
