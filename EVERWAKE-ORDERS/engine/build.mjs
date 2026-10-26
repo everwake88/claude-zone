@@ -201,7 +201,7 @@ function buildMain() {
   presence.parameters.url = `={{ ${I}.channel.base_url }}/chat/sendPresence/{{ ${I}.channel.instance }}`;
   presence.parameters.headerParameters.parameters[0].value = `={{ ${I}.channel.api_key }}`;
   w.add(iff('Route: Real Customer?', `!${TEST}`, [-1400, 360]));
-  w.add(wait('Debounce Wait 6s', 6, [-1100, 460]));
+  w.add(wait('Debounce Wait 2s', 2, [-1100, 460]));
   w.add(pg('Claim Debounce Window', 'select everwake.claim_window($1::uuid, $2::text, $3::text, $4::bigint) as r;',
            `={{ [ ${I}.tenant_id, ${I}.wa_id, $('Normalize Inbound').first().json.run_id, String(${I}.buffer_id) ] }}`,
            [-900, 460], { alwaysOutputData: true }));
@@ -297,12 +297,12 @@ function buildMain() {
   w.link('Route: Actionable?', 'Intake', 0); w.link('Route: Actionable?', 'Exit: Ignored', 1);
   w.chain('Intake', 'Route: To The Agent?');
   w.link('Route: To The Agent?', 'Route: Real Customer?', 0);
-  w.link('Route: Real Customer?', 'Send Typing Presence', 0); w.link('Route: Real Customer?', 'Debounce Wait 6s', 1); w.link('Route: To The Agent?', 'Route: Apologise (Agent OFF)?', 1);
+  w.link('Route: Real Customer?', 'Send Typing Presence', 0); w.link('Route: Real Customer?', 'Debounce Wait 2s', 1); w.link('Route: To The Agent?', 'Route: Apologise (Agent OFF)?', 1);
   w.link('Route: Apologise (Agent OFF)?', 'Prepare Apology', 0); w.link('Route: Apologise (Agent OFF)?', 'Route: Typed On The Phone?', 1);
   w.chain('Prepare Apology', 'Evolution — Send Apology', 'Record Apology', 'Log Apology');
   w.link('Route: Typed On The Phone?', 'Wait For Own Echo 5s', 0); w.link('Route: Typed On The Phone?', 'Exit: Not For The Agent', 1);
   w.chain('Wait For Own Echo 5s', 'Log Phone Reply');
-  w.chain('Send Typing Presence', 'Debounce Wait 6s', 'Claim Debounce Window', 'Route: Won The Window?');
+  w.chain('Send Typing Presence', 'Debounce Wait 2s', 'Claim Debounce Window', 'Route: Won The Window?');
   w.link('Route: Won The Window?', 'Route: Has Location?', 0); w.link('Route: Won The Window?', 'Route: Retry Or Exit?', 1);
   w.link('Route: Retry Or Exit?', 'Retry Backoff 3s', 0); w.link('Route: Retry Or Exit?', 'Exit: Superseded', 1);
   w.chain('Retry Backoff 3s', 'Claim Debounce Window');

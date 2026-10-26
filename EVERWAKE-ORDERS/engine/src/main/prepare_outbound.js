@@ -15,6 +15,8 @@ const mediaRow = row($input.first().json);
 const dec = obj(d.decision);
 
 if (persisted.mode === 'human' || persisted.agent_enabled === false) return [];
+// the customer wrote again while this reply was being thought out: it is dropped, the next turn answers both
+if (persisted.superseded === true) return [];
 
 const channel = obj(intake.channel);
 const replyTo = str(intake.reply_to) || str(d.wa_id);

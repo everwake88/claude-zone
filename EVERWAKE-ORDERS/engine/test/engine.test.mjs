@@ -1013,3 +1013,45 @@ test('pictures per branch: naming the branch lets them go out; without a branch,
     await sql(db, `select everwake.rebuild_snapshot($1::uuid) as r`, [intake.tenant_id]);
   }
 });
+
+test('a message that arrives while the reply is being thought out: that reply is dropped and the next turn answers both', async () => {
+  const phone = '201099990516';
+  let t = await turn(db, evolutionPayload({ phone, text: 'عايز كفتة' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x' },
+    reply: quiet('تحب الكفتة دليفري ولا استلام؟'),
+    // the customer writes again before this reply goes out
+    beforePersist: async () => {
+      const n = (await runCode('main/normalize_inbound.js', { input: evolutionPayload({ phone, text: 'وكمان رز' }) }))[0];
+      await callB64(db, 'intake', n.b64_intake);
+    }
+  }));
+  assert.equal(t.persisted.superseded, true);
+  assert.deepEqual(t.outbound, [], 'the dropped reply is never sent');
+  // the next turn holds both messages
+  t = await turn(db, evolutionPayload({ phone, text: 'بسرعة لو سمحت' }), async (brief) => {
+    assert.match(brief.latest_text, /عايز كفتة[\s\S]*وكمان رز[\s\S]*بسرعة لو سمحت/);
+    return { plan: { read: 'x', stage: 'discovery', objective: 'x' }, reply: quiet('حاضر! دليفري ولا استلام؟') };
+  });
+  assert.notEqual(t.persisted.superseded, true);
+  assert.equal(t.outbound.length, 1);
+});
+
+test('a placed order\'s reply always goes out, even when the customer has written again', async () => {
+  const phone = '201099990517';
+  const open = async (text) => (await callB64(db, 'intake', (await runCode('main/normalize_inbound.js', { input: evolutionPayload({ phone, text }) }))[0].b64_intake)).r;
+  const intake = await open('hi');
+  await manageCart(db, intake, 'add', [{ menu_id: 'M001', quantity: 1 }], 'zamalek');
+  const h = await import('./harness.mjs');
+  await h.saveDetails(db, intake, { delivery_method: 'pickup', full_name: 'كريم', phone_confirmed: 'yes', payment_method: 'cash' });
+  await manageCart(db, intake, 'summary');
+  await sql(db, `select everwake.persist_turn($1::jsonb) as r`, [JSON.stringify({ tenant_id: intake.tenant_id, wa_id: intake.wa_id, run_id: 'x', save_review: true, state_patch: {}, ledger_patch: {} })]);
+  const t = await turn(db, evolutionPayload({ phone, text: 'أكد' }), async () => ({
+    plan: { read: 'x', stage: 'placed', objective: 'x', place_order: true },
+    tools: [{ tool: 'manage_cart', action: 'place_order' }],
+    reply: (steps) => quiet(`اتأكد طلبك برقم ${steps[0].result.order_no} 🎉`),
+    beforePersist: async () => { await open('شكرا'); }
+  }));
+  assert.ok(t.checked.order_placed_no, JSON.stringify(t.steps[0].result).slice(0, 300));
+  assert.notEqual(t.persisted.superseded, true);
+  assert.equal(t.outbound.length, 1);
+});

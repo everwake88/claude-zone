@@ -76,6 +76,8 @@ return [{
       tenant_id: d.tenant_id, wa_id: d.wa_id, run_id: d.run_id,
       state_patch: statePatch, ledger_patch: ledgerPatch, log_row: logRow,
       save_review: !!dec.showed_order_summary,
+      // something final happened this turn: its reply goes out even if the customer has written again
+      final: !!(d.order_placed_no || d.booking_requested_ref || d.pay_link),
       handoff: { needed: !!handoff.needed, reason: str(handoff.reason) },
       language: dec.language || null
     }),

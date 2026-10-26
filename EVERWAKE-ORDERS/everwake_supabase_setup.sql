@@ -2119,9 +2119,31 @@ declare
   v_wa      text := p ->> 'wa_id';
   v_run     text := p ->> 'run_id';
   v_handoff boolean := coalesce((p -> 'handoff' ->> 'needed')::boolean, false);
+  v_final   boolean := coalesce((p ->> 'final')::boolean, false);
   v_take    boolean;
+  v_since   timestamptz;
   n_state int; n_unlock int; n_clean int;
 begin
+  -- the customer wrote again while this reply was being thought out: it is dropped, and this turn's
+  -- messages go back to wait so the next turn answers them all together — the way a person who sees
+  -- a new message arrive stops typing and reads it. Not when this turn did something final (placed an
+  -- order, sent a booking, made a payment link): that reply always goes out.
+  select l.locked_at into v_since from everwake.conversation_locks l
+   where l.tenant_id = v_tenant and l.wa_id = v_wa and l.run_id = v_run;
+  if not v_final and v_since is not null and exists (
+       select 1 from everwake.inbound_buffer b
+        where b.tenant_id = v_tenant and b.wa_id = v_wa and b.claimed_by_run_id is null and b.received_at > v_since) then
+    update everwake.inbound_buffer set claimed_by_run_id = null
+     where tenant_id = v_tenant and wa_id = v_wa and claimed_by_run_id = v_run;
+    get diagnostics n_clean = row_count;
+    delete from everwake.conversation_locks where tenant_id = v_tenant and wa_id = v_wa and run_id = v_run;
+    get diagnostics n_unlock = row_count;
+    insert into everwake.agent_events (tenant_id, wa_id, run_id, stage, input, output)
+    values (v_tenant, v_wa, v_run, 'superseded', coalesce(p -> 'log_row' -> 'input', '{}'::jsonb),
+            jsonb_build_object('dropped_reply', p -> 'log_row' -> 'output' -> 'messages'));
+    return jsonb_build_object('superseded', true, 'state_written', 0, 'locks_released', n_unlock, 'buffer_rows_returned', n_clean);
+  end if;
+
   select coalesce((everwake.merged_settings(settings) ->> 'auto_takeover_on_handoff')::boolean, false)
     into v_take from everwake.tenants where id = v_tenant;
 
