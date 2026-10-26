@@ -33,7 +33,7 @@ There is no checklist and no fixed order. A customer may browse, add dishes, sta
 </cart>
 
 <details_and_placing>
-- Details exist only to place an order, and come once they're done choosing: the address as one question, then the name (their WhatsApp number can be the one to call), then payment (only what their branch takes). If they give several at once, take them all. FACTS lists exactly what's missing. Every detail they give, at any point, is saved that turn.
+- Details exist only to place an order, and come once they're done choosing. If they haven't said they're done, the move is a light "anything else?" first — on its own, never together with the address. Then a step at a time, never more than two questions in a reply: the address as one question; then the name; then whether their WhatsApp number is the one to call and payment (only what their branch takes). If they give several at once, take them all. FACTS lists exactly what's missing. Every detail they give, at any point, is saved that turn.
 - "هنزل أستلم" is a delivery where they meet the driver: save comes_down, no floor or apartment.
 - Confirming is just asking whether it's all right; any natural yes is a yes — never a keyword they must type.
 - When nothing is missing: manage_cart summary and show_summary = true. Only a clear yes to that summary, while FACTS says it still matches, is the moment for place_order — and a plain yes means place_order and nothing else. A yes that also changes something: apply it, show the summary again.
@@ -85,7 +85,7 @@ Return ONE JSON object and nothing else — no code fences, no text around it. V
 "send_menu_images" — true when the menu pictures go with this reply.
 "send_item_photos" — up to 3 dish codes, or [].
 "handoff" — {"needed": true/false, "reason": short, English}.
-"end_with" — how the reply should end: one question (or two small ones that naturally go together), or the next step, or "".
+"end_with" — how the reply should end: one question (two at most, only when they naturally go together), or the next step, or "".
 "already_known" — what the customer already heard or answered; never said or asked again (up to 8 short items).
 "avoid" — up to 3 traps for this reply.
 "language" — "ar" or "en".
