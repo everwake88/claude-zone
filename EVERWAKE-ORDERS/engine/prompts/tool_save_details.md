@@ -5,4 +5,4 @@ comes_down: the customer's own words when they will come down for the order or l
 Add "reset_address": true when they give a DIFFERENT address — the old one and the old pin are cleared first.
 Add "use_saved_address": <the saved address number from FACTS> (or "last") when they want an address from a previous order.
 Examples: {"full_name":"أحمد"} · {"phone_confirmed":"yes"} · {"delivery_method":"pickup"} · {"use_saved_address":"12"} · {"address_area":"المعادي","address_street":"شارع 9","address_building":"8","address_floor":"3","address_apartment":"6"}
-The result says whether the address is inside a delivery zone (delivery_area). The branch is NOT a field here — use manage_cart set_branch.
+An area is saved in its local spelling. The result says whether the address is inside a delivery zone (delivery_area), which branch serves it and the fee — "do you deliver to X?" is answered from that. The branch is NOT a field here — use manage_cart set_branch.
