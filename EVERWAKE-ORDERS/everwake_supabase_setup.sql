@@ -1,4 +1,4 @@
--- Everwake Orders · full database setup for Supabase (migrations 001–013 + 090, in order)
+-- Everwake Orders · full database setup for Supabase (migrations 001–014 + 090, in order)
 -- Paste into Supabase → SQL Editor → New query, then Run. Run it once.
 
 -- ================= 001_schema.sql =================
@@ -1591,6 +1591,25 @@ begin
     return base || jsonb_build_object('route', 'ignore', 'reason', 'no_sender');
   end if;
 
+  -- the team answered a question the agent asked (014): no customer message, the agent passes the answer on
+  if p ->> 'kind' = 'team_answer' then
+    select * into conv from everwake.conversations where tenant_id = t.id and wa_id = v_wa;
+    if not found or not exists (select 1 from everwake.team_questions q
+                                 where q.tenant_id = t.id and q.wa_id = v_wa and q.status = 'answered' and q.told_at is null) then
+      return base || jsonb_build_object('route', 'ignore', 'reason', 'no_new_answer');
+    end if;
+    select * into cust from everwake.customers where id = conv.customer_id;
+    base := base || jsonb_build_object(
+      'customer_id', cust.id, 'conversation_id', conv.id, 'wa_id', cust.wa_id, 'reply_to', cust.reply_to,
+      'phone_hidden', cust.phone_hidden, 'team_answer', true);
+    if cust.is_blocked or conv.mode = 'human' or not t.agent_enabled then
+      return base || jsonb_build_object('route', 'ignore', 'reason', 'agent_not_answering');
+    end if;
+    insert into everwake.inbound_buffer (tenant_id, wa_id, message_text) values (t.id, cust.wa_id, '')
+    returning id into v_buf;
+    return base || jsonb_build_object('route', 'agent', 'buffer_id', v_buf);
+  end if;
+
   -- the customer, by any identity -----------------------------------------
   select ci.customer_id into v_cid
     from everwake.customer_identities ci
@@ -2077,6 +2096,15 @@ begin
                order by pc.last_message_at desc limit 1),
     -- table bookings (010): the rules, the one in progress, and what is coming up
     'reservation_setup', everwake.reservation_setup(p_tenant),
+    -- what the agent asked the team in the last day, and their answers (014)
+    'team_questions', coalesce((
+       select jsonb_agg(jsonb_build_object('id', q.id, 'question', q.question, 'asked_at', q.asked_at, 'status', q.status,
+                                           'answer_kind', q.answer_kind, 'answer', q.answer, 'answered_at', q.answered_at,
+                                           'answered_by', q.answered_by_name, 'told', q.told_at is not null)
+                        order by q.asked_at)
+         from (select * from everwake.team_questions
+                where tenant_id = p_tenant and wa_id = p_wa and status <> 'dismissed' and asked_at > now() - interval '24 hours'
+                order by asked_at desc limit 6) q), '[]'::jsonb),
     'reservation', (select everwake.reservation_view(x) from everwake.reservations x
                      where x.tenant_id = p_tenant and x.wa_id = p_wa and x.status = 'draft'),
     'reservations_upcoming', coalesce((select jsonb_agg(everwake.reservation_view(x) order by x.reserved_for)
@@ -2164,6 +2192,22 @@ begin
          human_reason     = case when v_handoff and v_take and c.mode = 'agent' then 'agent asked for a person: ' || coalesce(p -> 'handoff' ->> 'reason', '') else c.human_reason end
    where c.tenant_id = v_tenant and c.wa_id = v_wa;
   get diagnostics n_state = row_count;
+
+  -- the agent asked the team (014): the question waits in the inbox; the answers this reply passed on are done
+  insert into everwake.team_questions (tenant_id, conversation_id, wa_id, question, run_id)
+  select distinct v_tenant, c.id, v_wa, left(btrim(x), 500), v_run
+    from everwake.conversations c,
+         jsonb_array_elements_text(case jsonb_typeof(p -> 'ask_team') when 'array' then p -> 'ask_team'
+                                        when 'string' then jsonb_build_array(p -> 'ask_team') else '[]'::jsonb end) x
+   where c.tenant_id = v_tenant and c.wa_id = v_wa and btrim(x) <> ''
+     and not exists (select 1 from everwake.team_questions q
+                      where q.conversation_id = c.id and q.status = 'open' and q.question = left(btrim(x), 500));
+  update everwake.team_questions q set told_at = now()
+   where q.tenant_id = v_tenant and q.wa_id = v_wa and q.status = 'answered' and q.told_at is null
+     and q.id in (select (x #>> '{}')::bigint from jsonb_array_elements(coalesce(p -> 'answers_told', '[]'::jsonb)) x);
+  update everwake.conversations c
+     set questions_open = (select count(*) from everwake.team_questions q where q.conversation_id = c.id and q.status = 'open')
+   where c.tenant_id = v_tenant and c.wa_id = v_wa;
 
   if nullif(p ->> 'language', '') is not null then
     update everwake.customers set language = p ->> 'language'
@@ -6497,7 +6541,8 @@ begin
               'plan', ev.output -> 'brain', 'tools', ev.output -> 'tools_used', 'tool_problems', ev.output -> 'tool_problems',
               'caught', ev.output -> 'violations', 'rewritten', ev.repair_used,
               'calls', ev.output -> 'tool_calls', 'agent_error', ev.output ->> 'agent_error',
-              'order_placed', ev.output ->> 'order_placed_no', 'handoff', ev.output -> 'handoff') end,
+              'order_placed', ev.output ->> 'order_placed_no', 'handoff', ev.output -> 'handoff',
+              'ask_team', ev.output -> 'ask_team') end,
     'mode', conv.mode,
     'details', conv.state -> 'customer',
     'branch', (select name_ar from everwake.branches b where b.id::text = conv.state -> 'branch' ->> 'id'),
@@ -6512,6 +6557,107 @@ end $$;
 revoke execute on function everwake.is_test_number(text),
   everwake.test_chat_prepare(text, text, boolean, numeric),
   everwake.test_chat_result(uuid, text, timestamptz) from public, anon, authenticated;
+
+-- ================= 014_team_questions.sql =================
+-- =====================================================================
+-- Everwake Orders · 014 · the agent asks the team
+--
+-- Some things only the restaurant knows: whether a dish not on the menu
+-- can be made, whether a branch takes half online and half cash, what a
+-- charge the branch sets comes to. The agent asks the team the way a new
+-- host asks the manager — one clear question — tells the customer it is
+-- checking, and carries on with the rest.
+--
+--   team_questions        each question, its answer and who gave it
+--   answer_team_question  the inbox's Yes / No / typed answer; the
+--                         dashboard then wakes the agent (Main, intake
+--                         'team_answer', 004), which passes the answer on
+--   dismiss_team_question the team dealt with it another way
+--
+-- persist_turn (004) records the agent's question (ask_team) and marks
+-- the answers its reply passed on (told_at); turn_context (004) gives the
+-- agent the questions of the last day.
+-- =====================================================================
+
+create table everwake.team_questions (
+  id               bigint generated always as identity primary key,
+  tenant_id        uuid not null references everwake.tenants(id) on delete cascade,
+  conversation_id  bigint not null references everwake.conversations(id) on delete cascade,
+  wa_id            text not null,
+  question         text not null,
+  run_id           text,
+  asked_at         timestamptz not null default now(),
+  status           text not null default 'open' check (status in ('open', 'answered', 'dismissed')),
+  answer_kind      text check (answer_kind in ('yes', 'no', 'text')),
+  answer           text,
+  answered_by      uuid,
+  answered_by_name text,
+  answered_at      timestamptz,
+  told_at          timestamptz             -- the agent passed the answer on to the customer
+);
+create index team_questions_chat_idx on everwake.team_questions (tenant_id, wa_id, asked_at desc);
+create index team_questions_open_idx on everwake.team_questions (tenant_id, status) where status = 'open';
+
+-- the inbox list shows a chat with a question waiting
+alter table everwake.conversations add column questions_open int not null default 0;
+
+create or replace function everwake.sync_questions_open(p_conversation bigint)
+returns void language sql security definer set search_path = everwake, pg_temp as $$
+  update everwake.conversations c
+     set questions_open = (select count(*) from everwake.team_questions q
+                            where q.conversation_id = c.id and q.status = 'open')
+   where c.id = p_conversation;
+$$;
+
+create or replace function everwake.answer_team_question(p_question bigint, p_kind text, p_answer text default null)
+returns jsonb language plpgsql security definer set search_path = everwake, pg_temp as $$
+declare
+  q      everwake.team_questions%rowtype;
+  v_kind text := lower(btrim(coalesce(p_kind, '')));
+  v_text text := nullif(btrim(coalesce(p_answer, '')), '');
+begin
+  select * into q from everwake.team_questions where id = p_question for update;
+  if not found then raise exception 'no such question'; end if;
+  perform everwake.require_role(q.tenant_id, array['owner', 'manager', 'staff']);
+  if v_kind not in ('yes', 'no', 'text') then raise exception 'the answer is yes, no or text'; end if;
+  if v_kind = 'text' and v_text is null then raise exception 'write the answer'; end if;
+  if q.status = 'dismissed' then raise exception 'this question was closed'; end if;
+
+  update everwake.team_questions
+     set status = 'answered', answer_kind = v_kind, answer = left(v_text, 1000), told_at = null,
+         answered_at = now(), answered_by = everwake.current_user_id(),
+         answered_by_name = (select coalesce(m.display_name, m.email) from everwake.tenant_members m
+                              where m.tenant_id = q.tenant_id and m.user_id = everwake.current_user_id())
+   where id = q.id;
+  perform everwake.sync_questions_open(q.conversation_id);
+
+  return jsonb_build_object('ok', true, 'tenant_id', q.tenant_id, 'wa_id', q.wa_id,
+                            'conversation_id', q.conversation_id,
+                            'mode', (select mode from everwake.conversations where id = q.conversation_id));
+end $$;
+
+create or replace function everwake.dismiss_team_question(p_question bigint)
+returns void language plpgsql security definer set search_path = everwake, pg_temp as $$
+declare q everwake.team_questions%rowtype;
+begin
+  select * into q from everwake.team_questions where id = p_question;
+  if not found then raise exception 'no such question'; end if;
+  perform everwake.require_role(q.tenant_id, array['owner', 'manager', 'staff']);
+  update everwake.team_questions set status = 'dismissed' where id = q.id and status = 'open';
+  perform everwake.sync_questions_open(q.conversation_id);
+end $$;
+
+alter table everwake.team_questions enable row level security;
+create policy member_read on everwake.team_questions for select to authenticated
+  using (tenant_id = any ((select everwake.my_tenant_ids())::uuid[]));
+grant select on everwake.team_questions to authenticated;
+grant all on everwake.team_questions to service_role;
+
+revoke execute on all functions in schema everwake from public, anon;
+grant execute on all functions in schema everwake to service_role;
+revoke execute on function everwake.sync_questions_open(bigint) from authenticated;
+grant execute on function everwake.answer_team_question(bigint, text, text), everwake.dismiss_team_question(bigint)
+  to authenticated;
 
 -- ================= 090_supabase.sql =================
 -- =====================================================================
@@ -6560,7 +6706,7 @@ create policy "everwake imports" on storage.objects for all to authenticated
 do $$
 declare t text;
 begin
-  foreach t in array array['orders', 'conversations', 'messages', 'tenants', 'reservations'] loop
+  foreach t in array array['orders', 'conversations', 'messages', 'tenants', 'reservations', 'team_questions'] loop
     begin
       execute format('alter publication supabase_realtime add table everwake.%I', t);
     exception when duplicate_object then null;

@@ -145,9 +145,15 @@ export interface Address {
 export interface Conversation {
   id: number; tenant_id: string; customer_id: number | null; wa_id: string; state: ConversationState;
   mode: 'agent' | 'human'; assigned_user_id: string | null; human_since: string | null; human_reason: string | null;
-  needs_attention: boolean; attention_reason: string | null; unread_count: number;
+  needs_attention: boolean; attention_reason: string | null; unread_count: number; questions_open: number;
   last_message_at: string | null; last_inbound_at: string | null; last_message_preview: string | null;
   customers?: Pick<Customer, 'display_name' | 'full_name' | 'phone' | 'phone_hidden' | 'orders_count' | 'is_blocked'> | null;
+}
+// a question the agent asked the team (014): answered Yes / No / typed in the inbox
+export interface TeamQuestion {
+  id: number; tenant_id: string; conversation_id: number; wa_id: string; question: string; asked_at: string;
+  status: 'open' | 'answered' | 'dismissed'; answer_kind: 'yes' | 'no' | 'text' | null; answer: string | null;
+  answered_by_name: string | null; answered_at: string | null; told_at: string | null;
 }
 export interface ConversationState {
   branch?: { id?: string; code?: string; name_ar?: string; source?: string };

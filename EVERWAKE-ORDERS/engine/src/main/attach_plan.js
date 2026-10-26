@@ -61,6 +61,7 @@ if (!plan || typeof plan !== 'object') {
   const photosOk = [...new Set(photos.filter(c => photoCodes.has(c)))].slice(0, 3);
   const photosMissing = photos.filter(c => !photoCodes.has(c));
   const handoff = plan.handoff && typeof plan.handoff === 'object' ? plan.handoff : {};
+  const askTeam = list(plan.ask_team).map(q => clip(q, 300)).filter(Boolean).slice(0, 2);
   planText = [
     'PLAN (from the head host — the thinking is theirs, the words are yours)',
     `What is going on: ${clip(plan.read, 400)}`,
@@ -73,6 +74,7 @@ if (!plan || typeof plan !== 'object') {
     `Place the order now: ${bool(plan.place_order) ? 'YES — call manage_cart place_order' : 'no'}`,
     `Send the menu pictures: ${sendMenu ? 'YES (set send_menu_images true)' : 'no'}${menuNote}`,
     `Send dish photos: ${photosOk.length ? 'YES — ' + photosOk.join(', ') + ' (put them in send_item_photos)' : 'no'}${photosMissing.length ? ` (no photo on file for ${photosMissing.join(', ')} — describe it instead)` : ''}`,
+    `Ask the team: ${askTeam.length ? 'YES — ' + askTeam.join(' | ') : 'no'}`,
     `Handoff to the team: ${bool(handoff.needed) ? 'YES — ' + clip(handoff.reason, 200) : 'no'}`,
     `End with: ${clip(plan.end_with, 240) || '(nothing in particular)'}`,
     `They already know / already answered (never say or ask again): ${list(plan.already_known).join(' · ') || '(nothing yet)'}`,
@@ -86,7 +88,7 @@ if (!plan || typeof plan !== 'object') {
     read: clip(plan.read, 400), other_readings: clip(plan.other_readings, 400), move: clip(plan.move, 800), end_with: clip(plan.end_with, 240),
     planned: actions, already_known: list(plan.already_known), avoid: list(plan.avoid), language: clip(plan.language, 10), customer: clip(plan.customer, 20),
     actions: actions.length, show_summary: bool(plan.show_summary), place_order: bool(plan.place_order),
-    send_menu_images: sendMenu, send_item_photos: photosOk, handoff: bool(handoff.needed)
+    send_menu_images: sendMenu, send_item_photos: photosOk, handoff: bool(handoff.needed), ask_team: askTeam
   };
 }
 

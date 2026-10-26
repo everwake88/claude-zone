@@ -3,7 +3,8 @@
 // The cart is written by manage_cart and the details by
 // save_customer_details. This write is the turn's own record: memory
 // notes, pictures sent, the review fingerprint when the summary was
-// shown, a handoff for the inbox, telemetry, unlock and buffer cleanup.
+// shown, a handoff and questions for the team in the inbox, telemetry,
+// unlock and buffer cleanup.
 // =====================================================================
 // @include shared/basics.js
 
@@ -65,6 +66,7 @@ const logRow = {
     send_menu_images: !!dec.send_menu_images,
     send_item_photos: arr(dec.send_item_photos),
     handoff,
+    ask_team: arr(dec.ask_team),
     brief_chars: d.brief_chars, agent_prompt_chars: d.agent_prompt_chars
   }
 };
@@ -79,6 +81,9 @@ return [{
       // something final happened this turn: its reply goes out even if the customer has written again
       final: !!(d.order_placed_no || d.booking_requested_ref || d.pay_link),
       handoff: { needed: !!handoff.needed, reason: str(handoff.reason) },
+      ask_team: arr(dec.ask_team),
+      // the team's new answers were in this turn's FACTS: a real reply passed them on
+      answers_told: arr(dec.reply_messages).length && d.repair_source !== 'fallback' ? arr(d.team_answers_new) : [],
       language: dec.language || null
     }),
     b64_media: b64({

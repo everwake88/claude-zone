@@ -1055,3 +1055,45 @@ test('a placed order\'s reply always goes out, even when the customer has writte
   assert.notEqual(t.persisted.superseded, true);
   assert.equal(t.outbound.length, 1);
 });
+
+test('the agent asks the team; their answer wakes it, and its reply passes the answer on', async () => {
+  const phone = '201099990518';
+  const wake = { headers: {}, params: {}, query: { token: 'demo-token' },
+                 body: { event: 'everwake.team_answer', instance: 'nilegrill', data: { wa_id: phone } } };
+  // it can't know whether the branch takes half cash, half online: it asks, and tells the customer it's checking
+  let t = await turn(db, evolutionPayload({ phone, text: 'ينفع أدفع نص كاش ونص أونلاين؟' }), async () => ({
+    plan: { read: 'x', stage: 'other', objective: 'x', ask_team: ['Can this customer pay half cash, half online?'] },
+    reply: quiet('هسأل الفرع وأرجعلك على طول 🙏', { ask_team: ['ينفع العميل يدفع نص كاش ونص أونلاين؟', ''] })
+  }));
+  assert.match(t.plan.plan_text, /Ask the team: YES — Can this customer pay half cash/);
+  assert.deepEqual(t.checked.decision.ask_team, ['ينفع العميل يدفع نص كاش ونص أونلاين؟']);
+  const q = await sql(db, `select q.id, c.questions_open from everwake.team_questions q join everwake.conversations c on c.id = q.conversation_id
+                            where q.wa_id = $1 and q.status = 'open'`, [phone]);
+  assert.equal(q.questions_open, 1);
+
+  // waiting: the agent sees it is still open
+  t = await turn(db, evolutionPayload({ phone, text: 'ها؟' }), async (brief) => {
+    assert.match(brief.facts_text, /QUESTIONS YOU ASKED THE TEAM:\n- «ينفع العميل يدفع نص كاش ونص أونلاين؟» \(asked \d+ min ago\) — waiting for their answer/);
+    return { plan: { read: 'x', stage: 'other', objective: 'x' }, reply: quiet('لسه مستنية رد الفرع، ثواني 🙏') };
+  });
+
+  // the team says yes; the dashboard wakes the agent with no customer message
+  await sql(db, `select everwake.answer_team_question($1::bigint, 'yes', 'بس الأونلاين الأول') as r`, [q.id]);
+  t = await turn(db, wake, async (brief) => {
+    assert.match(brief.facts_text, /the team answered \d+ min ago: YES — "بس الأونلاين الأول" · NEW — the customer has not heard it yet/);
+    assert.match(brief.latest_text, /no new message from them — the team has just answered your question/);
+    assert.deepEqual(brief.team_answers_new.map(Number), [Number(q.id)]);
+    return { plan: { read: 'x', stage: 'other', objective: 'x' }, reply: quiet('الفرع وافق 🎉 تقدر تدفع نص أونلاين ونص كاش، بس الأونلاين الأول') };
+  });
+  assert.equal(t.route, 'agent');
+  assert.equal(t.outbound.length, 1);
+  const told = await sql(db, `select told_at is not null as r from everwake.team_questions where id = $1`, [q.id]);
+  assert.equal(told.r, true);
+  // passed on: a second wake does nothing, and the next brief says so
+  t = await turn(db, wake, async () => ({ reply: quiet('x') }));
+  assert.equal(t.route, 'ignore');
+  t = await turn(db, evolutionPayload({ phone, text: 'تمام' }), async (brief) => {
+    assert.match(brief.facts_text, /already passed on to the customer/);
+    return { plan: { read: 'x', stage: 'other', objective: 'x' }, reply: quiet('تمام 👌') };
+  });
+});

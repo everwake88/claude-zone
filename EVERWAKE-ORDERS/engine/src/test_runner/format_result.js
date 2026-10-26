@@ -44,6 +44,7 @@ const lines = [
   `details=${short(res.details || {}, 500)}`,
   res.orders ? `orders=${short(res.orders)}` : '',
   t.order_placed ? `ORDER PLACED ${t.order_placed} (no ticket sent to the kitchen in a test)` : '',
-  t.handoff && t.handoff.needed ? `HANDOFF: ${t.handoff.reason}` : ''
+  t.handoff && t.handoff.needed ? `HANDOFF: ${t.handoff.reason}` : '',
+  t.ask_team && t.ask_team.length ? `ASKED THE TEAM: ${[].concat(t.ask_team).join(' | ')}` : ''
 ].filter(l => l !== '');
 return [{ json: { output: lines.join('\n'), reply: said || null } }];

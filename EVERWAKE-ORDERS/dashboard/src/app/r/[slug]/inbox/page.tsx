@@ -1,6 +1,7 @@
 'use client';
 import {
-  AlertTriangle, ArrowLeft, Ban, Bot, Check, CheckCheck, Clock, Hand, ImagePlus, MapPin, Search, Send, ShieldAlert, User
+  AlertTriangle, ArrowLeft, Ban, Bot, Check, CheckCheck, Clock, Hand, ImagePlus, MapPin, MessageCircleQuestion, Search, Send,
+  ShieldAlert, User, X
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -9,7 +10,7 @@ import { useTenant } from '@/components/tenant';
 import { clock, cx, dateTime, day, displayName, money, phoneLabel, qty, statusLabel, timeAgo } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
-import type { Address, Conversation, Customer, Message, Order } from '@/lib/types';
+import type { Address, Conversation, Customer, Message, Order, TeamQuestion } from '@/lib/types';
 
 type Filter = 'all' | 'attention' | 'human' | 'unread';
 
@@ -28,7 +29,7 @@ function InboxInner() {
       .select('*, customers(display_name, full_name, phone, phone_hidden, orders_count, is_blocked)')
       .eq('tenant_id', tenant.id).not('last_message_at', 'is', null)
       .order('last_message_at', { ascending: false }).limit(200);
-    if (filter === 'attention') query = query.eq('needs_attention', true);
+    if (filter === 'attention') query = query.or('needs_attention.eq.true,questions_open.gt.0');
     if (filter === 'human') query = query.eq('mode', 'human');
     if (filter === 'unread') query = query.gt('unread_count', 0);
     const { data } = await query;
@@ -82,6 +83,7 @@ function InboxInner() {
               <span className="truncate text-sm text-muted" dir="auto">{c.last_message_preview}</span>
               <span className="flex flex-wrap gap-1">
                 {c.needs_attention && <Badge tone="critical"><AlertTriangle className="size-3" /> {t('needs you')}</Badge>}
+                {(c.questions_open || 0) > 0 && <Badge tone="caution"><MessageCircleQuestion className="size-3" /> {t('question for you')}</Badge>}
                 {c.mode === 'human' && <Badge tone="gold"><Hand className="size-3" /> {t('taken over')}</Badge>}
                 {c.unread_count > 0 && <Badge tone="navy">{t('{n} new', { n: c.unread_count })}</Badge>}
                 {(c.customers?.orders_count || 0) > 0 && <Badge>{t('{n} orders', { n: c.customers?.orders_count })}</Badge>}
@@ -96,6 +98,7 @@ function InboxInner() {
             <p>{t("Every WhatsApp chat is here, live — the agent's replies, your team's, and the customer's.")}</p>
             <ol className="mt-3 list-decimal space-y-1 ps-5 text-start">
               <li>{t('A red “needs you” mark means the chat needs a person: the agent asked for help, or the customer is unhappy.')}</li>
+              <li>{t('A “question for you” mark means the agent is asking you something only the restaurant knows. Answer Yes, No or type it — the agent tells the customer straight away.')}</li>
               <li>{t('Take over to answer yourself — the agent stays quiet in that chat.')}</li>
               <li>{t('Hand back to the agent when you are done: it reads what you said and carries on.')}</li>
               <li>{t('Forgot to hand back? It goes back to the agent by itself after the time set in Settings → Ordering rules.')}</li>
@@ -114,6 +117,7 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
   const [draft, setDraft] = useState<Order | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
+  const [questions, setQuestions] = useState<TeamQuestion[]>([]);
   const [text, setText] = useState('');
   const [notes, setNotes] = useState('');
   const [showSide, setShowSide] = useState(true);
@@ -128,12 +132,14 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
     if (!c) return;
     const cv = c as Conversation;
     setConv(cv);
-    const [m, cu, d, o, a] = await Promise.all([
+    const [m, cu, d, o, a, q] = await Promise.all([
       db.from('messages').select('*').eq('tenant_id', tenant.id).eq('wa_id', cv.wa_id).order('created_at', { ascending: false }).limit(150),
       cv.customer_id ? db.from('customers').select('*').eq('id', cv.customer_id).single() : Promise.resolve({ data: null }),
       db.from('orders').select('*').eq('tenant_id', tenant.id).eq('wa_id', cv.wa_id).eq('status', 'draft').maybeSingle(),
       db.from('orders').select('*').eq('tenant_id', tenant.id).eq('wa_id', cv.wa_id).neq('status', 'draft').order('placed_at', { ascending: false }).limit(5),
-      cv.customer_id ? db.from('customer_addresses').select('*').eq('customer_id', cv.customer_id).order('last_used_at', { ascending: false }).limit(3) : Promise.resolve({ data: [] })
+      cv.customer_id ? db.from('customer_addresses').select('*').eq('customer_id', cv.customer_id).order('last_used_at', { ascending: false }).limit(3) : Promise.resolve({ data: [] }),
+      db.from('team_questions').select('*').eq('conversation_id', id).neq('status', 'dismissed')
+        .gt('asked_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString()).order('asked_at')
     ]);
     setMessages(((m.data || []) as Message[]).reverse());
     setCustomer(cu.data as Customer | null);
@@ -141,6 +147,7 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
     setDraft(d.data as Order | null);
     setOrders((o.data || []) as Order[]);
     setAddresses((a.data || []) as Address[]);
+    setQuestions((q.data || []) as TeamQuestion[]);
   }, [id, tenant.id]);
 
   useEffect(() => {
@@ -156,6 +163,7 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
         if (row?.wa_id === conv.wa_id) load();
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'everwake', table: 'conversations', filter: `id=eq.${id}` }, (p) => setConv(c => ({ ...(c as Conversation), ...(p.new as Conversation) })))
+      .on('postgres_changes', { event: '*', schema: 'everwake', table: 'team_questions', filter: `conversation_id=eq.${id}` }, () => load())
       .subscribe();
     return () => { sb().removeChannel(ch); };
   }, [conv?.wa_id, id, tenant.id, load]);
@@ -232,6 +240,21 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
             <Button size="sm" variant="outline" onClick={() => rpc('resolve_attention', { p_conversation: id }, t('Marked as handled'))}>{t('Handled')}</Button>
           </div>
         )}
+
+        {questions.filter(q => q.status === 'open').map(q => (
+          <QuestionCard key={q.id} q={q} onDone={() => { load(); onChanged(); }} />
+        ))}
+        {questions.filter(q => q.status === 'answered' && q.answered_at && Date.now() - new Date(q.answered_at).getTime() < 30 * 60000).map(q => (
+          <div key={q.id} className="flex items-center gap-2 border-b border-hairline bg-white px-4 py-1.5 text-xs text-muted">
+            <MessageCircleQuestion className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate" dir="auto">
+              {q.question} → <strong className="text-ink">{q.answer_kind === 'yes' ? t('Yes') : q.answer_kind === 'no' ? t('No') : ''}{q.answer_kind !== 'text' && q.answer ? ' — ' : ''}{q.answer}</strong>
+              {q.answered_by_name ? ` · ${q.answered_by_name}` : ''}
+            </span>
+            {q.told_at ? <span className="flex items-center gap-1 text-positive"><CheckCheck className="size-3.5" /> {t('the agent told the customer')}</span>
+              : <span className="flex items-center gap-1"><Clock className="size-3.5" /> {t('the agent is telling the customer…')}</span>}
+          </div>
+        ))}
 
         <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
           {messages.map((m, i) => {
@@ -354,6 +377,50 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
           </Card>
         </aside>
       )}
+    </div>
+  );
+}
+
+// the agent asked the team something only the restaurant knows: Yes / No / typed, and it tells the customer
+function QuestionCard({ q, onDone }: { q: TeamQuestion; onDone: () => void }) {
+  const t = useT();
+  const toast = useToast();
+  const { busy, run } = useAction();
+  const [answer, setAnswer] = useState('');
+  const send = (body: { kind?: 'yes' | 'no' | 'text'; answer?: string; dismiss?: boolean }) => run(async () => {
+    const res = await fetch(`/api/team-question/${q.id}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const j = await res.json().catch(() => ({})) as { error?: string; woke?: boolean; reason?: string };
+    if (!res.ok) throw new Error(j.error || 'Could not save the answer');
+    toast(body.dismiss ? t('Closed — the agent will not wait for it')
+      : j.woke ? t('Sent — the agent is telling the customer now')
+      : j.reason === 'taken_over' ? t('Saved — you have this chat, so tell the customer yourself')
+      : t('Saved — the agent tells the customer with their next message'));
+    setAnswer('');
+    onDone();
+  });
+  const note = answer.trim();
+  return (
+    <div className="border-b border-caution/30 bg-caution-wash px-4 py-3">
+      <div className="flex items-start gap-2">
+        <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-caution" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-caution">{t('The agent is asking you')} · <span className="font-normal">{timeAgo(q.asked_at)}</span></p>
+          <p className="mt-0.5 text-sm font-medium text-ink" dir="auto">{q.question}</p>
+        </div>
+        <button onClick={() => send({ dismiss: true })} disabled={busy} title={t('Close without answering')}
+          className="rounded p-1 text-muted hover:bg-white/60"><X className="size-4" /></button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 ps-6">
+        <Button size="sm" variant="positive" busy={busy} onClick={() => send({ kind: 'yes', answer: note })}><Check className="size-4" /> {t('Yes')}</Button>
+        <Button size="sm" variant="danger" busy={busy} onClick={() => send({ kind: 'no', answer: note })}><X className="size-4" /> {t('No')}</Button>
+        <input value={answer} onChange={e => setAnswer(e.target.value)} dir="auto"
+          onKeyDown={e => { if (e.key === 'Enter' && note) { e.preventDefault(); send({ kind: 'text', answer: note }); } }}
+          placeholder={t('Or type the answer — it also goes with Yes / No as a note')}
+          className="h-8 min-w-48 flex-1 rounded-lg border border-hairline bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50" />
+        <Button size="sm" variant="gold" busy={busy} disabled={!note} onClick={() => send({ kind: 'text', answer: note })}><Send className="size-4" /> {t('Send')}</Button>
+      </div>
     </div>
   );
 }

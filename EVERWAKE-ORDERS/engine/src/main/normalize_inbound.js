@@ -29,6 +29,21 @@ const instance = str(body.instance || body.instanceName || data.instance || data
 const token = str(query.token || query.t || '');
 const testRun = payload.test_run === true;
 
+// the team answered a question the agent asked (the dashboard, 014): no customer message — the agent
+// wakes up to pass the answer on. The channel's token proves it; intake checks there is a new answer.
+if (event === 'everwake.team_answer') {
+  const wa = String(data.wa_id || '').replace(/\D/g, '');
+  const pretend = /^20000000000[0-9]$|^2000000000[1-9][0-9]$/.test(wa);   // a Test Runner chat: nothing goes out
+  return [{
+    json: {
+      run_id: makeRunId(), instance, wa_id: wa, reply_to: wa, customer_message: '', message_type: 'team_answer',
+      from_me: false, is_group: false, has_location: false, location: null, is_test: pretend, team_answer: true,
+      is_ignorable: !wa || !instance, received_at: new Date().toISOString(),
+      b64_intake: b64({ provider: 'evolution', instance, token, kind: 'team_answer', wa_id: wa, test_run: pretend || undefined })
+    }
+  }];
+}
+
 const text =
   message.conversation ||
   message.extendedTextMessage?.text ||

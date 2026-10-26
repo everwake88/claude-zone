@@ -44,7 +44,7 @@ create policy "everwake imports" on storage.objects for all to authenticated
 do $$
 declare t text;
 begin
-  foreach t in array array['orders', 'conversations', 'messages', 'tenants', 'reservations'] loop
+  foreach t in array array['orders', 'conversations', 'messages', 'tenants', 'reservations', 'team_questions'] loop
     begin
       execute format('alter publication supabase_realtime add table everwake.%I', t);
     exception when duplicate_object then null;

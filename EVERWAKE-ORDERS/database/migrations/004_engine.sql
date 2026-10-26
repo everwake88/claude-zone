@@ -199,6 +199,25 @@ begin
     return base || jsonb_build_object('route', 'ignore', 'reason', 'no_sender');
   end if;
 
+  -- the team answered a question the agent asked (014): no customer message, the agent passes the answer on
+  if p ->> 'kind' = 'team_answer' then
+    select * into conv from everwake.conversations where tenant_id = t.id and wa_id = v_wa;
+    if not found or not exists (select 1 from everwake.team_questions q
+                                 where q.tenant_id = t.id and q.wa_id = v_wa and q.status = 'answered' and q.told_at is null) then
+      return base || jsonb_build_object('route', 'ignore', 'reason', 'no_new_answer');
+    end if;
+    select * into cust from everwake.customers where id = conv.customer_id;
+    base := base || jsonb_build_object(
+      'customer_id', cust.id, 'conversation_id', conv.id, 'wa_id', cust.wa_id, 'reply_to', cust.reply_to,
+      'phone_hidden', cust.phone_hidden, 'team_answer', true);
+    if cust.is_blocked or conv.mode = 'human' or not t.agent_enabled then
+      return base || jsonb_build_object('route', 'ignore', 'reason', 'agent_not_answering');
+    end if;
+    insert into everwake.inbound_buffer (tenant_id, wa_id, message_text) values (t.id, cust.wa_id, '')
+    returning id into v_buf;
+    return base || jsonb_build_object('route', 'agent', 'buffer_id', v_buf);
+  end if;
+
   -- the customer, by any identity -----------------------------------------
   select ci.customer_id into v_cid
     from everwake.customer_identities ci
@@ -685,6 +704,15 @@ begin
                order by pc.last_message_at desc limit 1),
     -- table bookings (010): the rules, the one in progress, and what is coming up
     'reservation_setup', everwake.reservation_setup(p_tenant),
+    -- what the agent asked the team in the last day, and their answers (014)
+    'team_questions', coalesce((
+       select jsonb_agg(jsonb_build_object('id', q.id, 'question', q.question, 'asked_at', q.asked_at, 'status', q.status,
+                                           'answer_kind', q.answer_kind, 'answer', q.answer, 'answered_at', q.answered_at,
+                                           'answered_by', q.answered_by_name, 'told', q.told_at is not null)
+                        order by q.asked_at)
+         from (select * from everwake.team_questions
+                where tenant_id = p_tenant and wa_id = p_wa and status <> 'dismissed' and asked_at > now() - interval '24 hours'
+                order by asked_at desc limit 6) q), '[]'::jsonb),
     'reservation', (select everwake.reservation_view(x) from everwake.reservations x
                      where x.tenant_id = p_tenant and x.wa_id = p_wa and x.status = 'draft'),
     'reservations_upcoming', coalesce((select jsonb_agg(everwake.reservation_view(x) order by x.reserved_for)
@@ -772,6 +800,22 @@ begin
          human_reason     = case when v_handoff and v_take and c.mode = 'agent' then 'agent asked for a person: ' || coalesce(p -> 'handoff' ->> 'reason', '') else c.human_reason end
    where c.tenant_id = v_tenant and c.wa_id = v_wa;
   get diagnostics n_state = row_count;
+
+  -- the agent asked the team (014): the question waits in the inbox; the answers this reply passed on are done
+  insert into everwake.team_questions (tenant_id, conversation_id, wa_id, question, run_id)
+  select distinct v_tenant, c.id, v_wa, left(btrim(x), 500), v_run
+    from everwake.conversations c,
+         jsonb_array_elements_text(case jsonb_typeof(p -> 'ask_team') when 'array' then p -> 'ask_team'
+                                        when 'string' then jsonb_build_array(p -> 'ask_team') else '[]'::jsonb end) x
+   where c.tenant_id = v_tenant and c.wa_id = v_wa and btrim(x) <> ''
+     and not exists (select 1 from everwake.team_questions q
+                      where q.conversation_id = c.id and q.status = 'open' and q.question = left(btrim(x), 500));
+  update everwake.team_questions q set told_at = now()
+   where q.tenant_id = v_tenant and q.wa_id = v_wa and q.status = 'answered' and q.told_at is null
+     and q.id in (select (x #>> '{}')::bigint from jsonb_array_elements(coalesce(p -> 'answers_told', '[]'::jsonb)) x);
+  update everwake.conversations c
+     set questions_open = (select count(*) from everwake.team_questions q where q.conversation_id = c.id and q.status = 'open')
+   where c.tenant_id = v_tenant and c.wa_id = v_wa;
 
   if nullif(p ->> 'language', '') is not null then
     update everwake.customers set language = p ->> 'language'

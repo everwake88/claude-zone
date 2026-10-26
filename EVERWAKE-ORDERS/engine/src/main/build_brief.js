@@ -327,6 +327,18 @@ if (pause && pause.apologized_at) {
   situation.push(`The WhatsApp ordering line was PAUSED by the restaurant (busy) when this customer wrote; they got an automatic apology${pause.resume_notified_at ? ' and later an automatic "we are back, you can order now" message' : ''}. Thank them warmly for waiting once, then serve them normally.`);
 }
 
+// ---- questions asked to the team (014) ---------------------------------------------------------
+const ago = (at) => { const m = Math.max(0, Math.round((Date.now() - new Date(at).getTime()) / 60000));
+                      return m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+const teamQs = arr(ctx.team_questions);
+const answersNew = teamQs.filter(q => q.status === 'answered' && !q.told);
+const ANSWER = { yes: 'YES', no: 'NO', text: 'they wrote' };
+const teamLines = teamQs.map(q => `- «${clip(q.question, 300)}» (asked ${ago(q.asked_at)}) — `
+  + (q.status === 'open' ? 'waiting for their answer'
+    : `the team answered ${ago(q.answered_at)}${q.answered_by ? ' (' + q.answered_by + ')' : ''}: ${ANSWER[q.answer_kind] || ''}`
+      + (q.answer && q.answer_kind !== 'text' ? ' — ' : ' ') + (q.answer ? `"${clip(q.answer, 400)}"` : '')
+      + (q.told ? ' · already passed on to the customer' : ' · NEW — the customer has not heard it yet')));
+
 // ---- pictures --------------------------------------------------------------------------------------
 const pages = obj(media.menu_pages);
 const pageCount = branchId ? num(pages[branchId]) || num(pages.all) : num(pages.all);
@@ -401,6 +413,7 @@ const facts = [
   payFact,
   '',
   ...bookingLines,
+  teamLines.length ? 'QUESTIONS YOU ASKED THE TEAM:\n' + teamLines.join('\n') + '\n' : '',
   memory.length ? 'NOTES FROM EARLIER IN THIS CONVERSATION (the facts above win whenever a note disagrees with them):\n' + memory.map(m => '- ' + m).join('\n') : ''
 ].filter(x => x !== '').join('\n');
 
@@ -456,7 +469,8 @@ if (branchId) {
 
 // the model's prompt templates read { } as variables: none may reach them
 const safe = (s) => String(s == null ? '' : s).replace(/\{/g, '(').replace(/\}/g, ')');
-const latest = safe(customerText || '(no text)');
+const latest = safe(customerText || (answersNew.length
+  ? '(no new message from them — the team has just answered your question, in FACTS)' : '(no text)'));
 const factsText = safe(facts), businessText = safe(business), menuSafe = safe(menuText);
 const historyText = safe(historyLines.join('\n'));
 const brief = [
@@ -490,6 +504,8 @@ return [{
     photo_codes: photoCodes,
     reservations_on_whatsapp: rsvWa.length > 0,
     reservation_in_progress: !!draft,
+    team_answers_new: answersNew.map(q => q.id),      // passed on by this turn's reply (persist_turn marks them told)
+    team_questions_open: teamQs.filter(q => q.status === 'open').length,
     facts_text: factsText,
     business_text: businessText,
     menu_text: menuSafe,

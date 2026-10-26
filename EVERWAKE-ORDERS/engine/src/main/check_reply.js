@@ -47,7 +47,7 @@ function readDecision(raw) {
   const msgs = list ? (list[1].match(/"((?:[^"\\]|\\.)*)"/g) || []).map(q => q.slice(1, -1).replace(/\\n/g, '\n').replace(/\\"/g, '"')) : [];
   const flag = (k) => new RegExp(`"${k}"\\s*:\\s*true`).test(body);
   return { reply_messages: msgs, send_menu_images: flag('send_menu_images'), showed_order_summary: flag('showed_order_summary'),
-           send_item_photos: [], handoff: { needed: /"needed"\s*:\s*true/.test(body), reason: '' }, language: null, memory_note: '' };
+           send_item_photos: [], handoff: { needed: /"needed"\s*:\s*true/.test(body), reason: '' }, ask_team: [], language: null, memory_note: '' };
 }
 if (typeof decision === 'string') decision = readDecision(decision);
 decision = obj(decision);
@@ -340,6 +340,9 @@ if (bookingRef && !joined.includes(bookingRef) && messages.length) {
 }
 
 const handoff = obj(decision.handoff);
+// questions for the team (014): one or two, each a card in the inbox
+const askTeam = (Array.isArray(decision.ask_team) ? decision.ask_team : [decision.ask_team])
+  .map(q => str(q).trim()).filter(Boolean).slice(0, 2).map(q => q.slice(0, 500));
 return [{
   json: {
     ...pre,
@@ -349,6 +352,7 @@ return [{
       send_item_photos: photos,
       showed_order_summary: showedSummary,
       handoff: { needed: handoff.needed === true || String(handoff.needed) === 'true', reason: str(handoff.reason) },
+      ask_team: askTeam,
       language: str(decision.language) || null,
       memory_note: str(decision.memory_note)
     },
