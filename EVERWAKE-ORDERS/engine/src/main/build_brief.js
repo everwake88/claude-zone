@@ -401,7 +401,7 @@ const facts = [
   payFact,
   '',
   ...bookingLines,
-  memory.length ? 'NOTES FROM EARLIER IN THIS CONVERSATION:\n' + memory.map(m => '- ' + m).join('\n') : ''
+  memory.length ? 'NOTES FROM EARLIER IN THIS CONVERSATION (the facts above win whenever a note disagrees with them):\n' + memory.map(m => '- ' + m).join('\n') : ''
 ].filter(x => x !== '').join('\n');
 
 // ---- BUSINESS FACTS ---------------------------------------------------------------------------------------

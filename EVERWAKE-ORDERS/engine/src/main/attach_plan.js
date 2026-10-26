@@ -78,12 +78,13 @@ if (!plan || typeof plan !== 'object') {
     `They already know / already answered (never say or ask again): ${list(plan.already_known).join(' · ') || '(nothing yet)'}`,
     `Avoid: ${list(plan.avoid).join(' · ') || '-'}`,
     `Reply language: ${clip(plan.language, 10) || 'their language'}`,
+    `The customer is: ${/^(f|w|woman|female|she)/i.test(str(plan.customer)) ? 'a woman — address her as a woman' : 'a man — address him as a man (معاك، تحب، حضرتك — never معاكي، تحبي)'}`,
     `Next: ${clip(plan.next, 300)}`
   ].join('\n');
   brain = {
     used: true, stage: clip(plan.stage, 60), objective: clip(plan.objective, 260),
     read: clip(plan.read, 400), other_readings: clip(plan.other_readings, 400), move: clip(plan.move, 800), end_with: clip(plan.end_with, 240),
-    planned: actions, already_known: list(plan.already_known), avoid: list(plan.avoid), language: clip(plan.language, 10),
+    planned: actions, already_known: list(plan.already_known), avoid: list(plan.avoid), language: clip(plan.language, 10), customer: clip(plan.customer, 20),
     actions: actions.length, show_summary: bool(plan.show_summary), place_order: bool(plan.place_order),
     send_menu_images: sendMenu, send_item_photos: photosOk, handoff: bool(handoff.needed)
   };

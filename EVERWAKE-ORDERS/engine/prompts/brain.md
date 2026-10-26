@@ -77,4 +77,5 @@ Return ONE JSON object and nothing else — no code fences, no text around it. V
 "already_known" — what the customer already heard or answered; never said or asked again (up to 8 short items).
 "avoid" — up to 3 traps for this reply.
 "language" — "ar" or "en".
+"customer" — "man" or "woman": a woman only when her own words or name show it (Ahmad, Omar = a man).
 "next" — how to follow up depending on their answer.

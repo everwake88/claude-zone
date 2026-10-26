@@ -61,4 +61,4 @@ Return ONE JSON object and nothing else — no words around it, no code fence:
 - showed_order_summary: true only when this reply holds the full order summary to confirm
 - handoff: {needed: true/false, reason: Arabic, for the team}
 - language: "ar" or "en"
-- memory_note: one short English line worth remembering later that FACTS won't hold, or ""
+- memory_note: one short English line about the customer worth remembering later that FACTS won't hold (a preference, an occasion, a promise you made), or "". Never a conclusion about what the system can or can't do ("images don't reach him") — that changes, the facts tell you each turn.
