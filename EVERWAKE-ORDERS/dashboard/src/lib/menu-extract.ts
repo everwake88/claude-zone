@@ -51,7 +51,7 @@ Rules:
 - description_ar: the printed description, or null. Keep it short.
 - notes: anything the restaurant should check (unreadable prices, prices that differ by branch, taxes or service mentioned on the menu), or null.`;
 
-async function openai(body: Record<string, unknown>, timeoutMs: number) {
+export async function openai(body: Record<string, unknown>, timeoutMs: number) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('OPENAI_API_KEY is not set on the server.');
   const res = await fetch('https://api.openai.com/v1/responses', {

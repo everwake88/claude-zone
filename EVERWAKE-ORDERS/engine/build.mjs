@@ -25,6 +25,8 @@
 //   EW_BRAIN            'off' drops the planning Brain: the Agent then reads the whole situation and
 //                       thinks for itself (default on: the Brain thinks, the Agent writes)
 //   EW_AGENT_EFFORT     the Agent's reasoning effort (default low behind the Brain, medium alone)
+//   EW_TRANSCRIBE_MODEL hears a customer's voice note (default gpt-transcribe)
+//   EW_VISION_MODEL     looks at a customer's photo (default gpt-5-mini); EW_VISION_EFFORT its reasoning (default low, '' for none)
 //   (no Rewrite model: a reply that breaks a hard rail has only the offending lines dropped)
 //
 // n8n-ids.json (optional) holds the ids n8n gave the workflows, so the
@@ -49,6 +51,9 @@ const wfRef = (workflowName) => {
 const MODEL = process.env.EW_MODEL || 'gpt-5.6-luna';
 const USE_BRAIN = process.env.EW_BRAIN !== 'off';
 const AGENT_EFFORT = process.env.EW_AGENT_EFFORT || (USE_BRAIN ? 'low' : 'medium');
+const TRANSCRIBE_MODEL = process.env.EW_TRANSCRIBE_MODEL || 'gpt-transcribe';
+const VISION_MODEL = process.env.EW_VISION_MODEL || 'gpt-5-mini';
+const VISION_EFFORT = process.env.EW_VISION_EFFORT ?? 'low';
 const PG = { postgres: { id: process.env.EW_PG_CRED_ID || 'EVERWAKE_DB', name: 'Everwake DB' } };
 const OPENAI = { openAiApi: { id: process.env.EW_OPENAI_CRED_ID || 'CkjJoUDZ38ndmkPM', name: 'OpenAi account' } };
 const GEOCODE_URL = process.env.EW_GEOCODE_URL
@@ -58,7 +63,9 @@ const GEOCODE_URL = process.env.EW_GEOCODE_URL
 export function expand(code) {
   return code.replace(/^\/\/ @include (\S+)\s*$/gm, (_, f) => readFileSync(join(ROOT, 'src', f), 'utf8').trim());
 }
-const src = (p) => expand(readFileSync(join(ROOT, 'src', p), 'utf8')).trim() + '\n';
+const src = (p) => expand(readFileSync(join(ROOT, 'src', p), 'utf8')).trim()
+  .replace(/__TRANSCRIBE_MODEL__/g, TRANSCRIBE_MODEL).replace(/__VISION_MODEL__/g, VISION_MODEL)
+  .replace(/__VISION_EFFORT__/g, VISION_EFFORT) + '\n';
 const prompt = (p) => readFileSync(join(ROOT, 'prompts', p), 'utf8').trim();
 const b64sql = (fn) => `select everwake.${fn}(convert_from(decode($1::text, 'base64'), 'UTF8')::jsonb) as r;`;
 
@@ -201,6 +208,44 @@ function buildMain() {
   presence.parameters.url = `={{ ${I}.channel.base_url }}/chat/sendPresence/{{ ${I}.channel.instance }}`;
   presence.parameters.headerParameters.parameters[0].value = `={{ ${I}.channel.api_key }}`;
   w.add(iff('Route: Real Customer?', `!${TEST}`, [-1400, 360]));
+
+  // a photo or a voice note: fetched and understood before the turn (the agent waits for it, 015)
+  const N = "$('Normalize Inbound').first().json";
+  w.add(iff('Route: Photo Or Voice Note?', `!!${N}.media`, [-1300, 160]));
+  w.add(iff('Route: Fetch The File?', `!${N}.media_b64`, [-1100, 0]));
+  w.add({ ...evo('Fetch Media (Evolution)', 'chat/getBase64FromMediaMessage',
+                 `{ message: { key: { id: ${N}.external_id } }, convertToMp4: false }`, [-900, -80], { timeout: 30000 }) });
+  const fetchNode = w.nodes.find(n => n.name === 'Fetch Media (Evolution)');
+  fetchNode.parameters.url = `={{ ${I}.channel.base_url }}/chat/getBase64FromMediaMessage/{{ ${I}.channel.instance }}`;
+  fetchNode.parameters.headerParameters.parameters[0].value = `={{ ${I}.channel.api_key }}`;
+  w.add(code('Prepare Media', 'main/prepare_media.js', [-700, 0]));
+  w.add(iff('Route: Voice Note?', "$json.ok && $json.kind === 'audio'", [-500, 0]));
+  w.add(iff('Route: Photo?', "$json.ok && $json.kind === 'image'", [-300, 120]));
+  const P = "$('Prepare Media').first().json";
+  w.add({ name: 'Voice Note To File', type: 'n8n-nodes-base.convertToFile', typeVersion: 1.1, position: [-300, -120],
+          parameters: { operation: 'toBinary', sourceProperty: 'b64', binaryPropertyName: 'data',
+                        options: { fileName: `={{ ${P}.file_name }}`, mimeType: `={{ ${P}.mime }}` } },
+          onError: 'continueRegularOutput', alwaysOutputData: true });
+  w.add({ name: 'Transcribe Voice Note (OpenAI)', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: [-100, -120], credentials: OPENAI,
+          parameters: { method: 'POST', url: 'https://api.openai.com/v1/audio/transcriptions',
+                        authentication: 'predefinedCredentialType', nodeCredentialType: 'openAiApi',
+                        sendBody: true, contentType: 'multipart-form-data',
+                        bodyParameters: { parameters: [
+                          { parameterType: 'formBinaryData', name: 'file', inputDataFieldName: 'data' },
+                          { name: 'model', value: `={{ ${P}.transcribe_model }}` },
+                          { name: 'prompt', value: `={{ ${P}.transcribe_prompt }}` }] },
+                        options: { timeout: 60000, response: { response: { neverError: true, responseFormat: 'json' } } } },
+          retryOnFail: true, maxTries: 2, waitBetweenTries: 1500, onError: 'continueRegularOutput', alwaysOutputData: true });
+  w.add({ name: 'Look At Photo (OpenAI)', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: [-100, 120], credentials: OPENAI,
+          parameters: { method: 'POST', url: 'https://api.openai.com/v1/chat/completions',
+                        authentication: 'predefinedCredentialType', nodeCredentialType: 'openAiApi',
+                        sendBody: true, specifyBody: 'json', jsonBody: '={{ JSON.stringify($json.vision_body) }}',
+                        options: { timeout: 60000, response: { response: { neverError: true, responseFormat: 'json' } } } },
+          retryOnFail: true, maxTries: 2, waitBetweenTries: 1500, onError: 'continueRegularOutput', alwaysOutputData: true });
+  w.add(code('Media Understood', 'main/media_understood.js', [120, 0]));
+  w.add(pg('Save What It Said', b64sql('media_understood'), '={{ [ $json.b64_media ] }}', [340, 0], { alwaysOutputData: true }));
+  w.add(sticky('Sticky — Media', '### Photos and voice notes\nFetched from WhatsApp and understood before the agent answers: a voice note is transcribed (**' + TRANSCRIBE_MODEL + '**), a photo described (**' + VISION_MODEL + '**). The agent reads it in place of "[voice note]" / "[photo]"; a quick text after it waits for it (a minute at most).',
+               [-1320, -300], 1700, 160, 5));
   w.add(wait('Debounce Wait 2s', 2, [-1100, 460]));
   w.add(pg('Claim Debounce Window', 'select everwake.claim_window($1::uuid, $2::text, $3::text, $4::bigint) as r;',
            `={{ [ ${I}.tenant_id, ${I}.wa_id, $('Normalize Inbound').first().json.run_id, String(${I}.buffer_id) ] }}`,
@@ -302,7 +347,15 @@ function buildMain() {
   w.chain('Prepare Apology', 'Evolution — Send Apology', 'Record Apology', 'Log Apology');
   w.link('Route: Typed On The Phone?', 'Wait For Own Echo 5s', 0); w.link('Route: Typed On The Phone?', 'Exit: Not For The Agent', 1);
   w.chain('Wait For Own Echo 5s', 'Log Phone Reply');
-  w.chain('Send Typing Presence', 'Debounce Wait 2s', 'Claim Debounce Window', 'Route: Won The Window?');
+  w.chain('Send Typing Presence', 'Route: Photo Or Voice Note?');
+  w.link('Route: Photo Or Voice Note?', 'Route: Fetch The File?', 0); w.link('Route: Photo Or Voice Note?', 'Debounce Wait 2s', 1);
+  w.link('Route: Fetch The File?', 'Fetch Media (Evolution)', 0); w.link('Route: Fetch The File?', 'Prepare Media', 1);
+  w.chain('Fetch Media (Evolution)', 'Prepare Media', 'Route: Voice Note?');
+  w.link('Route: Voice Note?', 'Voice Note To File', 0); w.link('Route: Voice Note?', 'Route: Photo?', 1);
+  w.chain('Voice Note To File', 'Transcribe Voice Note (OpenAI)', 'Media Understood');
+  w.link('Route: Photo?', 'Look At Photo (OpenAI)', 0); w.link('Route: Photo?', 'Media Understood', 1);
+  w.chain('Look At Photo (OpenAI)', 'Media Understood', 'Save What It Said', 'Debounce Wait 2s');
+  w.chain('Debounce Wait 2s', 'Claim Debounce Window', 'Route: Won The Window?');
   w.link('Route: Won The Window?', 'Route: Has Location?', 0); w.link('Route: Won The Window?', 'Route: Retry Or Exit?', 1);
   w.link('Route: Retry Or Exit?', 'Retry Backoff 3s', 0); w.link('Route: Retry Or Exit?', 'Exit: Superseded', 1);
   w.chain('Retry Backoff 3s', 'Claim Debounce Window');

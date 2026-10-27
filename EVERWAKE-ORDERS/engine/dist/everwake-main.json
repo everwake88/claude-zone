@@ -73,7 +73,7 @@
         600
       ],
       "parameters": {
-        "jsCode": "// =====================================================================\n// EVERWAKE — Main · NODE: Normalize Inbound\n// Evolution API payload -> one flat, predictable shape (the Seagull\n// contract), plus what a multi-restaurant engine needs:\n//   · instance + token   → which restaurant, and proof it is Evolution\n//   · phone and lid      → both identities, so a customer hidden behind a\n//                          WhatsApp private id is still recognised\n//   · from_me            → a message the restaurant typed on the phone\n//                          itself: logged for the inbox and the agent\n// Captions count as text; a voice note / photo / sticker with no text\n// goes through as a bracketed marker so the agent can answer naturally.\n// Reactions, edits, deletes and receipts are ignored.\n// A run from the Test Runner workflow (test_run, next to the payload —\n// a real webhook can't set it) is a pretend chat: Main records the\n// replies but sends nothing on WhatsApp.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201554354929 → 01554354929\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\n// a villa or a house has no floor or apartment to ask for\nconst HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;\n// …and nobody climbs to a flat when the customer comes down for it or lowers a basket\n// (\"هنزل السبت\", \"حد هينزل يستلم\", \"لما توصل متطلعش\")\nconst COMES_DOWN_RE = /السبت|سبت|هنزل|هينزل|هننزل|حنزل|نازل|نازلين|هستلم تحت|هنستلم تحت|استلم تحت|متطلعش|ما تطلعش|مش محتاج تطلع|تحت البيت|تحت العمارة|على الباب تحت|comes? down|basket/i;\nconst fieldNeeded = (f, d) => !(['address_floor', 'address_apartment'].includes(f)\n  && (HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' '))\n      || !!str(d.comes_down)\n      || COMES_DOWN_RE.test([d.address_notes, d.order_notes].map(str).join(' '))));\n// a weight the Egyptian way: 0.5 → نص كيلو, 1.5 → كيلو ونص\nconst kiloText = (q) => {\n  const n = Math.round(num(q) * 100) / 100, whole = Math.floor(n), part = Math.round((n - whole) * 100) / 100;\n  const frac = { 0.25: 'ربع', 0.5: 'نص', 0.75: 'تلت تربع' }[part];\n  if (part && !frac) return `${fmt(n)} كيلو`;\n  if (!whole) return `${frac} كيلو`;\n  const w = whole === 1 ? 'كيلو' : whole === 2 ? '2 كيلو' : `${whole} كيلو`;\n  return frac ? `${w} و${frac}` : w;\n};\nconst payload = $input.first().json;\nconst makeRunId = () => ['run', Date.now(), Math.random().toString(36).slice(2, 10)].join('_');\n\nconst body = payload.body && typeof payload.body === 'object' ? payload.body : payload;\nconst query = obj(payload.query);\nconst data = body.data || payload.data || body;\nconst key = data.key || {};\nconst message = data.message || {};\nconst event = String(body.event || payload.event || '').toLowerCase();\nconst instance = str(body.instance || body.instanceName || data.instance || data.instanceName || payload.instance);\nconst token = str(query.token || query.t || '');\nconst testRun = payload.test_run === true;\n\n// the team answered a question the agent asked (the dashboard, 014): no customer message — the agent\n// wakes up to pass the answer on. The channel's token proves it; intake checks there is a new answer.\nif (event === 'everwake.team_answer') {\n  const wa = String(data.wa_id || '').replace(/\\D/g, '');\n  const pretend = /^20000000000[0-9]$|^2000000000[1-9][0-9]$/.test(wa);   // a Test Runner chat: nothing goes out\n  return [{\n    json: {\n      run_id: makeRunId(), instance, wa_id: wa, reply_to: wa, customer_message: '', message_type: 'team_answer',\n      from_me: false, is_group: false, has_location: false, location: null, is_test: pretend, team_answer: true,\n      is_ignorable: !wa || !instance, received_at: new Date().toISOString(),\n      b64_intake: b64({ provider: 'evolution', instance, token, kind: 'team_answer', wa_id: wa, test_run: pretend || undefined })\n    }\n  }];\n}\n\nconst text =\n  message.conversation ||\n  message.extendedTextMessage?.text ||\n  message.imageMessage?.caption ||\n  message.videoMessage?.caption ||\n  message.documentMessage?.caption ||\n  message.buttonsResponseMessage?.selectedDisplayText ||\n  message.listResponseMessage?.title ||\n  message.templateButtonReplyMessage?.selectedDisplayText ||\n  data.messageText || data.text || '';\n\n// a swipe-reply: WhatsApp attaches the message it answers (its id, and a copy of it)\nconst replyInfo = obj(Object.values(message).map(v => (v && typeof v === 'object' ? v.contextInfo : null)).find(c => c && (c.stanzaId || c.quotedMessage))\n  || data.contextInfo);\nconst qm = obj(replyInfo.quotedMessage);\nconst quotedText = str(qm.conversation || obj(qm.extendedTextMessage).text || obj(qm.imageMessage).caption || obj(qm.videoMessage).caption\n  || obj(qm.documentMessage).caption);\nconst quotedKind = qm.imageMessage ? 'photo' : qm.documentMessage ? 'file' : (qm.audioMessage || qm.pttMessage) ? 'voice note'\n  : qm.locationMessage ? 'location pin' : qm.stickerMessage ? 'sticker' : (quotedText ? 'text' : '');\nconst quoted = (replyInfo.stanzaId || quotedKind) ? { id: str(replyInfo.stanzaId) || null, text: quotedText.slice(0, 400), kind: quotedKind } : null;\n\nconst location = message.locationMessage || message.liveLocationMessage || data.locationMessage || data.location || null;\n\nconst IGNORE = ['reactionMessage', 'protocolMessage', 'editedMessage', 'senderKeyDistributionMessage', 'pollUpdateMessage',\n                'messageContextInfo'];\nconst msgType = data.messageType || Object.keys(message).filter(k => k !== 'messageContextInfo')[0] || 'text';\nconst isMessageEvent = !event || /messages[._]upsert/.test(event) || /send[._]message/.test(event);\nconst ignorable = IGNORE.includes(msgType) || !isMessageEvent;\n\nconst MEDIA_MARK = {\n  audioMessage: '[voice note]', pttMessage: '[voice note]', imageMessage: '[photo]', videoMessage: '[video]',\n  stickerMessage: '[sticker]', documentMessage: '[file]', contactMessage: '[contact card]'\n};\n\nconst fromMe = Boolean(key.fromMe || data.fromMe || payload.fromMe) || /send[._]message/.test(event);\nconst remoteJid = String(key.remoteJid || data.remoteJid || data.from || payload.from || '');\nconst pushName = fromMe ? null : (data.pushName || payload.pushName || null);\nconst isGroup = remoteJid.includes('@g.us') || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter');\n\n// WhatsApp often hides the phone behind a private id (\"…@lid\"); Evolution\n// may give the real number in another field. reply_to = where a reply must\n// go (the number, or the FULL \"…@lid\" jid); wa_id = the customer key.\nconst digitsOf = (j) => String(j || '').replace(/@.*$/, '').replace(/:\\d+$/, '').replace(/\\D/g, '');\nconst candidates = [key.remoteJid, key.remoteJidAlt, key.senderPn, data.senderPn, key.participantAlt, data.remoteJid, data.sender]\n  .filter(Boolean).map(String);\nconst phoneJid = candidates.find(j => /@(s\\.whatsapp\\.net|c\\.us)$/.test(j)) || null;\nconst lidJid = candidates.find(j => /@lid$/.test(j)) || null;\nconst phone = phoneJid ? digitsOf(phoneJid) : '';\nconst lid = lidJid ? digitsOf(lidJid) : '';\nconst waId = phone || lid || digitsOf(remoteJid);\nconst replyTo = phone || lidJid || digitsOf(remoteJid);\nconst phoneHidden = !phone && !!lid;\nconst messageId = key.id || data.id || data.messageId || payload.id || `${waId}_${Date.now()}`;\n\nconst lat = location?.degreesLatitude ?? location?.latitude ?? location?.lat ?? null;\nconst lng = location?.degreesLongitude ?? location?.longitude ?? location?.lng ?? null;\nconst hasLocation = lat !== null && lng !== null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));\n\nlet customerMessage = String(text || '').trim();\nif (!customerMessage && hasLocation) customerMessage = '[shared a location pin]';\nif (!customerMessage && MEDIA_MARK[msgType]) customerMessage = MEDIA_MARK[msgType];\n\nconst locationObj = hasLocation ? {\n  lat: Number(lat), lng: Number(lng),\n  name: location?.name || null, address: location?.address || null,\n  maps_url: `https://www.google.com/maps?q=${Number(lat)},${Number(lng)}`\n} : null;\n\n// keep the raw payload for support, minus media bytes and thumbnails\nconst slim = (v, depth = 0) => {\n  if (depth > 6) return null;\n  if (typeof v === 'string') return v.length > 2000 ? `[${v.length} chars]` : v;\n  if (Array.isArray(v)) return v.slice(0, 20).map(x => slim(x, depth + 1));\n  if (v && typeof v === 'object') {\n    const o = {};\n    for (const [k, x] of Object.entries(v)) {\n      if (/^(base64|jpegThumbnail|thumbnail|mediaKey|fileEncSha256|fileSha256)$/i.test(k)) continue;\n      o[k] = slim(x, depth + 1);\n    }\n    return o;\n  }\n  return v;\n};\n\nconst intake = {\n  provider: 'evolution', instance, token, external_id: messageId, wa_id: waId, reply_to: replyTo, phone, lid,\n  phone_hidden: phoneHidden, push_name: pushName, text: customerMessage, message_type: hasLocation ? 'location' : msgType,\n  has_location: hasLocation, location: locationObj, from_me: fromMe, test_run: testRun || undefined, quoted: quoted || undefined,\n  raw: slim({ event, instance, data: { key, pushName: data.pushName, messageType: data.messageType,\n                                       messageTimestamp: data.messageTimestamp, message } })\n};\n\nreturn [{\n  json: {\n    run_id: makeRunId(),\n    instance,\n    wa_id: waId,\n    reply_to: replyTo,\n    phone_hidden: phoneHidden,\n    customer_name: pushName,\n    customer_message: customerMessage,\n    external_id: messageId,\n    message_type: intake.message_type,\n    from_me: fromMe,\n    is_group: isGroup,\n    has_location: hasLocation,\n    location: locationObj,\n    is_test: testRun,\n    is_ignorable: ignorable || !customerMessage || isGroup || !waId || !instance,\n    received_at: new Date().toISOString(),\n    b64_intake: b64(intake)\n  }\n}];\n"
+        "jsCode": "// =====================================================================\n// EVERWAKE — Main · NODE: Normalize Inbound\n// Evolution API payload -> one flat, predictable shape (the Seagull\n// contract), plus what a multi-restaurant engine needs:\n//   · instance + token   → which restaurant, and proof it is Evolution\n//   · phone and lid      → both identities, so a customer hidden behind a\n//                          WhatsApp private id is still recognised\n//   · from_me            → a message the restaurant typed on the phone\n//                          itself: logged for the inbox and the agent\n// Captions count as text; a voice note / photo / sticker with no text\n// goes through as a bracketed marker so the agent can answer naturally.\n// Reactions, edits, deletes and receipts are ignored.\n// A run from the Test Runner workflow (test_run, next to the payload —\n// a real webhook can't set it) is a pretend chat: Main records the\n// replies but sends nothing on WhatsApp.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201554354929 → 01554354929\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\n// a villa or a house has no floor or apartment to ask for\nconst HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;\n// …and nobody climbs to a flat when the customer comes down for it or lowers a basket\n// (\"هنزل السبت\", \"حد هينزل يستلم\", \"لما توصل متطلعش\")\nconst COMES_DOWN_RE = /السبت|سبت|هنزل|هينزل|هننزل|حنزل|نازل|نازلين|هستلم تحت|هنستلم تحت|استلم تحت|متطلعش|ما تطلعش|مش محتاج تطلع|تحت البيت|تحت العمارة|على الباب تحت|comes? down|basket/i;\nconst fieldNeeded = (f, d) => !(['address_floor', 'address_apartment'].includes(f)\n  && (HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' '))\n      || !!str(d.comes_down)\n      || COMES_DOWN_RE.test([d.address_notes, d.order_notes].map(str).join(' '))));\n// a weight the Egyptian way: 0.5 → نص كيلو, 1.5 → كيلو ونص\nconst kiloText = (q) => {\n  const n = Math.round(num(q) * 100) / 100, whole = Math.floor(n), part = Math.round((n - whole) * 100) / 100;\n  const frac = { 0.25: 'ربع', 0.5: 'نص', 0.75: 'تلت تربع' }[part];\n  if (part && !frac) return `${fmt(n)} كيلو`;\n  if (!whole) return `${frac} كيلو`;\n  const w = whole === 1 ? 'كيلو' : whole === 2 ? '2 كيلو' : `${whole} كيلو`;\n  return frac ? `${w} و${frac}` : w;\n};\nconst payload = $input.first().json;\nconst makeRunId = () => ['run', Date.now(), Math.random().toString(36).slice(2, 10)].join('_');\n\nconst body = payload.body && typeof payload.body === 'object' ? payload.body : payload;\nconst query = obj(payload.query);\nconst data = body.data || payload.data || body;\nconst key = data.key || {};\nconst message = data.message || {};\nconst event = String(body.event || payload.event || '').toLowerCase();\nconst instance = str(body.instance || body.instanceName || data.instance || data.instanceName || payload.instance);\nconst token = str(query.token || query.t || '');\nconst testRun = payload.test_run === true;\n\n// the team answered a question the agent asked (the dashboard, 014): no customer message — the agent\n// wakes up to pass the answer on. The channel's token proves it; intake checks there is a new answer.\nif (event === 'everwake.team_answer') {\n  const wa = String(data.wa_id || '').replace(/\\D/g, '');\n  const pretend = /^20000000000[0-9]$|^2000000000[1-9][0-9]$/.test(wa);   // a Test Runner chat: nothing goes out\n  return [{\n    json: {\n      run_id: makeRunId(), instance, wa_id: wa, reply_to: wa, customer_message: '', message_type: 'team_answer',\n      from_me: false, is_group: false, has_location: false, location: null, is_test: pretend, team_answer: true,\n      is_ignorable: !wa || !instance, received_at: new Date().toISOString(),\n      b64_intake: b64({ provider: 'evolution', instance, token, kind: 'team_answer', wa_id: wa, test_run: pretend || undefined })\n    }\n  }];\n}\n\nconst text =\n  message.conversation ||\n  message.extendedTextMessage?.text ||\n  message.imageMessage?.caption ||\n  message.videoMessage?.caption ||\n  message.documentMessage?.caption ||\n  message.buttonsResponseMessage?.selectedDisplayText ||\n  message.listResponseMessage?.title ||\n  message.templateButtonReplyMessage?.selectedDisplayText ||\n  data.messageText || data.text || '';\n\n// a swipe-reply: WhatsApp attaches the message it answers (its id, and a copy of it)\nconst replyInfo = obj(Object.values(message).map(v => (v && typeof v === 'object' ? v.contextInfo : null)).find(c => c && (c.stanzaId || c.quotedMessage))\n  || data.contextInfo);\nconst qm = obj(replyInfo.quotedMessage);\nconst quotedText = str(qm.conversation || obj(qm.extendedTextMessage).text || obj(qm.imageMessage).caption || obj(qm.videoMessage).caption\n  || obj(qm.documentMessage).caption);\nconst quotedKind = qm.imageMessage ? 'photo' : qm.documentMessage ? 'file' : (qm.audioMessage || qm.pttMessage) ? 'voice note'\n  : qm.locationMessage ? 'location pin' : qm.stickerMessage ? 'sticker' : (quotedText ? 'text' : '');\nconst quoted = (replyInfo.stanzaId || quotedKind) ? { id: str(replyInfo.stanzaId) || null, text: quotedText.slice(0, 400), kind: quotedKind } : null;\n\nconst location = message.locationMessage || message.liveLocationMessage || data.locationMessage || data.location || null;\n\nconst IGNORE = ['reactionMessage', 'protocolMessage', 'editedMessage', 'senderKeyDistributionMessage', 'pollUpdateMessage',\n                'messageContextInfo'];\nconst msgType = data.messageType || Object.keys(message).filter(k => k !== 'messageContextInfo')[0] || 'text';\nconst isMessageEvent = !event || /messages[._]upsert/.test(event) || /send[._]message/.test(event);\nconst ignorable = IGNORE.includes(msgType) || !isMessageEvent;\n\nconst MEDIA_MARK = {\n  audioMessage: '[voice note]', pttMessage: '[voice note]', imageMessage: '[photo]', videoMessage: '[video]',\n  stickerMessage: '[sticker]', documentMessage: '[file]', contactMessage: '[contact card]'\n};\n\nconst fromMe = Boolean(key.fromMe || data.fromMe || payload.fromMe) || /send[._]message/.test(event);\nconst remoteJid = String(key.remoteJid || data.remoteJid || data.from || payload.from || '');\nconst pushName = fromMe ? null : (data.pushName || payload.pushName || null);\nconst isGroup = remoteJid.includes('@g.us') || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter');\n\n// WhatsApp often hides the phone behind a private id (\"…@lid\"); Evolution\n// may give the real number in another field. reply_to = where a reply must\n// go (the number, or the FULL \"…@lid\" jid); wa_id = the customer key.\nconst digitsOf = (j) => String(j || '').replace(/@.*$/, '').replace(/:\\d+$/, '').replace(/\\D/g, '');\nconst candidates = [key.remoteJid, key.remoteJidAlt, key.senderPn, data.senderPn, key.participantAlt, data.remoteJid, data.sender]\n  .filter(Boolean).map(String);\nconst phoneJid = candidates.find(j => /@(s\\.whatsapp\\.net|c\\.us)$/.test(j)) || null;\nconst lidJid = candidates.find(j => /@lid$/.test(j)) || null;\nconst phone = phoneJid ? digitsOf(phoneJid) : '';\nconst lid = lidJid ? digitsOf(lidJid) : '';\nconst waId = phone || lid || digitsOf(remoteJid);\nconst replyTo = phone || lidJid || digitsOf(remoteJid);\nconst phoneHidden = !phone && !!lid;\nconst messageId = key.id || data.id || data.messageId || payload.id || `${waId}_${Date.now()}`;\n\nconst lat = location?.degreesLatitude ?? location?.latitude ?? location?.lat ?? null;\nconst lng = location?.degreesLongitude ?? location?.longitude ?? location?.lng ?? null;\nconst hasLocation = lat !== null && lng !== null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));\n\n// a photo or a voice note: fetched and understood before the agent answers (Main: Prepare Media)\nconst mediaMsg = message.audioMessage || message.pttMessage || message.imageMessage || null;\nconst media = mediaMsg && !fromMe ? {\n  kind: message.imageMessage ? 'image' : 'audio',\n  mime: str(mediaMsg.mimetype) || (message.imageMessage ? 'image/jpeg' : 'audio/ogg'),\n  seconds: Number(mediaMsg.seconds) || null\n} : null;\n// Evolution can put the file in the webhook itself (\"base64\" on): then nothing needs fetching\nconst mediaB64 = media ? str(message.base64 || data.base64 || '') : '';\n\nlet customerMessage = String(text || '').trim();\nif (!customerMessage && hasLocation) customerMessage = '[shared a location pin]';\nif (!customerMessage && MEDIA_MARK[msgType]) customerMessage = MEDIA_MARK[msgType];\n\nconst locationObj = hasLocation ? {\n  lat: Number(lat), lng: Number(lng),\n  name: location?.name || null, address: location?.address || null,\n  maps_url: `https://www.google.com/maps?q=${Number(lat)},${Number(lng)}`\n} : null;\n\n// keep the raw payload for support, minus media bytes and thumbnails\nconst slim = (v, depth = 0) => {\n  if (depth > 6) return null;\n  if (typeof v === 'string') return v.length > 2000 ? `[${v.length} chars]` : v;\n  if (Array.isArray(v)) return v.slice(0, 20).map(x => slim(x, depth + 1));\n  if (v && typeof v === 'object') {\n    const o = {};\n    for (const [k, x] of Object.entries(v)) {\n      if (/^(base64|jpegThumbnail|thumbnail|mediaKey|fileEncSha256|fileSha256)$/i.test(k)) continue;\n      o[k] = slim(x, depth + 1);\n    }\n    return o;\n  }\n  return v;\n};\n\nconst intake = {\n  provider: 'evolution', instance, token, external_id: messageId, wa_id: waId, reply_to: replyTo, phone, lid,\n  phone_hidden: phoneHidden, push_name: pushName, text: customerMessage, message_type: hasLocation ? 'location' : msgType,\n  media: media ? { kind: media.kind } : undefined,\n  has_location: hasLocation, location: locationObj, from_me: fromMe, test_run: testRun || undefined, quoted: quoted || undefined,\n  raw: slim({ event, instance, data: { key, pushName: data.pushName, messageType: data.messageType,\n                                       messageTimestamp: data.messageTimestamp, message } })\n};\n\nreturn [{\n  json: {\n    run_id: makeRunId(),\n    instance,\n    wa_id: waId,\n    reply_to: replyTo,\n    phone_hidden: phoneHidden,\n    customer_name: pushName,\n    customer_message: customerMessage,\n    external_id: messageId,\n    message_type: intake.message_type,\n    from_me: fromMe,\n    is_group: isGroup,\n    has_location: hasLocation,\n    location: locationObj,\n    is_test: testRun,\n    media,\n    media_b64: mediaB64 || undefined,\n    is_ignorable: ignorable || !customerMessage || isGroup || !waId || !instance,\n    received_at: new Date().toISOString(),\n    b64_intake: b64(intake)\n  }\n}];\n"
       },
       "id": "f4d6e2aa-a212-582d-ad2f-3cb7d60c32d6"
     },
@@ -463,6 +463,368 @@
         "options": {}
       },
       "id": "1f64b2a0-7a6c-5928-abb8-56b6937ec205"
+    },
+    {
+      "name": "Route: Photo Or Voice Note?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1300,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ba8b3e7a-3ef7-5a7a-ade1-78a4980caad2",
+              "leftValue": "={{ !!$('Normalize Inbound').first().json.media }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "99b4df8a-51a4-5197-aac8-9708df5dfb64"
+    },
+    {
+      "name": "Route: Fetch The File?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1100,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0b30ac5e-b433-5b74-ac86-9e1309149c82",
+              "leftValue": "={{ !$('Normalize Inbound').first().json.media_b64 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "17b818e4-be01-5d21-a509-bd2187e46790"
+    },
+    {
+      "name": "Fetch Media (Evolution)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -900,
+        -80
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Intake').first().json.r.channel.base_url }}/chat/getBase64FromMediaMessage/{{ $('Intake').first().json.r.channel.instance }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Intake').first().json.r.channel.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: { key: { id: $('Normalize Inbound').first().json.external_id } }, convertToMp4: false }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "a6061947-b6ff-5eed-a9ec-62c79298e0f1"
+    },
+    {
+      "name": "Prepare Media",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -700,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Main · NODE: Prepare Media\n// A customer's photo or voice note, ready for the model that understands\n// it: the file (from the webhook itself, or fetched from Evolution), the\n// transcription request for a voice note, the vision request for a photo.\n// What it says or shows replaces \"[voice note]\" / \"[photo]\" for the agent\n// (Media Understood) before the turn starts.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201554354929 → 01554354929\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\n// a villa or a house has no floor or apartment to ask for\nconst HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;\n// …and nobody climbs to a flat when the customer comes down for it or lowers a basket\n// (\"هنزل السبت\", \"حد هينزل يستلم\", \"لما توصل متطلعش\")\nconst COMES_DOWN_RE = /السبت|سبت|هنزل|هينزل|هننزل|حنزل|نازل|نازلين|هستلم تحت|هنستلم تحت|استلم تحت|متطلعش|ما تطلعش|مش محتاج تطلع|تحت البيت|تحت العمارة|على الباب تحت|comes? down|basket/i;\nconst fieldNeeded = (f, d) => !(['address_floor', 'address_apartment'].includes(f)\n  && (HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' '))\n      || !!str(d.comes_down)\n      || COMES_DOWN_RE.test([d.address_notes, d.order_notes].map(str).join(' '))));\n// a weight the Egyptian way: 0.5 → نص كيلو, 1.5 → كيلو ونص\nconst kiloText = (q) => {\n  const n = Math.round(num(q) * 100) / 100, whole = Math.floor(n), part = Math.round((n - whole) * 100) / 100;\n  const frac = { 0.25: 'ربع', 0.5: 'نص', 0.75: 'تلت تربع' }[part];\n  if (part && !frac) return `${fmt(n)} كيلو`;\n  if (!whole) return `${frac} كيلو`;\n  const w = whole === 1 ? 'كيلو' : whole === 2 ? '2 كيلو' : `${whole} كيلو`;\n  return frac ? `${w} و${frac}` : w;\n};\nconst norm = $('Normalize Inbound').first().json;\nconst intake = $('Intake').first().json.r;\nconst fetched = obj(obj($input.first().json).body);\nconst media = obj(norm.media);\nconst file64 = str(norm.media_b64) || str(fetched.base64);\nconst mime = (str(fetched.mimetype) || str(media.mime) || (media.kind === 'image' ? 'image/jpeg' : 'audio/ogg')).split(';')[0].trim();\nconst ext = { 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/aac': 'm4a', 'audio/amr': 'amr', 'audio/webm': 'webm',\n              'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[mime] || (media.kind === 'image' ? 'jpg' : 'ogg');\n// the customer's own words with it (a caption), or the marker the agent would otherwise see\nconst marker = str(norm.customer_message);\nconst caption = /^\\[(photo|voice note)\\]$/.test(marker) ? '' : marker;\n\nconst VISION = `A customer sent this picture to a restaurant on WhatsApp. In one to three short English sentences, say what it shows that matters for helping them:\n- food or a dish: what it looks like (name the dish only when it is plainly recognisable);\n- a menu, a delivery-app screenshot or a post: copy the dish names, prices and other text exactly, in their language;\n- a payment or transfer screenshot: the amount, the reference, the date, and whether it says it went through;\n- a map, a location or an address: the place or the address as written;\n- a problem with an order (wrong, spilled, cold, missing): what is wrong;\n- anything else: what it is, plainly.\nCopy written text exactly and never guess text you cannot read. Describe only — no advice, no reply to the customer.`;\n\nreturn [{\n  json: {\n    kind: media.kind === 'image' ? 'image' : 'audio',\n    ok: file64.length > 100,\n    b64: file64,\n    mime,\n    file_name: `${media.kind === 'image' ? 'photo' : 'voice'}.${ext}`,\n    seconds: media.seconds || null,\n    marker,\n    caption,\n    buffer_id: intake.buffer_id,\n    message_id: intake.message_id,\n    transcribe_model: 'gpt-transcribe',\n    transcribe_prompt: 'A WhatsApp voice note to a restaurant in Egypt, usually in Egyptian Arabic: ordering food, dishes, prices, addresses, delivery.',\n    vision_model: 'gpt-5-mini',\n    vision_body: media.kind === 'image' && file64 ? {\n      model: 'gpt-5-mini',\n      messages: [\n        { role: 'system', content: VISION },\n        { role: 'user', content: [\n          { type: 'text', text: caption ? `They wrote with it: \"${caption}\"` : 'They sent it without text.' },\n          { type: 'image_url', image_url: { url: `data:${mime};base64,${file64}` } }\n        ] }\n      ],\n      max_completion_tokens: 2000,\n      ...('low' ? { reasoning_effort: 'low' } : {})\n    } : null\n  }\n}];\n"
+      },
+      "id": "a4abe79e-2617-59a8-a870-f84e14b35d7b"
+    },
+    {
+      "name": "Route: Voice Note?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -500,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f29394b0-c9c4-53f7-abd8-a86d43ad7e18",
+              "leftValue": "={{ $json.ok && $json.kind === 'audio' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "5e870611-3220-559f-a24e-b44098886f5b"
+    },
+    {
+      "name": "Route: Photo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -300,
+        120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "11926bac-6dc6-5a22-a41e-3f3df792c3ef",
+              "leftValue": "={{ $json.ok && $json.kind === 'image' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9d5eb52c-6c2c-57f9-abc8-702a65d2429f"
+    },
+    {
+      "name": "Voice Note To File",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -300,
+        -120
+      ],
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "b64",
+        "binaryPropertyName": "data",
+        "options": {
+          "fileName": "={{ $('Prepare Media').first().json.file_name }}",
+          "mimeType": "={{ $('Prepare Media').first().json.mime }}"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "c30a7bd3-9cb9-5acd-ae6e-9b53f6c48e78"
+    },
+    {
+      "name": "Transcribe Voice Note (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -100,
+        -120
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "CkjJoUDZ38ndmkPM",
+          "name": "OpenAi account"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "={{ $('Prepare Media').first().json.transcribe_model }}"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $('Prepare Media').first().json.transcribe_prompt }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "6af03eab-1752-537b-ae15-798832b186f3"
+    },
+    {
+      "name": "Look At Photo (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -100,
+        120
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "CkjJoUDZ38ndmkPM",
+          "name": "OpenAi account"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.vision_body) }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "e9a19447-eee4-52f6-adee-1e23c1b456f6"
+    },
+    {
+      "name": "Media Understood",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Main · NODE: Media Understood\n// What the voice note said or the photo showed, in the words the agent\n// reads with the customer's message: [voice note: «…»] or [photo: …]\n// (their caption stays with it). A file that could not be fetched or\n// understood says so plainly, so the agent asks rather than guesses.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201554354929 → 01554354929\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\n// a villa or a house has no floor or apartment to ask for\nconst HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;\n// …and nobody climbs to a flat when the customer comes down for it or lowers a basket\n// (\"هنزل السبت\", \"حد هينزل يستلم\", \"لما توصل متطلعش\")\nconst COMES_DOWN_RE = /السبت|سبت|هنزل|هينزل|هننزل|حنزل|نازل|نازلين|هستلم تحت|هنستلم تحت|استلم تحت|متطلعش|ما تطلعش|مش محتاج تطلع|تحت البيت|تحت العمارة|على الباب تحت|comes? down|basket/i;\nconst fieldNeeded = (f, d) => !(['address_floor', 'address_apartment'].includes(f)\n  && (HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' '))\n      || !!str(d.comes_down)\n      || COMES_DOWN_RE.test([d.address_notes, d.order_notes].map(str).join(' '))));\n// a weight the Egyptian way: 0.5 → نص كيلو, 1.5 → كيلو ونص\nconst kiloText = (q) => {\n  const n = Math.round(num(q) * 100) / 100, whole = Math.floor(n), part = Math.round((n - whole) * 100) / 100;\n  const frac = { 0.25: 'ربع', 0.5: 'نص', 0.75: 'تلت تربع' }[part];\n  if (part && !frac) return `${fmt(n)} كيلو`;\n  if (!whole) return `${frac} كيلو`;\n  const w = whole === 1 ? 'كيلو' : whole === 2 ? '2 كيلو' : `${whole} كيلو`;\n  return frac ? `${w} و${frac}` : w;\n};\nconst prep = $('Prepare Media').first().json;\nconst r = obj($input.first().json);\nlet text;\nif (prep.kind === 'audio') {\n  const heard = prep.ok ? str(r.text).trim() : '';\n  text = heard ? `[voice note${prep.seconds ? ` (${prep.seconds}s)` : ''}: «${heard.slice(0, 2000)}»]` : '[voice note — it could not be played]';\n} else {\n  const seen = prep.ok ? str(obj(obj(arr(r.choices)[0]).message).content).replace(/\\s+/g, ' ').trim() : '';\n  text = (seen ? `[photo: ${seen.slice(0, 1500)}]` : '[photo — it could not be opened]') + (prep.caption ? ' ' + prep.caption : '');\n}\n\nreturn [{\n  json: {\n    understood: text,\n    failed: !prep.ok || !!r.error,\n    error: r.error ? str(obj(r.error).message || r.error).slice(0, 300) : null,\n    b64_media: b64({ buffer_id: prep.buffer_id, message_id: prep.message_id, marker: prep.marker, text,\n                     model: prep.kind === 'audio' ? prep.transcribe_model : prep.vision_model })\n  }\n}];\n"
+      },
+      "id": "61227c4f-6601-5492-ae94-99b5c7314980"
+    },
+    {
+      "name": "Save What It Said",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        340,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.media_understood(convert_from(decode($1::text, 'base64'), 'UTF8')::jsonb) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $json.b64_media ] }}"
+        }
+      },
+      "alwaysOutputData": true,
+      "id": "99501d81-a610-57f9-ae37-7372693db752"
+    },
+    {
+      "name": "Sticky — Media",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1320,
+        -300
+      ],
+      "parameters": {
+        "content": "### Photos and voice notes\nFetched from WhatsApp and understood before the agent answers: a voice note is transcribed (**gpt-transcribe**), a photo described (**gpt-5-mini**). The agent reads it in place of \"[voice note]\" / \"[photo]\"; a quick text after it waits for it (a minute at most).",
+        "width": 1700,
+        "height": 160,
+        "color": 5
+      },
+      "id": "585f6b2b-9418-54d2-a50d-f81bd3814045"
     },
     {
       "name": "Debounce Wait 2s",
@@ -1848,6 +2210,155 @@
       ]
     },
     "Send Typing Presence": {
+      "main": [
+        [
+          {
+            "node": "Route: Photo Or Voice Note?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Photo Or Voice Note?": {
+      "main": [
+        [
+          {
+            "node": "Route: Fetch The File?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Debounce Wait 2s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Fetch The File?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Media (Evolution)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Media (Evolution)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Media": {
+      "main": [
+        [
+          {
+            "node": "Route: Voice Note?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Voice Note?": {
+      "main": [
+        [
+          {
+            "node": "Voice Note To File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route: Photo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice Note To File": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Voice Note (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Voice Note (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Media Understood",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Photo?": {
+      "main": [
+        [
+          {
+            "node": "Look At Photo (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Media Understood",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Look At Photo (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Media Understood",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Media Understood": {
+      "main": [
+        [
+          {
+            "node": "Save What It Said",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save What It Said": {
       "main": [
         [
           {

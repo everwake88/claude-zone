@@ -1135,3 +1135,62 @@ test('a swipe-reply: the agent reads what they replied to — its own message, a
     return { plan: { read: 'x', stage: 'discovery', objective: 'x' }, reply: quiet('هتأكدلك 🙏') };
   });
 });
+
+test('a voice note and a photo: understood before the agent answers, and a quick text waits for them', async () => {
+  const phone = '201099990520';
+  const understand = async (payload, modelAnswer) => {
+    const norm = (await runCode('main/normalize_inbound.js', { input: payload }))[0];
+    const intake = await callB64(db, 'intake', norm.b64_intake);
+    const prep = (await runCode('main/prepare_media.js', {
+      input: { body: { base64: 'T2dnUw'.repeat(40), mimetype: payload.body.data.message.imageMessage ? 'image/jpeg' : 'audio/ogg; codecs=opus' } },
+      nodes: { 'Normalize Inbound': norm, Intake: intake } }))[0];
+    const done = (await runCode('main/media_understood.js', { input: modelAnswer, nodes: { 'Prepare Media': prep } }))[0];
+    return { norm, intake: intake.r, prep, done };
+  };
+  // a voice note, then a text while it is still being heard: the text's turn waits for it
+  const vn = evolutionPayload({ phone, type: 'audio' });
+  const norm = (await runCode('main/normalize_inbound.js', { input: vn }))[0];
+  assert.deepEqual([norm.media.kind, norm.customer_message, norm.is_ignorable], ['audio', '[voice note]', false]);
+  const first = await callB64(db, 'intake', norm.b64_intake);
+  const text = (await runCode('main/normalize_inbound.js', { input: evolutionPayload({ phone, text: 'بسرعة لو سمحت' }) }))[0];
+  const second = await callB64(db, 'intake', text.b64_intake);
+  const wait = await sql(db, 'select everwake.claim_window($1::uuid, $2::text, $3::text, $4::bigint) as r',
+                         [second.r.tenant_id, phone, text.run_id, String(second.r.buffer_id)]);
+  assert.equal(wait.r.waiting_for_media, true, JSON.stringify(wait.r));
+
+  const prep = (await runCode('main/prepare_media.js', {
+    input: { body: { base64: 'T2dnUw'.repeat(40), mimetype: 'audio/ogg; codecs=opus' } }, nodes: { 'Normalize Inbound': norm, Intake: first } }))[0];
+  assert.deepEqual([prep.kind, prep.ok, prep.file_name, prep.mime, prep.vision_body], ['audio', true, 'voice.ogg', 'audio/ogg', null]);
+  const heard = (await runCode('main/media_understood.js', { input: { text: 'عايز كيلو كفتة ونص فرخة حار' }, nodes: { 'Prepare Media': prep } }))[0];
+  assert.equal(heard.understood, '[voice note (4s): «عايز كيلو كفتة ونص فرخة حار»]');
+  await callB64(db, 'media_understood', heard.b64_media);
+
+  // the next turn reads both, the voice note as it was said
+  let t = await turn(db, evolutionPayload({ phone, text: 'وكمان بيبسي' }), async (brief) => {
+    assert.match(brief.latest_text, /^\[voice note \(4s\): «عايز كيلو كفتة ونص فرخة حار»\]\nبسرعة لو سمحت\nوكمان بيبسي$/);
+    return { plan: { read: 'x', stage: 'building_cart', objective: 'x' }, reply: quiet('تمام 👌 دليفري ولا استلام؟') };
+  });
+  assert.equal(t.route, 'agent');
+
+  // a photo with their words: what it shows, then what they wrote
+  const ph = await understand(evolutionPayload({ phone, type: 'image', text: 'عايز زي ده' }),
+    { choices: [{ message: { content: 'A delivery-app screenshot: "Rizo — 100 EGP", rice with spicy chicken strips and barbecue sauce.' } }] });
+  assert.equal(ph.prep.vision_body.messages[1].content[0].text, 'They wrote with it: "عايز زي ده"');
+  assert.match(ph.prep.vision_body.messages[1].content[1].image_url.url, /^data:image\/jpeg;base64,T2dnUw/);
+  assert.equal(ph.done.understood, '[photo: A delivery-app screenshot: "Rizo — 100 EGP", rice with spicy chicken strips and barbecue sauce.] عايز زي ده');
+  await callB64(db, 'media_understood', ph.done.b64_media);
+  t = await turn(db, evolutionPayload({ phone, text: 'عندكم؟' }), async (brief) => {
+    assert.match(brief.latest_text, /^\[photo: A delivery-app screenshot: "Rizo — 100 EGP".*\] عايز زي ده\nعندكم؟$/);
+    return { plan: { read: 'x', stage: 'discovery', objective: 'x' }, reply: quiet('مش عندنا للأسف 🙏') };
+  });
+  // the inbox keeps what they sent; what it said is beside it
+  const row = await sql(db, `select jsonb_build_object('body', body, 'understood', meta ->> 'understood') as r from everwake.messages where id = $1`, [ph.intake.message_id]);
+  assert.equal(row.r.body, 'عايز زي ده');
+  assert.match(row.r.understood, /^\[photo: A delivery-app screenshot/);
+
+  // a file that could not be fetched: said plainly, the turn is not held up
+  const lost = await understand(evolutionPayload({ phone, type: 'audio' }), {});
+  const lostPrep = (await runCode('main/prepare_media.js', { input: { body: {} }, nodes: { 'Normalize Inbound': lost.norm, Intake: { r: lost.intake } } }))[0];
+  const lostDone = (await runCode('main/media_understood.js', { input: { error: { message: 'no file' } }, nodes: { 'Prepare Media': lostPrep } }))[0];
+  assert.equal(lostDone.understood, '[voice note — it could not be played]');
+});

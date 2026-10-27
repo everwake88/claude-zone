@@ -127,6 +127,7 @@ export default function MenuPage() {
       <PageHeader title={t('Menu')} subtitle={t('Everything the agent offers. Any change here — a price, a dish out of stock — reaches the agent on the very next message.')}
         actions={can.edit && <>
           <Link href={`${base}/menu/pages`}><Button variant="outline"><FileImage className="size-4" /> {t('Menu pictures / PDF')}</Button></Link>
+          <Link href={`${base}/menu/photos`}><Button variant="outline"><Camera className="size-4" /> {t('Dish photos with AI')}</Button></Link>
           <Link href={`${base}/menu/import${branch ? `?branch=${branch.id}` : ''}`}><Button variant="outline"><Sparkles className="size-4" /> {branch ? t('Import this branch’s menu') : t('Import a menu with AI')}</Button></Link>
           <Button variant="gold" onClick={() => setEditing('new')}><Plus className="size-4" /> {t('Add a dish')}</Button>
         </>} />

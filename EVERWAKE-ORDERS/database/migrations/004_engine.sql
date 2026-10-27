@@ -362,9 +362,11 @@ begin
     return base || jsonb_build_object('route', 'not_live');
   end if;
 
-  insert into everwake.inbound_buffer (tenant_id, wa_id, message_text, has_location, location)
+  insert into everwake.inbound_buffer (tenant_id, wa_id, message_text, has_location, location, media_pending)
   values (t.id, cust.wa_id, case when v_quote is not null then '[' || v_quote || '] ' || v_text else v_text end,
-          coalesce((p ->> 'has_location')::boolean, false), p -> 'location')
+          coalesce((p ->> 'has_location')::boolean, false), p -> 'location',
+          -- a photo or a voice note (015): the agent waits until it is understood
+          coalesce(jsonb_typeof(p -> 'media') = 'object', false) and not coalesce((p ->> 'test_run')::boolean, false))
   returning id into v_buf;
 
   return base || jsonb_build_object('route', 'agent', 'buffer_id', v_buf);
@@ -475,6 +477,12 @@ begin
    limit 1;
   if v_newest is distinct from p_buffer then
     return jsonb_build_object('is_newest', false, 'lock_acquired', false);
+  end if;
+  -- a photo or voice note in this window is still being understood (015): wait for it (a minute at most)
+  if exists (select 1 from everwake.inbound_buffer b
+              where b.tenant_id = p_tenant and b.wa_id = p_wa and b.claimed_by_run_id is null
+                and b.media_pending and b.received_at > now() - interval '60 seconds') then
+    return jsonb_build_object('is_newest', true, 'lock_acquired', false, 'waiting_for_media', true);
   end if;
 
   insert into everwake.conversation_locks as l (tenant_id, wa_id, run_id, locked_at, expires_at)
@@ -709,7 +717,7 @@ begin
                 where customer_id = any(v_ids) order by last_used_at desc limit 3) a), '[]'::jsonb),
     'recent_messages', coalesce((
        select jsonb_agg(jsonb_build_object('direction', m.direction, 'sender', m.sender, 'kind', m.kind,
-                                           'text', m.body, 'at', m.created_at, 'staff_name', m.staff_name,
+                                           'text', coalesce(m.meta ->> 'understood', m.body), 'at', m.created_at, 'staff_name', m.staff_name,
                                            'status', m.status, 'reply_to', m.meta ->> 'reply_to')
                         order by m.created_at)
          from (select mm.*, tm.display_name as staff_name

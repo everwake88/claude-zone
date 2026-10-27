@@ -102,6 +102,16 @@ const lat = location?.degreesLatitude ?? location?.latitude ?? location?.lat ?? 
 const lng = location?.degreesLongitude ?? location?.longitude ?? location?.lng ?? null;
 const hasLocation = lat !== null && lng !== null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
 
+// a photo or a voice note: fetched and understood before the agent answers (Main: Prepare Media)
+const mediaMsg = message.audioMessage || message.pttMessage || message.imageMessage || null;
+const media = mediaMsg && !fromMe ? {
+  kind: message.imageMessage ? 'image' : 'audio',
+  mime: str(mediaMsg.mimetype) || (message.imageMessage ? 'image/jpeg' : 'audio/ogg'),
+  seconds: Number(mediaMsg.seconds) || null
+} : null;
+// Evolution can put the file in the webhook itself ("base64" on): then nothing needs fetching
+const mediaB64 = media ? str(message.base64 || data.base64 || '') : '';
+
 let customerMessage = String(text || '').trim();
 if (!customerMessage && hasLocation) customerMessage = '[shared a location pin]';
 if (!customerMessage && MEDIA_MARK[msgType]) customerMessage = MEDIA_MARK[msgType];
@@ -131,6 +141,7 @@ const slim = (v, depth = 0) => {
 const intake = {
   provider: 'evolution', instance, token, external_id: messageId, wa_id: waId, reply_to: replyTo, phone, lid,
   phone_hidden: phoneHidden, push_name: pushName, text: customerMessage, message_type: hasLocation ? 'location' : msgType,
+  media: media ? { kind: media.kind } : undefined,
   has_location: hasLocation, location: locationObj, from_me: fromMe, test_run: testRun || undefined, quoted: quoted || undefined,
   raw: slim({ event, instance, data: { key, pushName: data.pushName, messageType: data.messageType,
                                        messageTimestamp: data.messageTimestamp, message } })
@@ -152,6 +163,8 @@ return [{
     has_location: hasLocation,
     location: locationObj,
     is_test: testRun,
+    media,
+    media_b64: mediaB64 || undefined,
     is_ignorable: ignorable || !customerMessage || isGroup || !waId || !instance,
     received_at: new Date().toISOString(),
     b64_intake: b64(intake)

@@ -279,6 +279,9 @@ function Thread({ id, onBack, onChanged }: { id: number; onBack: () => void; onC
                       : <a href={m.media_url} target="_blank" rel="noreferrer" className="underline">{t('Open the file')}</a>)}
                     {loc?.maps_url && <a href={loc.maps_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 underline"><MapPin className="size-3.5" /> {t('Location pin')}</a>}
                     {m.body && <p className="bubble" dir="auto">{m.body}</p>}
+                    {typeof m.meta?.understood === 'string' && (
+                      <p className="mt-1 border-t border-hairline pt-1 text-xs italic text-muted" dir="auto">{m.meta.understood}</p>
+                    )}
                     <p className={cx('mt-0.5 flex items-center justify-end gap-1 text-[11px]', mine && m.sender === 'agent' ? 'text-on-navy-muted' : 'text-muted')}>
                       {clock(m.created_at, tenant.timezone)}
                       {mine && (m.status === 'queued' || m.status === 'sending' ? <Clock className="size-3" />

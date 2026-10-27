@@ -68,7 +68,8 @@ export function evolutionPayload({ text, phone, lid, pushName = 'Test', id, from
   if (phone) key.remoteJid = phone + '@s.whatsapp.net';
   if (lid) { if (!phone) key.remoteJid = lid + '@lid'; else key.remoteJidAlt = lid + '@lid'; }
   const message = location ? { locationMessage: { degreesLatitude: location.lat, degreesLongitude: location.lng } }
-    : (type === 'audio' ? { audioMessage: { seconds: 4 } } : (type === 'reaction' ? { reactionMessage: { text: '👍' } }
+    : type === 'image' ? { imageMessage: { mimetype: 'image/jpeg', ...(text ? { caption: text } : {}) } }
+    : (type === 'audio' ? { audioMessage: { seconds: 4, mimetype: 'audio/ogg; codecs=opus' } } : (type === 'reaction' ? { reactionMessage: { text: '👍' } }
     // a swipe-reply: WhatsApp sends the text with the message it answers attached
     : quoted ? { extendedTextMessage: { text, contextInfo: { stanzaId: quoted.id, quotedMessage: quoted.message || { conversation: quoted.text || '' } } } }
     : { conversation: text }));
