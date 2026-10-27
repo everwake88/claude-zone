@@ -56,6 +56,34 @@ export function logoColors(img: HTMLImageElement): string[] {
     .sort((a, b) => b.score - a.score).slice(0, 5).map(x => x.c);
 }
 
+// A logo with its own solid background (a square of colour with the mark in it) is that
+// colour all round its edge: its badge takes that colour and the logo fills it, so no white
+// shows around or between its corners. A logo on transparency (or on a busy edge) → null:
+// it sits on white with room around it.
+const backdrops = new WeakMap<HTMLImageElement, string | null>();
+export function logoBackground(img: HTMLImageElement): string | null {
+  if (backdrops.has(img)) return backdrops.get(img)!;
+  const n = 64, c = document.createElement('canvas');
+  c.width = c.height = n;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0, n, n);
+  const px = ctx.getImageData(0, 0, n, n).data;
+  const edge: number[][] = [];
+  for (let i = 0; i < n; i++) for (const [x, y] of [[i, 0], [i, n - 1], [0, i], [n - 1, i]]) {
+    const o = (y * n + x) * 4; edge.push([px[o], px[o + 1], px[o + 2], px[o + 3]]);
+  }
+  let found: string | null = null;
+  if (edge.filter(p => p[3] < 200).length <= edge.length * 0.05) {
+    const solid = edge.filter(p => p[3] >= 200);
+    const mean = [0, 1, 2].map(k => solid.reduce((s, p) => s + p[k], 0) / solid.length);
+    // mostly one colour: most of the edge within a small distance of the average
+    const near = solid.filter(p => Math.hypot(p[0] - mean[0], p[1] - mean[1], p[2] - mean[2]) < 40).length;
+    if (near >= solid.length * 0.85) found = hex(mean);
+  }
+  backdrops.set(img, found);
+  return found;
+}
+
 export function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -169,13 +197,16 @@ function drawPage(input: ArtInput, page: Page, index: number, total: number): HT
     const h = wide ? r * 1.7 : 2 * r, w = wide ? Math.min(r * 4.6, h * img.width / img.height + r * 0.6) : 2 * r;
     const cx = anchor === 'center' ? x : x - w / 2;
     const shape = () => { ctx.beginPath(); if (wide) ctx.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2.6); else ctx.arc(cx, cy, r, 0, Math.PI * 2); };
+    const bg = logoBackground(img);
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 6;
-    ctx.fillStyle = '#FFFFFF'; shape(); ctx.fill();
+    ctx.fillStyle = bg || '#FFFFFF'; shape(); ctx.fill();
     ctx.restore();
     ctx.save();
     shape(); ctx.clip();
-    const pad = wide ? h * 0.16 : 14, k = Math.min((w - 2 * pad) / img.width, (h - 2 * pad) / img.height);
+    // its own background → it fills the badge (a round one shows the mark, the corners were only background)
+    const pad = bg ? 0 : wide ? h * 0.16 : 14;
+    const k = bg && !wide ? Math.max(w / img.width, h / img.height) : Math.min((w - 2 * pad) / img.width, (h - 2 * pad) / img.height);
     ctx.drawImage(img, cx - (img.width * k) / 2, cy - (img.height * k) / 2, img.width * k, img.height * k);
     ctx.restore();
     return w;

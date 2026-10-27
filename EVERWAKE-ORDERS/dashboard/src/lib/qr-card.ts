@@ -1,6 +1,6 @@
 'use client';
 import QRCode from 'qrcode';
-import { inkOf, mix, onColor } from './menu-art';
+import { inkOf, logoBackground, mix, onColor } from './menu-art';
 
 // A printable card with the restaurant's WhatsApp QR code: for the bags that
 // go out with delivery-app orders, the counter, flyers. A6 at 300 dpi.
@@ -55,11 +55,15 @@ export async function drawCard(p: CardInput): Promise<HTMLCanvasElement> {
     const h = wide ? 170 : 220, w = wide ? Math.min(620, h * img.width / img.height + 80) : 220;
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 8;
-    ctx.fillStyle = '#FFFFFF'; ctx.beginPath();
-    if (wide) ctx.roundRect(W / 2 - w / 2, y, w, h, h / 2.6); else ctx.arc(W / 2, y + h / 2, h / 2, 0, Math.PI * 2);
-    ctx.fill(); ctx.restore();
-    const pad = wide ? 30 : 26, k = Math.min((w - 2 * pad) / img.width, (h - 2 * pad) / img.height);
+    const bg = logoBackground(img);
+    const badge = () => { ctx.beginPath(); if (wide) ctx.roundRect(W / 2 - w / 2, y, w, h, h / 2.6); else ctx.arc(W / 2, y + h / 2, h / 2, 0, Math.PI * 2); };
+    ctx.fillStyle = bg || '#FFFFFF'; badge(); ctx.fill(); ctx.restore();
+    // a logo with its own background fills its badge in that colour; one on transparency sits on white
+    const pad = bg ? 0 : wide ? 30 : 26;
+    const k = bg && !wide ? Math.max(w / img.width, h / img.height) : Math.min((w - 2 * pad) / img.width, (h - 2 * pad) / img.height);
+    ctx.save(); badge(); ctx.clip();
     ctx.drawImage(img, W / 2 - img.width * k / 2, y + h / 2 - img.height * k / 2, img.width * k, img.height * k);
+    ctx.restore();
     y += h + 40;
   } else {
     ctx.fillStyle = on; ctx.font = F(800, 80); ctx.fillText(p.title, W / 2, y + 80); y += 130;
