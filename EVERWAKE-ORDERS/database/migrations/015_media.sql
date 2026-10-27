@@ -11,7 +11,7 @@
 --     understood) for the inbox and the chat history (turn_context)
 -- =====================================================================
 
-alter table everwake.inbound_buffer add column media_pending boolean not null default false;
+alter table everwake.inbound_buffer add column if not exists media_pending boolean not null default false;
 
 create or replace function everwake.media_understood(p jsonb)
 returns jsonb language plpgsql as $$
