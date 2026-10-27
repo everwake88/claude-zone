@@ -55,6 +55,16 @@ const text =
   message.templateButtonReplyMessage?.selectedDisplayText ||
   data.messageText || data.text || '';
 
+// a swipe-reply: WhatsApp attaches the message it answers (its id, and a copy of it)
+const replyInfo = obj(Object.values(message).map(v => (v && typeof v === 'object' ? v.contextInfo : null)).find(c => c && (c.stanzaId || c.quotedMessage))
+  || data.contextInfo);
+const qm = obj(replyInfo.quotedMessage);
+const quotedText = str(qm.conversation || obj(qm.extendedTextMessage).text || obj(qm.imageMessage).caption || obj(qm.videoMessage).caption
+  || obj(qm.documentMessage).caption);
+const quotedKind = qm.imageMessage ? 'photo' : qm.documentMessage ? 'file' : (qm.audioMessage || qm.pttMessage) ? 'voice note'
+  : qm.locationMessage ? 'location pin' : qm.stickerMessage ? 'sticker' : (quotedText ? 'text' : '');
+const quoted = (replyInfo.stanzaId || quotedKind) ? { id: str(replyInfo.stanzaId) || null, text: quotedText.slice(0, 400), kind: quotedKind } : null;
+
 const location = message.locationMessage || message.liveLocationMessage || data.locationMessage || data.location || null;
 
 const IGNORE = ['reactionMessage', 'protocolMessage', 'editedMessage', 'senderKeyDistributionMessage', 'pollUpdateMessage',
@@ -121,7 +131,7 @@ const slim = (v, depth = 0) => {
 const intake = {
   provider: 'evolution', instance, token, external_id: messageId, wa_id: waId, reply_to: replyTo, phone, lid,
   phone_hidden: phoneHidden, push_name: pushName, text: customerMessage, message_type: hasLocation ? 'location' : msgType,
-  has_location: hasLocation, location: locationObj, from_me: fromMe, test_run: testRun || undefined,
+  has_location: hasLocation, location: locationObj, from_me: fromMe, test_run: testRun || undefined, quoted: quoted || undefined,
   raw: slim({ event, instance, data: { key, pushName: data.pushName, messageType: data.messageType,
                                        messageTimestamp: data.messageTimestamp, message } })
 };

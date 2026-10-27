@@ -168,6 +168,8 @@ declare
   v_send    boolean := false;
   v_apology text;
   base      jsonb;
+  v_q       everwake.messages%rowtype;
+  v_quote   text;
 begin
   select * into ch from everwake.whatsapp_channels
    where provider = coalesce(nullif(p ->> 'provider', ''), 'evolution')
@@ -254,12 +256,29 @@ begin
     values (t.id, 'lid', v_lid, v_cid) on conflict do nothing;
   end if;
 
+  -- a swipe-reply: what they replied to, in words the agent reads like any other marker
+  if jsonb_typeof(p -> 'quoted') = 'object' then
+    select * into v_q from everwake.messages m
+     where m.tenant_id = t.id and m.external_id = nullif(p -> 'quoted' ->> 'id', '') limit 1;
+    v_quote := case
+      when v_q.id is null then
+        case when coalesce(p -> 'quoted' ->> 'text', '') <> '' then 'replying to: "' || left(p -> 'quoted' ->> 'text', 300) || '"'
+             when coalesce(p -> 'quoted' ->> 'kind', '') <> '' then 'replying to a ' || (p -> 'quoted' ->> 'kind') end
+      when v_q.direction = 'inbound' then 'replying to their own earlier message: "' || left(coalesce(v_q.body, '[' || v_q.kind || ']'), 300) || '"'
+      when v_q.body like '[photo: %]' then 'replying to the photo of ' || substring(v_q.body from '^\[photo: (.*)\]$')
+      when v_q.body like '[menu %]' then 'replying to the ' || btrim(v_q.body, '[]')
+      when v_q.kind <> 'text' then 'replying to ' || case v_q.sender when 'agent' then 'your ' else 'a ' end || v_q.kind
+      else 'replying to ' || case v_q.sender when 'agent' then 'your message' when 'staff' then 'the team''s message'
+                                           when 'driver' then 'the driver''s message' else 'the automatic message' end
+           || ': "' || left(coalesce(v_q.body, ''), 300) || '"' end;
+  end if;
+
   -- the message, exactly once (Evolution can deliver twice) ---------------
   insert into everwake.messages (tenant_id, wa_id, direction, sender, kind, body, external_id, raw_payload, meta)
   values (t.id, cust.wa_id, 'inbound', 'customer', coalesce(nullif(p ->> 'message_type', ''), 'text'), v_text,
           nullif(p ->> 'external_id', ''), p -> 'raw',
           jsonb_strip_nulls(jsonb_build_object('location', p -> 'location', 'push_name', p ->> 'push_name',
-                                               'channel_id', ch.id)))
+                                               'channel_id', ch.id, 'reply_to', v_quote)))
   on conflict (tenant_id, external_id) where external_id is not null do nothing
   returning id into v_msg;
   if v_msg is null then
@@ -344,7 +363,8 @@ begin
   end if;
 
   insert into everwake.inbound_buffer (tenant_id, wa_id, message_text, has_location, location)
-  values (t.id, cust.wa_id, v_text, coalesce((p ->> 'has_location')::boolean, false), p -> 'location')
+  values (t.id, cust.wa_id, case when v_quote is not null then '[' || v_quote || '] ' || v_text else v_text end,
+          coalesce((p ->> 'has_location')::boolean, false), p -> 'location')
   returning id into v_buf;
 
   return base || jsonb_build_object('route', 'agent', 'buffer_id', v_buf);
@@ -690,7 +710,7 @@ begin
     'recent_messages', coalesce((
        select jsonb_agg(jsonb_build_object('direction', m.direction, 'sender', m.sender, 'kind', m.kind,
                                            'text', m.body, 'at', m.created_at, 'staff_name', m.staff_name,
-                                           'status', m.status)
+                                           'status', m.status, 'reply_to', m.meta ->> 'reply_to')
                         order by m.created_at)
          from (select mm.*, tm.display_name as staff_name
                  from everwake.messages mm

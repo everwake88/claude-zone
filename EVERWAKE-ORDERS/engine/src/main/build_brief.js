@@ -314,7 +314,8 @@ const who = (m) => m.direction === 'inbound' ? 'customer: '
   : (m.sender === 'staff' ? `team member${m.staff_name ? ' (' + m.staff_name + ')' : ''}: `
   : (m.sender === 'system' ? 'automatic message from the restaurant: '
   : (m.sender === 'driver' ? 'the delivery driver (via the restaurant number): ' : 'you: ')));
-const historyLines = recent.slice(-18).map(m => who(m) + clip(m.text || `[${m.kind}]`, m.direction === 'inbound' ? 600 : 450).replace(/\n+/g, ' ⏎ '));
+const historyLines = recent.slice(-18).map(m => who(m) + (m.reply_to ? `[${clip(m.reply_to, 200)}] ` : '')
+  + clip(m.text || `[${m.kind}]`, m.direction === 'inbound' ? 600 : 450).replace(/\n+/g, ' ⏎ '));
 const memory = arr(state.memory_notes).slice(-10);
 
 const situation = [];

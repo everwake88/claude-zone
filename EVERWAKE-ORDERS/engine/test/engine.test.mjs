@@ -1097,3 +1097,41 @@ test('the agent asks the team; their answer wakes it, and its reply passes the a
     return { plan: { read: 'x', stage: 'other', objective: 'x' }, reply: quiet('تمام 👌') };
   });
 });
+
+test('a swipe-reply: the agent reads what they replied to — its own message, a dish photo, a menu page, or a message we never saw', async () => {
+  const phone = '201099990519';
+  let t = await turn(db, evolutionPayload({ phone, text: 'عندكم إيه؟' }), async () => ({
+    plan: { read: 'x', stage: 'discovery', objective: 'x' }, reply: quiet('عندنا *كفتة مشوية — 480ج للكيلو* و*فرخة مشوية — 260ج* 😋')
+  }));
+  const sent = await sql(db, `select external_id as r from everwake.messages where wa_id = $1 and direction = 'outbound' order by id desc limit 1`, [phone]);
+  t = await turn(db, evolutionPayload({ phone, text: 'عايز ده', quoted: { id: sent.r, text: 'whatever WhatsApp copied' } }), async (brief) => {
+    assert.match(brief.latest_text, /^\[replying to your message: "عندنا \*كفتة مشوية — 480ج للكيلو\*/);
+    assert.match(brief.latest_text, /\] عايز ده$/);
+    return { plan: { read: 'x', stage: 'building_cart', objective: 'x' }, reply: quiet('الكفتة ولا الفرخة؟') };
+  });
+  // the inbox shows their own words; the history keeps what they pointed at
+  const inbound = await sql(db, `select jsonb_build_object('body', body, 'reply', meta ->> 'reply_to') as r from everwake.messages
+                                  where wa_id = $1 and direction = 'inbound' order by id desc limit 1`, [phone]);
+  assert.equal(inbound.r.body, 'عايز ده');
+  assert.match(inbound.r.reply, /^replying to your message/);
+
+  // a dish photo and a menu page, as they were logged when sent
+  const intake = t.intake;
+  for (const [ext, body, kind] of [['PHOTO1', '[photo: كفتة مشوية]', 'image'], ['MENU2', '[menu picture 2]', 'image']]) {
+    await callB64(db, 'log_outbound', Buffer.from(JSON.stringify({ tenant_id: intake.tenant_id, wa_id: phone, sender: 'agent', kind, body, external_id: ext, ok: true })).toString('base64'));
+  }
+  t = await turn(db, evolutionPayload({ phone, text: 'بكام دي؟', quoted: { id: 'PHOTO1', message: { imageMessage: { caption: '' } } } }), async (brief) => {
+    assert.match(brief.latest_text, /^\[replying to the photo of كفتة مشوية\] بكام دي؟$/);
+    assert.match(brief.history_text, /customer: \[replying to your message: "عندنا/);
+    return { plan: { read: 'x', stage: 'discovery', objective: 'x' }, reply: quiet('*كفتة مشوية — 480ج للكيلو* 😋') };
+  });
+  t = await turn(db, evolutionPayload({ phone, text: 'عايز من دي', quoted: { id: 'MENU2', message: { imageMessage: {} } } }), async (brief) => {
+    assert.match(brief.latest_text, /^\[replying to the menu picture 2\] عايز من دي$/);
+    return { plan: { read: 'x', stage: 'discovery', objective: 'x' }, reply: quiet('تمام 😊 أنهي صنف بالظبط؟') };
+  });
+  // a message we never logged (sent from the phone, or very old): what WhatsApp copied
+  t = await turn(db, evolutionPayload({ phone, text: 'ده لسه موجود؟', quoted: { id: 'UNKNOWN', text: 'عرض الجمعة: فرخة + رز' } }), async (brief) => {
+    assert.match(brief.latest_text, /^\[replying to: "عرض الجمعة: فرخة \+ رز"\] ده لسه موجود؟$/);
+    return { plan: { read: 'x', stage: 'discovery', objective: 'x' }, reply: quiet('هتأكدلك 🙏') };
+  });
+});

@@ -25,11 +25,11 @@ const base = { run_id: d.run_id, tenant_id: d.tenant_id, wa_id: d.wa_id, reply_t
                base_url: str(channel.base_url), instance: str(channel.instance), api_key: str(channel.api_key) };
 const out = [];
 
-for (const p of arr(mediaRow.menu_pages)) {
+for (const [i, p] of arr(mediaRow.menu_pages).entries()) {
   out.push({ ...base, kind: p.kind === 'pdf' ? 'document' : 'image', media_url: p.url,
              mime: p.mime || (p.kind === 'pdf' ? 'application/pdf' : 'image/jpeg'),
              file_name: p.file_name || (p.kind === 'pdf' ? 'menu.pdf' : 'menu.jpg'), caption: p.caption || '',
-             log_text: `[menu ${p.kind === 'pdf' ? 'PDF' : 'picture'}]`, delay_ms: 400 });
+             log_text: p.kind === 'pdf' ? '[menu PDF]' : `[menu picture ${i + 1}]`, delay_ms: 400 });
 }
 for (const ph of arr(mediaRow.item_photos)) {
   const unit = ph.unit === 'kg' ? ' للكيلو' : '';
