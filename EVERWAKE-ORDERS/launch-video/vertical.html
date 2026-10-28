@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>Everwake Orders — vertical cut</title>
+<!--
+  The 59-second vertical cut (1080 × 1920) for Reels, TikTok and WhatsApp
+  Status, in Egyptian Arabic. Each scene shows a tap in the real dashboard
+  (filmed in Arabic by capture/, FILM_LANG=ar → capture/shots-ar/) and, below
+  it, what that tap sends to the customer's WhatsApp. The words are in
+  vertical-script.md. render(t) draws the moment t; render-vertical.cjs records.
+-->
+<style>
+@font-face { font-family: "Plex Arabic"; font-weight: 400; src: url(fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Plex Arabic"; font-weight: 500; src: url(fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Plex Arabic"; font-weight: 600; src: url(fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Plex Arabic"; font-weight: 700; src: url(fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2) format("woff2"); }
+:root {
+  --navy: #0B222E; --navy-deep: #071822; --gold: #B8913F; --gold-bright: #D4A94B; --muted: #9FB3BC;
+  --wa-bg: #0B141A; --wa-bar: #1F2C34; --wa-in: #202C33; --wa-out: #005C4B; --wa-green: #25D366;
+  --ar: "Plex Arabic", "Inter", sans-serif; --en: "Inter", -apple-system, Arial, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--navy-deep); }
+body { font-family: var(--ar); color: #fff; -webkit-font-smoothing: antialiased; }
+#stage { position: relative; width: 1080px; height: 1920px; overflow: hidden;
+  background: radial-gradient(1200px 1100px at 50% 18%, #163c50 0%, var(--navy) 48%, var(--navy-deep) 100%); }
+#glow { position: absolute; width: 900px; height: 900px; border-radius: 50%; filter: blur(120px); background: rgba(184,145,63,.18); left: 90px; top: 900px; }
+.abs { position: absolute; }
+
+/* captions */
+.cap { position: absolute; left: 60px; right: 60px; top: 92px; text-align: center; opacity: 0; z-index: 20; }
+.cap .k { display: inline-block; font-size: 30px; font-weight: 600; color: var(--gold-bright); letter-spacing: .02em; padding: 6px 22px;
+  border: 2px solid rgba(212,169,75,.45); border-radius: 40px; margin-bottom: 18px; }
+.cap .t { font-size: 70px; font-weight: 700; line-height: 1.18; }
+.cap .t .g { color: var(--gold-bright); }
+.cap .s { font-size: 37px; font-weight: 500; line-height: 1.45; color: #c9d6dc; margin-top: 14px; }
+
+/* dashboard card */
+#card { position: absolute; left: 40px; top: 400px; width: 1000px; height: 690px; border-radius: 30px; overflow: hidden; background: #F3F5F6;
+  box-shadow: 0 30px 80px rgba(0,0,0,.5), 0 0 0 2px rgba(255,255,255,.06); opacity: 0; z-index: 5; }
+#cbar { height: 44px; background: #E4E8EB; display: flex; align-items: center; justify-content: center; position: relative; direction: ltr; }
+#cbar i { position: absolute; top: 16px; width: 12px; height: 12px; border-radius: 50%; background: #FF5F57; }
+#cbar i:nth-child(1) { left: 18px; } #cbar i:nth-child(2) { left: 38px; background: #FEBC2E; } #cbar i:nth-child(3) { left: 58px; background: #28C840; }
+#cbar span { font: 500 17px var(--en); color: #475a62; background: #fff; border-radius: 8px; padding: 4px 18px; }
+#cview { position: absolute; left: 0; top: 44px; width: 1000px; height: 646px; overflow: hidden; }
+#cview img { position: absolute; left: 0; top: 0; transform-origin: 0 0; opacity: 0; }
+#cursor { position: absolute; width: 46px; height: 46px; z-index: 9; filter: drop-shadow(0 4px 8px rgba(0,0,0,.4)); opacity: 0; transform-origin: 6px 3px; }
+#ripple { position: absolute; width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%; border: 5px solid var(--gold-bright); z-index: 8; opacity: 0; }
+#toastNew { position: absolute; z-index: 9; left: 50%; top: 70px; transform: translateX(-50%); background: var(--navy); color: #fff; border-radius: 40px;
+  padding: 14px 30px; font-size: 32px; font-weight: 600; box-shadow: 0 14px 40px rgba(0,0,0,.35); opacity: 0; white-space: nowrap; }
+#toastNew b { color: var(--gold-bright); font-family: var(--en); }
+
+/* the customer's WhatsApp */
+#chat { position: absolute; left: 40px; width: 1000px; border-radius: 34px; overflow: hidden; background: var(--wa-bg); z-index: 4;
+  box-shadow: 0 30px 80px rgba(0,0,0,.5), 0 0 0 2px rgba(255,255,255,.05); opacity: 0; }
+.wbar { position: absolute; top: 0; left: 0; right: 0; height: 104px; background: var(--wa-bar); display: flex; align-items: center; gap: 18px; padding: 0 28px; z-index: 3; }
+.wbar img { width: 66px; height: 66px; border-radius: 50%; }
+.wbar .n { font-size: 31px; font-weight: 600; }
+.wbar .o { font: 400 21px var(--en); color: #8696A0; direction: ltr; text-align: right; }
+.wbar .who { margin-right: auto; font-size: 23px; color: #c8d3d8; background: rgba(255,255,255,.08); border-radius: 30px; padding: 7px 20px; }
+.wview { position: absolute; top: 104px; left: 0; right: 0; bottom: 0; overflow: hidden;
+  background: #0B141A radial-gradient(circle at 20% 20%, rgba(255,255,255,.03) 0 2px, transparent 3px) 0 0/40px 40px; }
+.wscene { position: absolute; inset: 0; opacity: 0; }
+.winner { position: absolute; left: 0; right: 0; top: 0; padding: 0 22px; }
+.item { position: relative; }
+.msg { position: absolute; left: 0; right: 0; top: 0; display: flex; padding-bottom: 12px; }
+.msg.in { justify-content: flex-start; }   /* the restaurant: right, in an Arabic WhatsApp */
+.msg.out { justify-content: flex-end; }   /* the customer: left */
+.bubble { max-width: 760px; padding: 13px 20px 9px; border-radius: 22px; background: var(--wa-in); color: #E9EDEF;
+  font: 400 31px/1.5 var(--ar); text-align: right; white-space: pre-line; transform-origin: right bottom; }
+.out .bubble { background: var(--wa-out); transform-origin: left bottom; }
+.bubble small { display: block; font: 19px var(--en); color: #8696A0; margin-top: 2px; text-align: left; direction: ltr; }
+.out .bubble small { color: #8EB8AE; }
+.bubble b { font-weight: 700; }
+.bubble.hl { box-shadow: 0 0 0 4px rgba(37,211,102,.0); }
+.voice { width: 560px; display: flex; align-items: center; gap: 16px; direction: ltr; padding-top: 6px; }
+.voice .play { width: 0; height: 0; border-left: 24px solid #d7e9e4; border-top: 15px solid transparent; border-bottom: 15px solid transparent; flex: none; }
+.voice .wave { flex: 1; height: 48px; display: flex; align-items: center; gap: 3px; }
+.voice .wave i { flex: 1; background: #8EB8AE; border-radius: 3px; }
+.voice .wave i.on { background: #4FD1A5; }
+.voice .av { width: 64px; height: 64px; border-radius: 50%; background: #6b7c85; flex: none; display: grid; place-items: center; font-size: 28px; font-weight: 600; }
+.photo img { display: block; width: 470px; border-radius: 14px; }
+.loc .map { width: 520px; height: 250px; border-radius: 14px; background-size: cover; position: relative; }
+.loc .map::after { content: ""; position: absolute; left: 50%; top: 45%; width: 40px; height: 40px; margin: -40px 0 0 -20px; border-radius: 50% 50% 50% 0;
+  background: #E5484D; transform: rotate(-45deg); box-shadow: 0 3px 10px rgba(0,0,0,.4); }
+.link .lc { background: rgba(0,0,0,.25); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px; display: flex; gap: 14px; align-items: center; direction: ltr; }
+.link .lc img { width: 70px; height: 70px; border-radius: 12px; }
+.link .lc b { display: block; font: 600 25px var(--en); color: #E9EDEF; }
+.link .lc span { font: 21px var(--en); color: #8696A0; }
+.link a { color: #53BDEB; direction: ltr; unicode-bidi: plaintext; font-family: var(--en); font-size: 25px; }
+.typing { display: inline-flex; gap: 8px; padding: 22px 26px; border-radius: 22px; background: var(--wa-in); }
+.typing span { width: 13px; height: 13px; border-radius: 50%; background: #8696A0; }
+#paid { position: absolute; left: 0; right: 0; top: 0; bottom: 0; opacity: 0; z-index: 6; background: #F3F5F6; overflow: hidden; border-radius: 34px; }
+#paid img { width: 100%; position: absolute; top: -40px; }
+#tap { position: absolute; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; background: rgba(255,255,255,.45); opacity: 0; z-index: 7; }
+
+/* lock screen (opening) */
+#lock { position: absolute; left: 40px; top: 470px; width: 1000px; height: 1400px; border-radius: 60px; overflow: hidden; opacity: 0; z-index: 4;
+  background: radial-gradient(120% 70% at 50% 0%, #1d4a5e 0%, #0d2733 55%, #061219 100%); box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+#lock .clock { position: absolute; top: 110px; width: 100%; text-align: center; font: 600 180px var(--en); letter-spacing: -.02em; }
+#lock .date { position: absolute; top: 70px; width: 100%; text-align: center; font-size: 36px; font-weight: 500; color: #d6e2e8; }
+#notes { position: absolute; left: 30px; right: 30px; top: 420px; bottom: 0; }
+.note { position: absolute; left: 0; right: 0; height: 128px; border-radius: 36px; background: rgba(245,248,250,.16); padding: 18px 26px;
+  display: flex; gap: 22px; align-items: center; }
+.note .ic { width: 70px; height: 70px; border-radius: 18px; background: var(--wa-green); flex: none; display: grid; place-items: center; }
+.note .ic svg { width: 46px; height: 46px; }
+.note .tx { flex: 1; min-width: 0; }
+.note .hd { display: flex; justify-content: space-between; font: 500 24px var(--en); color: #dbe5ea; direction: ltr; }
+.note .nm { font-size: 31px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* signal from a tap to the customer's phone */
+#sig { position: absolute; inset: 0; z-index: 12; pointer-events: none; }
+#arrive { position: absolute; z-index: 11; width: 1000px; left: 40px; height: 8px; border-radius: 8px; background: var(--wa-green); opacity: 0; filter: blur(2px); }
+
+/* brand */
+#brand, #outro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; opacity: 0; z-index: 15; }
+#brand svg { width: 220px; height: 220px; margin-bottom: 50px; }
+#brand .nm, #outro .nm { font: 700 84px var(--en); letter-spacing: -.01em; direction: ltr; }
+#brand .nm span, #outro .nm span { color: var(--gold-bright); }
+#brand .t { font-size: 52px; font-weight: 600; line-height: 1.35; margin-top: 34px; max-width: 900px; }
+#outro img { width: 620px; }
+#outro .nm { margin-top: 60px; font-size: 70px; }
+#outro .cta { margin-top: 70px; background: var(--gold); color: var(--navy); font-size: 50px; font-weight: 700; padding: 28px 60px; border-radius: 80px;
+  box-shadow: 0 20px 60px rgba(184,145,63,.35); }
+#outro .url { margin-top: 44px; font: 500 40px var(--en); color: var(--muted); direction: ltr; }
+
+/* montage cards */
+.mcard { position: absolute; left: 40px; width: 1000px; height: 560px; border-radius: 30px; overflow: hidden; background: #F3F5F6; opacity: 0; z-index: 5;
+  box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+.mcard img { position: absolute; transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="glow"></div>
+
+  <div id="lock">
+    <div class="date">الجمعة، ٣٠ أكتوبر</div>
+    <div class="clock">9:47</div>
+    <div id="notes"></div>
+  </div>
+
+  <div id="card">
+    <div id="cbar"><i></i><i></i><i></i><span>orders.everwake.tech</span></div>
+    <div id="cview"></div>
+    <div id="toastNew">🔔 طلب جديد <b id="toastNo"></b></div>
+    <svg id="cursor" viewBox="0 0 24 24"><path d="M4 2l15 11-6.5 1.2L16 21l-3 1.4-3.4-6.9L4 19z" fill="#fff" stroke="#0B222E" stroke-width="1.4" stroke-linejoin="round"/></svg>
+    <div id="ripple"></div>
+  </div>
+
+  <div id="chat">
+    <div class="wbar"><img id="waLogo" alt=""><div><div class="n">بيت المشويات</div><div class="o">online</div></div><div class="who" id="who"></div></div>
+    <div class="wview" id="wview"></div>
+    <div id="paid"><img id="paidImg" alt=""></div>
+    <div id="tap"></div>
+  </div>
+  <div id="arrive"></div>
+
+  <div class="mcard" id="m1"></div><div class="mcard" id="m2"></div><div class="mcard" id="m3"></div>
+
+  <svg id="sig" viewBox="0 0 1080 1920"><defs>
+    <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D4A94B"/><stop offset="1" stop-color="#25D366"/></linearGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="6"/></filter></defs>
+    <path id="sigGlow" fill="none" stroke="url(#sg)" stroke-width="16" stroke-linecap="round" filter="url(#blur)" opacity="0"/>
+    <path id="sigPath" fill="none" stroke="url(#sg)" stroke-width="6" stroke-linecap="round" opacity="0"/>
+    <circle id="sigDot" r="16" fill="#fff" opacity="0"/>
+  </svg>
+
+  <div id="brand">
+    <svg viewBox="-15.6371 -15.6371 31.2742 31.2742" aria-hidden="true">
+      <circle id="m-ring" r="15.1816" fill="none" stroke="#B8913F" stroke-width="0.9109" transform="rotate(-90)"/>
+      <path id="m-arc1" d="M -8.1601 4.9335 C -2.7227 -3.2890 2.7287 -3.2890 8.1601 4.9335" fill="none" stroke="#FFFFFF" stroke-width="1.67" stroke-linecap="round"/>
+      <path id="m-arc2" d="M -5.6953 7.5936 C -1.8984 1.3944 1.8945 1.3944 5.6914 7.5936" fill="none" stroke="#B8913F" stroke-width="1.2904" stroke-linecap="round"/>
+      <circle id="m-dot" cx="0" cy="-5.121" r="1.67" fill="#FFFFFF"/>
+    </svg>
+    <div class="nm" id="b-nm">Everwake <span>Orders</span></div>
+    <div class="t" id="b-t">مساعد ذكي بيستلم طلبات مطعمك<br>على الواتساب — وانت متابع كل حاجة</div>
+  </div>
+
+  <div id="outro">
+    <img src="../../brand/logo/everwake-lockup.svg" alt="Everwake" id="o-logo">
+    <div class="nm" id="o-nm">Everwake <span>Orders</span></div>
+    <div class="cta" id="o-cta">اطلب عرض تجريبي مجاني</div>
+    <div class="url" id="o-url">everwake.tech</div>
+  </div>
+
+  <div class="cap" id="capA"></div><div class="cap" id="capB"></div>
+</div>
+
+<script src="capture/shots-ar/manifest.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const easeInOut = (x) => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = (x) => { const c = 1.5; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const lastAt = (list, t) => { let r = -1; for (let i = 0; i < list.length; i++) if (list[i].t <= t) r = i; return r; };
+
+const SH = window.SHOTS, ST = SH.__state, NO = ST.order.no;
+const DIR = 'capture/shots-ar';
+function F(scene, name) {
+  const f = SH[scene].frames.find((x) => x.name === name);
+  if (!f) throw new Error(`no frame ${scene}/${name}`);
+  return { ...f, src: `${DIR}/${scene}/${f.file}` };
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// the timeline
+// ════════════════════════════════════════════════════════════════════════
+const DUR = 59.5;
+const T = {
+  hookEnd: 4.3, brand: 4.3, drums: 4.45, agent: 7.4, split: 20.4, ring: 20.4, accept: 24.4, out: 30.4, question: 35.4,
+  takeover: 41.0, sw: 46.4, montage: 52.6, outro: 56.2
+};
+const SFX = [];
+const sfx = (t, k) => SFX.push([+t.toFixed(3), k]);
+
+// captions: [t, key, title, sub]
+const CAPS = [
+  [0.25, null, 'الساعة ٩:٤٧ بالليل…', 'والطلبات على الواتساب ملهاش آخر'],
+  [2.5, null, 'مين هيرد على <span class="g">كل ده؟</span>', null],
+  [T.brand, null, null, null],
+  [T.agent + .2, 'المساعد الذكي', 'بيفهم الرسايل الصوتية', 'ويكتب الطلب بالأصناف والأسعار'],
+  [T.agent + 4.0, 'المساعد الذكي', 'وبيقرا الصور', 'صورة من المنيو… والصنف يتضاف على الطلب'],
+  [T.agent + 7.0, 'المساعد الذكي', 'وبيحدد الفرع والتوصيل', 'من لوكيشن العميل — من غير ما حد يسأل'],
+  [T.agent + 9.6, 'الدفع أونلاين', 'بالكارت أو المحفظة', 'لينك دفع آمن، والتأكيد يوصل فوراً'],
+  [T.ring + .1, 'لوحة التحكم', 'الطلب يوصلك <span class="g">في نفس اللحظة</span>', null],
+  [T.accept + .1, 'ضغطة واحدة', 'تقبل الطلب…<br><span class="g">والعميل يعرف على طول</span>', null],
+  [T.out + .1, 'التوصيل', 'خرج للتوصيل؟', 'العميل يعرف اسم المندوب ورقمه… وتنبيه لما يقرّب'],
+  [T.question + .1, 'أسئلة للفريق', 'المساعد بيسألك<br><span class="g">لما القرار عندك</span>', null],
+  [T.takeover + .1, 'المحادثات', 'تقدر ترد بنفسك<br><span class="g">في أي وقت</span>', null],
+  [T.sw + .1, 'زرار المساعد', 'المطبخ زحمة؟ <span class="g">زرار واحد</span>', 'اعتذار لطيف لكل عميل… ولما ترجعوا يعرفوا'],
+  [T.montage + .1, 'كله في مكان واحد', 'المنيو، الفروع، التوصيل<br>والتقارير', null],
+  [T.outro, null, null, null]
+];
+
+// the dashboard card: frames, camera (a rectangle of the 1600 × 1000 dashboard), taps
+const CF = [], CAM = [], TAPS = [], SIGS = [];
+const shot = (t, scene, name) => CF.push({ t, ...F(scene, name) });
+const cam = (t, cx, cy, w, dur = .9) => CAM.push({ t, r: [cx, cy, w], dur });
+const tap = (t, scene, name, { signal = null, click = true } = {}) => {
+  const f = F(scene, name);
+  TAPS.push({ t, x: f.cursor.x, y: f.cursor.y, click });
+  if (click) sfx(t + .05, 'click');
+  if (signal != null) { SIGS.push({ t: t + .15, x: f.cursor.x, y: f.cursor.y, arrive: signal }); sfx(signal, 'pop'); }
+};
+
+// ring
+shot(T.ring, 'orders', 'board'); cam(T.ring, 1150, 560, 900, 0);
+['ring-0', 'ring-1', 'ring-2', 'ring-3'].forEach((n, i) => shot(T.ring + .5 + i * .25, 'orders', n));
+sfx(T.ring + .5, 'ding');
+shot(T.ring + 1.6, 'orders', 'arrived'); cam(T.ring + 1.2, 1170, 640, 660, 1.4);
+// accept → the confirmation
+shot(T.accept, 'orders', 'accept'); cam(T.accept, 1150, 640, 700, .6);
+tap(T.accept + .9, 'orders', 'accept');
+shot(T.accept + 1.25, 'orders', 'accept-dialog'); cam(T.accept + 1.2, 800, 500, 760, .7);
+tap(T.accept + 2.3, 'orders', 'eta');
+shot(T.accept + 2.6, 'orders', 'accept-tell');
+tap(T.accept + 3.2, 'orders', 'accept-tell', { signal: T.accept + 4.0 });
+shot(T.accept + 3.55, 'orders', 'accepted'); cam(T.accept + 3.5, 846, 520, 760, .8);
+// driver, out for delivery
+shot(T.out, 'orders', 'driver'); cam(T.out, 846, 540, 700, .5);
+tap(T.out + .7, 'orders', 'driver');
+shot(T.out + 1.1, 'orders', 'driver-set');
+shot(T.out + 1.6, 'orders', 'out');
+tap(T.out + 2.2, 'orders', 'out', { signal: T.out + 3.0 });
+// a question for the team → the agent answers the customer
+shot(T.question, 'question', 'card'); cam(T.question, 940, 260, 820, 0);
+tap(T.question + 1.6, 'question', 'yes', { signal: T.question + 2.6 });
+shot(T.question + 2.0, 'question', 'answered');
+// taking over → the reply reaches the customer
+shot(T.takeover, 'takeover', 'chat'); cam(T.takeover, 760, 260, 840, 0);
+cam(T.takeover + 1.4, 760, 760, 820, .9);
+shot(T.takeover + 1.5, 'takeover', 'focus');
+const typing = SH.takeover.frames.filter((f) => f.name.startsWith('type-'));
+typing.forEach((f, i) => shot(T.takeover + 2.0 + i * .32, 'takeover', f.name));
+tap(T.takeover + 3.9, 'takeover', 'send', { signal: T.takeover + 4.6 });
+shot(T.takeover + 4.2, 'takeover', 'sent');
+// the agent switch → the apology, then "we're back"
+shot(T.sw, 'switch', 'on'); cam(T.sw, 420, 240, 820, 0);
+tap(T.sw + .6, 'switch', 'on');
+shot(T.sw + .9, 'switch', 'why'); cam(T.sw + .9, 810, 500, 660, .6);
+tap(T.sw + 1.9, 'switch', 'switch-off', { signal: T.sw + 2.9 });
+shot(T.sw + 2.2, 'switch', 'off'); cam(T.sw + 2.2, 420, 240, 820, .6);
+tap(T.sw + 3.6, 'switch', 'off-button');
+shot(T.sw + 3.9, 'switch', 'ask-on'); cam(T.sw + 3.9, 930, 470, 660, .5);
+tap(T.sw + 4.7, 'switch', 'switch-on', { signal: T.sw + 5.5 });
+shot(T.sw + 5.0, 'switch', 'on-again'); cam(T.sw + 5.0, 420, 240, 820, .5);
+
+// the customer's WhatsApp: one conversation per scene
+const LOGO = `${DIR}/assets/grill-house-logo.png`;
+const ZONES = F('places', 'zones').src;
+const CHATS = [];
+const conv = (t0, t1, who, msgs) => CHATS.push({ t0, t1, who, msgs });
+const say = (t, who, html, o = {}) => ({ t, who, html, ...o });
+const A = T.agent;
+conv(A - .4, T.question, 'العميلة: نادين', [
+  say(A + .2, 'out', '', { kind: 'voice', play: [A + .8, A + 2.2], time: '9:47 م' }),
+  { t: A + 2.3, typing: A + 3.0 },
+  say(A + 3.0, 'in', 'مساء النور 🌙 سمعتك:\n• كيلو كفتة مشوية — 540ج\n• فرخة مشوية كاملة، ليمون وثوم — 530ج\nتحبي تزودي حاجة؟', { time: '9:47 م' }),
+  say(A + 4.0, 'out', 'وده كمان، اتنين 👆', { kind: 'photo', time: '9:48 م' }),
+  { t: A + 5.1, typing: A + 5.8 },
+  say(A + 5.8, 'in', 'ضفت 2 أم علي — 180ج 😋\nوطلبك عدّى 1000ج، فليكي خصم 10%.\nابعتيلي اللوكيشن وأنا أحدد أقرب فرع.', { time: '9:48 م' }),
+  say(A + 7.0, 'out', '', { kind: 'location', time: '9:48 م' }),
+  { t: A + 7.6, typing: A + 8.2 },
+  say(A + 8.2, 'in', 'التجمع الخامس ✅ هيوصلك من فرع التجمع خلال 35–50 دقيقة، والتوصيل 30ج.', { time: '9:49 م' }),
+  say(A + 9.6, 'in', `اتأكد طلبك رقم *${NO}* 🎉 ولينك الدفع وصلك في الرسالة اللي جاية.`, { time: '9:50 م' }),
+  say(A + 10.2, 'in', `لينك الدفع لطلبك ${NO} — 1,312.5ج:`, { kind: 'link', time: '9:50 م' }),
+  say(A + 12.3, 'in', `وصلنا الدفع لطلبك رقم ${NO} ✅ شكراً ليكي!`, { time: '9:51 م' }),
+  // effects of the dashboard
+  say(T.accept + 4.0, 'in', `تمام 👨‍🍳 طلبك رقم ${NO} اتأكد من فرع التجمع الخامس وبيتجهز دلوقتي. الوقت المتوقع حوالي 45 دقيقة.`, { time: '9:52 م', fx: true }),
+  say(T.out + 3.0, 'in', `طلبك رقم ${NO} خرج مع مندوب التوصيل وفي الطريق ليك 🛵\nمندوب التوصيل: أحمد جمال — 01000000104`, { time: '10:21 م', fx: true }),
+  say(T.out + 4.3, 'in', '🛵 مندوب التوصيل أحمد جمال قرّب يوصلك — حوالي 3 دقايق.', { time: '10:33 م', fx: true })
+]);
+sfx(T.out + 4.3, 'pop');
+conv(T.question, T.takeover, 'العميل: مروان', [
+  say(T.question - 5, 'out', 'عندي عزومة بكرة لـ20 فرد، ينفع تعملولي صينية مشكل كبيرة الساعة 4؟', { time: '7:45 م' }),
+  say(T.question - 5, 'in', 'عزومة حلوة! 😍 هتأكد من الفرع إنهم يقدروا يجهزوها لبكرة الساعة 4، وأرجعلك على طول.', { time: '7:45 م' }),
+  say(T.question + 2.6, 'in', 'تمام يا مروان ✅ فرع التجمع أكّد إنه يقدر يجهز صينية المشكل لـ20 فرد بكرة الساعة 4 العصر.\nتحب أأكدلك الطلب؟', { time: '7:52 م', fx: true })
+]);
+conv(T.takeover, T.sw, 'العميل: يوسف', [
+  say(T.takeover - 5, 'out', 'الأوردر وصل بارد المرة دي 😕 والبطاطس مش مقرمشة خالص', { time: '8:40 م' }),
+  say(T.takeover - 5, 'in', 'حقك علينا جداً يا يوسف 🙏 ده مش المستوى اللي نحبه ليك. بلّغت مدير الفرع دلوقتي.', { time: '8:40 م' }),
+  say(T.takeover + 4.6, 'in', 'حقك علينا يا يوسف 🙏 أنا مدير الفرع. هنبعتلك الطلب من جديد سخن خلال 30 دقيقة، وعلى حسابنا.', { time: '8:46 م', fx: true })
+]);
+conv(T.sw, T.montage, 'العميلة: هبة', [
+  say(T.sw + 2.4, 'out', 'مساء الخير، عايزة أطلب', { time: '9:58 م' }),
+  say(T.sw + 2.9, 'in', 'أهلاً هبة 🙏 معلش جداً، خط الطلبات على الواتساب واقف مؤقتاً بسبب ضغط الطلبات. أول ما نرجع هنبعتلك رسالة هنا على طول علشان تطلب براحتك. متشكرين لصبرك.', { time: '9:58 م', fx: true }),
+  say(T.sw + 5.5, 'in', 'أهلاً هبة 👋 رجعنا نستقبل الطلبات على الواتساب! متشكرين جداً إنك استنيتنا، ابعتلنا طلبك وإحنا معاك.', { time: '10:20 م', fx: true })
+]);
+sfx(T.sw + 2.4, 'send');
+for (const c of CHATS) for (const m of c.msgs) if (m.who && !m.fx && m.t > c.t0) sfx(m.t, m.who === 'out' ? 'send' : 'pop');
+
+// opening notifications
+const NOTES = [['عمر', 'عايز أطلب دليفري'], ['سارة', 'فيه توصيل للتجمع؟'], ['يوسف', '🎤 رسالة صوتية (0:12)'], ['مريم', '📷 صورة'],
+  ['أحمد', 'ممكن المنيو؟'], ['هبة', 'لسه فاتحين؟'], ['كريم', 'عايز 2 كيلو كفتة'], ['نادين', '🎤 رسالة صوتية (0:14)'],
+  ['مروان', 'عندي عزومة بكرة لـ20 فرد'], ['دينا', 'عايزة أحجز ترابيزة']];
+NOTES.forEach((_, i) => sfx(.35 + i * .3, 'pop'));
+[T.brand, T.agent - .3, T.split, T.montage, T.outro].forEach((t) => sfx(t, 'whoosh'));
+
+window.DURATION = DUR;
+window.CUES = { duration: DUR, drums_in: T.drums, break: [T.sw + 2.0, T.sw + 4.8], outro: T.outro + .4, sfx: SFX.sort((a, b) => a[0] - b[0]) };
+
+// ════════════════════════════════════════════════════════════════════════
+// building
+// ════════════════════════════════════════════════════════════════════════
+const IM = new Map();
+function cimg(src) {
+  if (!IM.has(src)) { const i = new Image(); i.src = src; i.decoding = 'sync'; $('cview').appendChild(i); IM.set(src, i); }
+  return IM.get(src);
+}
+const md = (s) => s.replace(/\*([^*]+)\*/g, '<b>$1</b>');
+function buildChats() {
+  $('waLogo').src = LOGO;
+  $('paidImg').src = F('phones', 'paid').src;
+  for (const c of CHATS) {
+    const scene = document.createElement('div'); scene.className = 'wscene';
+    const inner = document.createElement('div'); inner.className = 'winner';
+    scene.appendChild(inner); $('wview').appendChild(scene);
+    c.el = scene; c.inner = inner;
+    for (const m of c.msgs) {
+      const item = document.createElement('div'); item.className = 'item';
+      const row = document.createElement('div');
+      if (m.typing) {
+        row.className = 'msg in';
+        row.innerHTML = '<div class="bubble typing"><span></span><span></span><span></span></div>';
+      } else {
+        row.className = 'msg ' + m.who;
+        let body = md(m.html);
+        if (m.kind === 'voice') {
+          const bars = Array.from({ length: 40 }, (_, i) => `<i style="height:${10 + Math.round(36 * Math.abs(Math.sin(i * 1.7) * Math.cos(i * .45)))}px"></i>`).join('');
+          body = `<div class="voice"><div class="av">ن</div><div class="play"></div><div class="wave">${bars}</div></div><div style="font:20px var(--en);color:#8EB8AE;direction:ltr;text-align:left;padding-left:80px">0:14</div>`;
+        } else if (m.kind === 'photo') body = `<div class="photo"><img src="${DIR}/assets/photo-nadeen.jpg"></div>${body}`;
+        else if (m.kind === 'location') body = `<div class="loc"><div class="map" style="background-image:url('${ZONES}');background-size:1700px auto;background-position:-900px -640px"></div><div style="padding-top:8px">📍 الموقع الحالي</div></div>`;
+        else if (m.kind === 'link') body = `<div class="link"><div class="lc"><img src="${LOGO}"><div><b>Grill House · Pay 1,312.5 EGP</b><span>Card or mobile wallet</span></div></div>${body}\n<a>orders.everwake.tech/p/${ST.order.ref}</a></div>`;
+        row.innerHTML = `<div class="bubble">${body}<small>${m.time}${m.who === 'out' ? ' ✓✓' : ''}</small></div>`;
+      }
+      item.appendChild(row); inner.appendChild(item);
+      m.item = item; m.row = row; m.bubble = row.firstChild;
+      if (m.kind === 'voice') m.bars = [...row.querySelectorAll('.wave i')];
+      if (m.kind === 'link') m.link = row.querySelector('a');
+    }
+  }
+  const wa = '<svg viewBox="0 0 24 24"><path fill="#fff" d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3zm4.6 12.6c-.2.6-1.1 1.1-1.6 1.2-.4.1-1 .1-1.6-.1a13 13 0 0 1-5.2-4.6c-.4-.6-.9-1.6-.9-2.5s.5-1.5.7-1.7c.2-.2.4-.3.6-.3h.4c.1 0 .3 0 .5.4l.7 1.6c.1.1.1.3 0 .4l-.3.5-.3.3c-.1.1-.2.3-.1.5.2.3.7 1.1 1.4 1.7.9.8 1.7 1.1 2 1.2.2.1.4.1.5-.1l.7-.8c.2-.2.3-.2.5-.1l1.6.8c.2.1.4.2.4.3.1.1.1.6-.1 1.2z"/></svg>';
+  NOTES.forEach(([n, msg]) => {
+    const d = document.createElement('div'); d.className = 'note';
+    d.innerHTML = `<div class="ic">${wa}</div><div class="tx"><div class="hd"><b>WhatsApp</b><span>now</span></div><div class="nm"><b>${n}</b> · ${msg}</div></div>`;
+    $('notes').appendChild(d);
+  });
+  // montage cards: [card, scene, frame, cx, cy, w]
+  window.MONT = [['m1', 'overview', 'top', 680, 215, 1330], ['m2', 'menu', 'stock-menu', 800, 520, 760], ['m3', 'places', 'pin-1', 560, 420, 1150]];
+  for (const [id, sc, n, cx, cy, w] of MONT) {
+    const im = new Image(); im.src = F(sc, n).src; $(id).appendChild(im);
+    const s = 1000 / w, h = 560 / s;
+    im.style.width = 1600 * s + 'px';
+    im.style.left = -(cx - w / 2) * s + 'px'; im.style.top = -clamp(cy - h / 2, 0, 1000 - h) * s + 'px';
+  }
+}
+function measure() { for (const c of CHATS) for (const m of c.msgs) m.h = m.row.offsetHeight; }
+
+// ════════════════════════════════════════════════════════════════════════
+// drawing one moment
+// ════════════════════════════════════════════════════════════════════════
+function camAt(t) {
+  let from = CAM[0].r, cur = CAM[0].r;
+  for (const k of CAM) {
+    if (k.t > t) break;
+    const p = k.dur ? easeInOut(prog(t, k.t, k.t + k.dur)) : 1;
+    cur = from.map((v, i) => lerp(v, k.r[i], p));
+    from = p >= 1 ? k.r : cur;
+  }
+  const [cx, cy, w] = cur, s = 1000 / w, h = 646 / s;
+  const x0 = clamp(cx - w / 2, 0, 1600 - w), y0 = clamp(cy - h / 2, 0, 1000 - h);
+  return { s, x0, y0 };
+}
+const toCard = (c, x, y) => ({ x: (x - c.x0) * c.s, y: 44 + (y - c.y0) * c.s });
+
+let layout = {};
+function renderCard(t) {
+  const card = $('card');
+  const on = t >= T.split - .1 && t < T.montage + .3;
+  const k = Math.min(easeOut(prog(t, T.split - .1, T.split + .5)), 1 - prog(t, T.montage - .2, T.montage + .3));
+  card.style.opacity = on ? k : 0;
+  card.style.transform = `translateY(${(1 - k) * -60}px)`;
+  if (!on) return null;
+  const c = camAt(t);
+  const i = lastAt(CF, t);
+  for (const im of IM.values()) im.style.opacity = 0;
+  const draw = (f, a, z) => {
+    const im = cimg(f.src);
+    im.style.width = 1600 * c.s + 'px';
+    im.style.transform = `translate(${-c.x0 * c.s}px, ${-c.y0 * c.s}px)`;
+    im.style.opacity = a; im.style.zIndex = z;
+  };
+  if (i >= 0) {
+    const f = CF[i], a = prog(t, f.t, f.t + .18);
+    if (i > 0 && a < 1) draw(CF[i - 1], 1, 1);
+    draw(f, i > 0 ? a : 1, 2);
+  }
+  // "new order" pill
+  const tn = $('toastNew');
+  const tk = easeOut(prog(t, T.ring + .5, T.ring + .9)) * (1 - prog(t, T.accept - .3, T.accept));
+  tn.style.opacity = tk; tn.style.transform = `translateX(-50%) translateY(${(1 - tk) * -30}px) scale(${.9 + .1 * tk})`;
+  $('toastNo').textContent = NO;
+  // cursor: glides to each tap
+  const cur = $('cursor'), rip = $('ripple');
+  cur.style.opacity = 0; rip.style.opacity = 0;
+  const scene = [T.ring, T.accept, T.out, T.question, T.takeover, T.sw, T.montage].filter((s) => s <= t).pop();
+  const taps = TAPS.filter((p) => p.t >= scene && p.t < scene + 6.2);
+  const nxt = taps.find((p) => p.t >= t), prv = [...taps].reverse().find((p) => p.t < t);
+  let pos = null;
+  if (nxt) {
+    const start = Math.max(prv ? prv.t + .2 : scene + .2, nxt.t - .7);
+    if (t >= start) {
+      const from = prv || { x: nxt.x + 160, y: nxt.y + 140 };
+      const e = easeInOut(prog(t, start, nxt.t));
+      pos = { x: lerp(from.x, nxt.x, e), y: lerp(from.y, nxt.y, e) };
+    } else if (prv) pos = prv;
+  } else if (prv && t - prv.t < 1.2) pos = prv;
+  if (pos) {
+    const p = toCard(c, pos.x, pos.y);
+    const press = prv && t - prv.t < .15 ? .82 : 1;
+    cur.style.opacity = 1;
+    cur.style.transform = `translate(${p.x - 6}px, ${p.y - 3}px) scale(${press})`;
+  }
+  if (prv && t - prv.t < .6 && prv.click) {
+    const q = prog(t - prv.t, 0, .6), p = toCard(c, prv.x, prv.y);
+    rip.style.opacity = 1 - q;
+    rip.style.transform = `translate(${p.x}px, ${p.y}px) scale(${.3 + q * 1.3})`;
+  }
+  return c;
+}
+
+function chatGeom(t) {
+  // full height for the agent part, the lower half once the dashboard joins
+  const s = easeInOut(prog(t, T.split - .2, T.split + .5));
+  return { top: lerp(400, 1120, s), h: lerp(1480, 770, s) };
+}
+
+function renderChat(t) {
+  const el = $('chat');
+  const on = t >= T.agent - .5 && t < T.montage + .3;
+  const k = Math.min(easeOut(prog(t, T.agent - .5, T.agent)), 1 - prog(t, T.montage - .2, T.montage + .3));
+  el.style.opacity = on ? k : 0;
+  if (!on) return;
+  const g = chatGeom(t);
+  el.style.top = g.top + 'px'; el.style.height = g.h + 'px';
+  el.style.transform = `translateY(${(1 - k) * 80}px)`;
+  const ci = CHATS.findIndex((c) => t >= c.t0 && t < c.t1);
+  CHATS.forEach((c, i) => {
+    const a = i === ci ? prog(t, c.t0, c.t0 + .35) : (i === ci - 1 ? 1 - prog(t, CHATS[ci].t0, CHATS[ci].t0 + .35) : 0);
+    c.el.style.opacity = a;
+    if (a > 0) drawConv(c, t, g.h - 104);
+  });
+  $('who').textContent = ci >= 0 ? CHATS[ci].who : '';
+  // the payment page, opened from the link
+  const pa = Math.min(easeOut(prog(t, A + 10.95, A + 11.3)), 1 - prog(t, A + 12.0, A + 12.3));
+  $('paid').style.opacity = pa;
+  // a finger taps the link
+  const tp = $('tap');
+  tp.style.opacity = 0;
+  const lt = A + 10.8;
+  if (t >= lt && t < lt + .5) {
+    const m = CHATS[0].msgs.find((x) => x.kind === 'link');
+    const r = m.link.getBoundingClientRect(), cr = el.getBoundingClientRect();
+    const q = prog(t, lt, lt + .5);
+    tp.style.opacity = .9 * (1 - q);
+    tp.style.left = r.left - cr.left + r.width / 2 + 'px'; tp.style.top = r.top - cr.top + r.height / 2 + 'px';
+    tp.style.transform = `scale(${.5 + q})`;
+  }
+}
+
+function drawConv(c, t, viewH) {
+  let total = 0;
+  for (const m of c.msgs) {
+    let k;
+    if (m.typing) k = easeOut(prog(t, m.t, m.t + .25)) * (1 - prog(t, m.typing - .15, m.typing));
+    else k = m.t <= c.t0 ? 1 : easeOut(prog(t, m.t, m.t + .35));
+    m.item.style.height = m.h * k + 'px';
+    const pop = m.typing || m.t <= c.t0 ? k : back(prog(t, m.t, m.t + .45));
+    m.bubble.style.opacity = k;
+    m.bubble.style.transform = `scale(${lerp(.55, 1, clamp(pop, 0, 1.12))})`;
+    if (m.fx) {
+      const glow = k > 0 ? Math.max(0, 1 - prog(t, m.t + .2, m.t + 1.6)) : 0;
+      m.bubble.style.boxShadow = `0 0 0 ${glow * 5}px rgba(37,211,102,${glow * .8}), 0 0 ${glow * 40}px rgba(37,211,102,${glow * .6})`;
+    }
+    if (m.typing) m.bubble.querySelectorAll('span').forEach((s, i) => { s.style.transform = `translateY(${Math.sin(t * 9 - i * 1.1) * 5}px)`; });
+    if (m.bars) { const p = prog(t, m.play[0], m.play[1]); m.bars.forEach((b, i) => b.classList.toggle('on', i / m.bars.length < p)); }
+    total += m.h * k;
+  }
+  c.inner.style.top = Math.min(18, viewH - total - 8) + 'px';
+}
+
+function renderSignal(t, c) {
+  const path = $('sigPath'), glow = $('sigGlow'), dot = $('sigDot'), arrive = $('arrive');
+  path.style.opacity = glow.style.opacity = dot.style.opacity = arrive.style.opacity = 0;
+  const s = SIGS.find((q) => t >= q.t && t <= q.arrive + .5);
+  if (!s || !c) return;
+  const from = toCard(c, s.x, s.y);
+  const x0 = 40 + from.x, y0 = 400 + from.y;
+  const g = chatGeom(t);
+  const x1 = 540, y1 = g.top + g.h - 80;
+  const d = `M ${x0} ${y0} C ${x0} ${y0 + 260}, ${x1} ${y1 - 360}, ${x1} ${y1}`;
+  path.setAttribute('d', d); glow.setAttribute('d', d);
+  const L = path.getTotalLength();
+  const p = easeInOut(prog(t, s.t, s.arrive));
+  const fade = 1 - prog(t, s.arrive, s.arrive + .5);
+  path.style.strokeDasharray = `${L * .35} ${L}`;
+  path.style.strokeDashoffset = L * .35 - p * L * 1.35;
+  glow.style.strokeDasharray = path.style.strokeDasharray; glow.style.strokeDashoffset = path.style.strokeDashoffset;
+  path.style.opacity = glow.style.opacity = fade * (p < 1 ? 1 : 0);
+  const pt = path.getPointAtLength(Math.min(L, p * L));
+  dot.setAttribute('cx', pt.x); dot.setAttribute('cy', pt.y);
+  dot.style.opacity = p < 1 ? 1 : 0;
+  if (t >= s.arrive) {
+    const q = prog(t, s.arrive, s.arrive + .5);
+    arrive.style.opacity = (1 - q) * .9;
+    arrive.style.top = g.top + g.h - 10 + 'px';
+    arrive.style.transform = `scaleX(${.3 + q * .7})`;
+  }
+}
+
+function renderLock(t) {
+  const el = $('lock');
+  const k = 1 - prog(t, T.hookEnd - .4, T.hookEnd);
+  el.style.opacity = Math.min(easeOut(prog(t, 0, .4)), k);
+  el.style.transform = `scale(${lerp(.96, 1, easeOut(prog(t, 0, 1)))})`;
+  const items = [...$('notes').children];
+  const shown = NOTES.map((_, i) => easeOut(prog(t, .35 + i * .3, .35 + i * .3 + .3)));
+  items.forEach((n, i) => {
+    let y = 0;
+    for (let j = i + 1; j < items.length; j++) y += shown[j] * 142;
+    n.style.opacity = shown[i];
+    n.style.transform = `translateY(${y - (1 - shown[i]) * 40}px) scale(${.94 + .06 * shown[i]})`;
+  });
+}
+
+function renderBrand(t) {
+  const el = $('brand');
+  const s = t - T.brand;
+  el.style.opacity = s < 0 ? 0 : 1 - prog(t, T.agent - .6, T.agent - .1);
+  if (s < 0) return;
+  const ring = $('m-ring'), L = 2 * Math.PI * 15.1816;
+  ring.style.strokeDasharray = L; ring.style.strokeDashoffset = L * (1 - easeInOut(prog(s, .05, .9)));
+  for (const [id, a] of [['m-arc1', .35], ['m-arc2', .5]]) { const p = $(id), l = p.getTotalLength(); p.style.strokeDasharray = l; p.style.strokeDashoffset = l * (1 - easeOut(prog(s, a, a + .45))); }
+  $('m-dot').style.transformOrigin = '0 -5.121px'; $('m-dot').style.transform = `scale(${clamp(back(prog(s, .8, 1.1)), 0, 1.3)})`;
+  for (const [id, a] of [['b-nm', .6], ['b-t', 1.1]]) { const q = easeOut(prog(s, a, a + .6)); $(id).style.opacity = q; $(id).style.transform = `translateY(${(1 - q) * 40}px)`; }
+}
+
+function renderMontage(t) {
+  const tops = [400, 990, 1580 - 300];
+  MONT.forEach(([id], i) => {
+    const el = $(id), a = T.montage + .25 + i * .55;
+    const k = Math.min(back(prog(t, a, a + .55)), 1 + 0 * t);
+    const out = 1 - prog(t, T.outro - .3, T.outro + .1);
+    el.style.opacity = Math.min(clamp(prog(t, a, a + .3)), out);
+    el.style.top = [420, 1010, 1600][i] - (i === 2 ? 0 : 0) + 'px';
+    el.style.height = i === 2 ? '300px' : '560px';
+    el.style.transform = `translateX(${(1 - clamp(k, 0, 1.1)) * (i % 2 ? -1 : 1) * 600}px) rotate(${(1 - clamp(k, 0, 1)) * (i % 2 ? -4 : 4)}deg)`;
+  });
+}
+
+function renderOutro(t) {
+  const el = $('outro'), s = t - T.outro;
+  el.style.opacity = s < 0 ? 0 : 1 - prog(t, DUR - .5, DUR);
+  if (s < 0) return;
+  const lg = easeOut(prog(s, .1, .9));
+  $('o-logo').style.opacity = lg; $('o-logo').style.transform = `scale(${lerp(.9, 1, lg)})`;
+  for (const [id, a] of [['o-nm', .5], ['o-cta', .9], ['o-url', 1.3]]) { const q = easeOut(prog(s, a, a + .6)); $(id).style.opacity = q; $(id).style.transform = `translateY(${(1 - q) * 30}px)`; }
+  const pulse = 1 + .03 * Math.sin((s - 1.5) * 4) * prog(s, 1.5, 2);
+  $('o-cta').style.transform += ` scale(${pulse})`;
+}
+
+let capKey = ['', ''];
+function renderCaps(t) {
+  let i = -1; CAPS.forEach((c, j) => { if (c[0] <= t) i = j; });
+  const slots = [$('capA'), $('capB')];
+  slots.forEach((s) => { s.style.opacity = 0; });
+  if (i < 0) return;
+  const put = (idx, a, dy) => {
+    const [, key, title, sub] = CAPS[idx];
+    if (!title) return;
+    const slot = slots[idx % 2], id = idx + title;
+    if (capKey[idx % 2] !== id) {
+      slot.innerHTML = `${key ? `<div class="k">${key}</div>` : ''}<div class="t">${title}</div>${sub ? `<div class="s">${sub}</div>` : ''}`;
+      capKey[idx % 2] = id;
+    }
+    slot.style.opacity = a; slot.style.transform = `translateY(${dy}px)`;
+  };
+  // the old one leaves first, then the new one rises in
+  const t0 = CAPS[i][0];
+  if (i > 0 && t < t0 + .25) { const o = prog(t, t0, t0 + .25); put(i - 1, 1 - o, -18 * o); }
+  const k = easeOut(prog(t, t0 + .18, t0 + .6));
+  put(i, k, (1 - k) * 30);
+}
+
+function renderGlow(t) {
+  const g = $('glow');
+  g.style.transform = `translate(${Math.sin(t * .35) * 120}px, ${Math.cos(t * .27) * 160 - 300}px)`;
+}
+
+window.render = async function (t) {
+  renderGlow(t);
+  renderLock(t);
+  renderBrand(t);
+  renderChat(t);
+  const c = renderCard(t);
+  renderSignal(t, c);
+  renderMontage(t);
+  renderOutro(t);
+  renderCaps(t);
+  const pending = [...IM.values(), ...document.querySelectorAll('.mcard img, #paidImg')].filter((i) => +i.style.opacity !== 0 && !i.complete);
+  if (pending.length) await Promise.all(pending.map((i) => i.decode().catch(() => {})));
+};
+
+window.ready = (async () => {
+  for (const w of [400, 500, 600, 700]) await document.fonts.load(`${w} 30px "Plex Arabic"`, 'عربي');
+  await document.fonts.ready;
+  buildChats();
+  for (const f of CF) cimg(f.src);
+  await Promise.all([...document.images].map((i) => i.decode().catch(() => {})));
+  measure();
+  await window.render(0);
+})();
+
+if (!navigator.webdriver) {
+  window.ready.then(() => {
+    let start = performance.now();
+    document.addEventListener('click', () => { start = performance.now(); });
+    const loop = async (now) => { await window.render(((now - start) / 1000) % DUR); requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>

@@ -3,9 +3,10 @@
 | File | Length | What it is |
 |---|---|---|
 | `everwake-orders-film.mp4` | 3:38 | **The full film.** The real dashboard, every feature, with music |
+| `everwake-orders-vertical.mp4` | 0:59 | **The vertical cut** for Reels, TikTok and WhatsApp Status, in Egyptian Arabic |
 | `everwake-orders-launch.mp4` | 0:46 | The short teaser, drawn rather than filmed |
 
-Both are 1920×1080, 30 fps. The music and sounds are generated (`music.py`),
+The film and the teaser are 1920×1080, the vertical cut 1080×1920; all 30 fps. The music and sounds are generated (`music.py`),
 so there is nothing to license. The restaurant in them, "بيت المشويات" (Grill
 House), its customers and its numbers are made up — the showcase restaurant in
 `database/tools/showcase_restaurant.sql`.
@@ -49,6 +50,27 @@ node render-film.cjs --from 40 --to 60     # a preview of part of it
 
 Needs Node, Playwright with Chromium, ffmpeg, and Python 3 with numpy. The
 footage (`capture/shots/`, about 45 MB) is not committed — film it first.
+
+## The vertical cut
+
+59 seconds, 1080×1920, captions in professional Egyptian Arabic. The screen is
+split: the Arabic dashboard on top, the customer's WhatsApp below, so every
+click shows what it sends the customer at that moment — accept and the
+confirmation arrives, "out for delivery" and the driver's name and number
+arrive, the agent switched off and every waiting customer gets the apology.
+Those messages are the system's real automatic-message templates.
+
+The script, scene by scene, with the voice-over lines and notes for the
+voice, is in [`vertical-script.md`](vertical-script.md).
+
+```sh
+FILM_LANG=ar SHOTS_DIR=shots-ar node capture.mjs     # in capture/: the Arabic footage
+node render-film.cjs --page vertical.html            # everwake-orders-vertical.mp4
+node render-film.cjs --page vertical.html --voice vo.wav   # with a voice-over, the music ducking under it
+```
+
+The voice file should run the full 59.5 seconds, each line starting at its
+time in the script.
 
 ## The teaser
 

@@ -5,6 +5,8 @@
 //   node render-film.cjs                         → everwake-orders-film.mp4 (1920×1080, 30 fps)
 //   node render-film.cjs --stills 12,45.5,80     → still-12.png … to check moments
 //   node render-film.cjs --from 40 --to 60       → a preview of part of it
+//   node render-film.cjs --page vertical.html    → the vertical cut (it sets its own size)
+//   … --voice vo.wav                             → mix a voice-over in, the music ducking under it
 //
 // Needs Playwright (with Chromium), ffmpeg, and Python 3 with numpy.
 // The frames come from capture/ (see capture/README.md).
@@ -15,13 +17,16 @@ const path = require('path');
 
 const FPS = 30;
 const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : null; };
+const PAGE = arg('--page') || 'film.html';
+const NAME = PAGE === 'film.html' ? 'everwake-orders-film' : 'everwake-orders-' + PAGE.replace(/\.html$/, '');
 
 (async () => {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const size = PAGE === 'vertical.html' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+  const page = await browser.newPage({ viewport: size });
   page.on('pageerror', (e) => { console.error('page error:', e.message); process.exitCode = 1; });
   page.on('console', (m) => { if (m.type() === 'error') console.error('console:', m.text()); });
-  await page.goto('file://' + path.join(__dirname, 'film.html'));
+  await page.goto('file://' + path.join(__dirname, PAGE));
   await page.evaluate(() => window.ready);
   const duration = await page.evaluate(() => window.DURATION);
   console.log(`film: ${duration.toFixed(1)}s`);
@@ -36,10 +41,18 @@ const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? pro
   }
 
   const from = Number(arg('--from') || 0), to = Number(arg('--to') || duration);
-  const out = path.join(__dirname, from === 0 && to === duration ? 'everwake-orders-film.mp4' : `preview-${from}-${to}.mp4`);
+  const out = path.join(__dirname, from === 0 && to === duration ? `${NAME}.mp4` : `preview-${from}-${to}.mp4`);
   const cuesFile = path.join(__dirname, '.cues.json'), music = path.join(__dirname, '.film-music.wav');
   fs.writeFileSync(cuesFile, JSON.stringify(await page.evaluate(() => window.CUES)));
   execFileSync('python3', [path.join(__dirname, 'music.py'), cuesFile, music], { stdio: 'inherit' });
+  if (arg('--voice')) {
+    // the voice on top; the music steps back while it speaks
+    const mixed = path.join(__dirname, '.film-mix.wav');
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', music, '-i', arg('--voice'), '-filter_complex',
+      '[1:a]aresample=48000,volume=1.0,asplit=2[v1][v2];[0:a][v1]sidechaincompress=threshold=0.03:ratio=6:attack=20:release=350[m];[m][v2]amix=inputs=2:normalize=0,alimiter=limit=0.95',
+      mixed]);
+    fs.renameSync(mixed, music);
+  }
 
   const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error',
     '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',

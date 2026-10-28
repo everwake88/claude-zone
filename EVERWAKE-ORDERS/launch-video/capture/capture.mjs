@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { BASE, R, OUT, Scene, dashboard, db, done, launch, phone, point, settle, tenant } from './lib.mjs';
+import { BASE, L, LR, R, OUT, Scene, dashboard, db, done, launch, phone, point, settle, tenant } from './lib.mjs';
 import { DRIVER_TOKEN, prepare, placeOrder } from './demo-data.mjs';
 import { writeManifest } from './manifest.mjs';
 
@@ -54,12 +54,12 @@ const scenes = {
     await page.goto(`${R}/menu/pages`);
     await settle(page);
     await s.shot(page, 'pages-empty');
-    await s.aim(page, 'design', page.getByRole('button', { name: 'Design the pictures' }), { click: true });
+    await s.aim(page, 'design', page.getByRole('button', { name: L('Design the pictures') }), { click: true });
     await page.waitForTimeout(5000);
     await settle(page, 1500);
     await s.shot(page, 'designed');
     await s.shot(page, 'designed-full', { fullPage: true });
-    const use = page.getByRole('button', { name: 'Use these as the menu pictures' });
+    const use = page.getByRole('button', { name: L('Use these as the menu pictures') });
     await use.scrollIntoViewIfNeeded();
     await page.waitForTimeout(400);
     await s.shot(page, 'picture');
@@ -128,21 +128,24 @@ const scenes = {
     await s.shot(page, 'details');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(500);
-    if (await page.getByText('Open the chat').isVisible()) { await page.mouse.click(700, 120); await page.waitForTimeout(500); }
-    await s.aim(page, 'accept', card().getByRole('button', { name: 'Accept', exact: true }), { click: true });
+    if (await page.getByText(L('Open the chat')).isVisible()) { await page.mouse.click(700, 120); await page.waitForTimeout(500); }
+    await s.aim(page, 'accept', card().getByRole('button', { name: L('Accept'), exact: true }), { click: true });
     await page.waitForTimeout(700);
     await s.shot(page, 'accept-dialog');
     await s.aim(page, 'eta', page.getByRole('button', { name: '45 دقيقة' }), { click: true });
     await page.waitForTimeout(400);
-    await s.aim(page, 'accept-tell', page.getByRole('button', { name: 'Accept and tell the customer' }), { click: true });
+    await s.aim(page, 'accept-tell', page.getByRole('button', { name: L('Accept and tell the customer') }), { click: true });
     await page.waitForTimeout(1800);
+    // the accepted card can land low in a long column: bring it to the middle of the screen
+    await card().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(500);
     await s.shot(page, 'accepted', { focus: await point(page, card()) });
     const select = card().locator('select');
     await s.aim(page, 'driver', select);
     await select.selectOption(state.prepared.driver);
     await page.waitForTimeout(1500);
     await s.shot(page, 'driver-set', { focus: await point(page, card()) });
-    await s.aim(page, 'out', card().getByRole('button', { name: 'Out for delivery' }), { click: true });
+    await s.aim(page, 'out', card().getByRole('button', { name: L('Out for delivery') }), { click: true });
     await page.waitForTimeout(800);
     const dialog = page.locator('[role=dialog]');
     if (await dialog.count() && await dialog.first().isVisible()) {
@@ -193,7 +196,7 @@ const scenes = {
     await s.aim(page, 'open', page.getByText('مروان منصور', { exact: true }).first(), { click: true });
     await settle(page, 1200);
     await s.shot(page, 'card');
-    await s.aim(page, 'yes', page.getByRole('button', { name: 'Yes', exact: true }).first(), { click: true });
+    await s.aim(page, 'yes', page.getByRole('button', { name: L('Yes'), exact: true }).first(), { click: true });
     await page.waitForTimeout(1500);
     await s.shot(page, 'answered');
     s.save();
@@ -212,16 +215,16 @@ const scenes = {
     await settle(page, 1200);
     await s.shot(page, 'chat');
     const reply = 'حقك علينا يا يوسف 🙏 أنا مدير الفرع. هنبعتلك الطلب من جديد سخن خلال 30 دقيقة، وعلى حسابنا.';
-    const box = page.getByPlaceholder('Write to the customer…');
+    const box = page.getByPlaceholder(L('Write to the customer…'));
     await s.aim(page, 'focus', box, { click: true });
     for (const n of [12, 30, 52, 76, reply.length]) {
       await box.fill(reply.slice(0, n));
       await s.shot(page, `type-${n}`, { cursor: null });
     }
-    await s.aim(page, 'send', page.getByRole('button', { name: 'Send', exact: true }), { click: true });
+    await s.aim(page, 'send', page.getByRole('button', { name: L('Send'), exact: true }), { click: true });
     await page.waitForTimeout(1800);
     await s.shot(page, 'sent');
-    await s.aim(page, 'hand-back', page.getByRole('button', { name: 'Hand back to the agent' }), { click: true });
+    await s.aim(page, 'hand-back', page.getByRole('button', { name: L('Hand back to the agent') }), { click: true });
     await page.waitForTimeout(1500);
     await s.shot(page, 'handed-back');
     s.save();
@@ -233,7 +236,7 @@ const scenes = {
     await page.goto(`${R}/reservations`);
     await settle(page, 1000);
     await s.shot(page, 'list');
-    await s.aim(page, 'confirm', page.getByRole('button', { name: 'Confirm', exact: true }).first(), { click: true });
+    await s.aim(page, 'confirm', page.getByRole('button', { name: L('Confirm'), exact: true }).first(), { click: true });
     await page.waitForTimeout(1500);
     await s.shot(page, 'confirmed');
     s.save();
@@ -260,17 +263,17 @@ const scenes = {
     await settle(page, 1000);
     await s.shot(page, 'list');
     const row = (name) => page.locator('tr', { hasText: name }).first();
-    await s.aim(page, 'stock', row('ملوخية').getByRole('button', { name: /Available/ }), { click: true });
+    await s.aim(page, 'stock', row('ملوخية').getByRole('button', { name: LR('Available') }), { click: true });
     await page.waitForTimeout(600);
     await s.shot(page, 'stock-menu');
-    await s.aim(page, 'today', page.getByRole('button', { name: /For today/ }).first(), { click: true });
+    await s.aim(page, 'today', page.getByRole('button', { name: LR('For today (back tomorrow morning)') }).first(), { click: true });
     await page.waitForTimeout(1200);
     await s.shot(page, 'sold-out', { focus: await point(page, row('ملوخية')) });
     await s.aim(page, 'edit', row('فرخة مشوية').getByRole('button').last(), { click: true });
     await page.waitForTimeout(1200);
     await s.shot(page, 'editor');
     for (const tab of ['Choices', 'Branches', 'Photos']) {
-      await s.aim(page, `tab-${tab.toLowerCase()}`, page.getByText(new RegExp(`^${tab}( \\(\\d+\\))?$`)).last(), { click: true });
+      await s.aim(page, `tab-${tab.toLowerCase()}`, page.getByText(new RegExp(`^${L(tab)}( \\(\\d+\\))?$`)).last(), { click: true });
       await page.waitForTimeout(700);
       await s.shot(page, `editor-${tab.toLowerCase()}`);
     }
@@ -316,7 +319,7 @@ const scenes = {
     await settle(page, 2000);
     await s.shot(page, 'sales');
     await s.shot(page, 'sales-full', { fullPage: true });
-    await s.aim(page, 'missed', page.getByRole('button', { name: 'Missed sales' }), { click: true });
+    await s.aim(page, 'missed', page.getByRole('button', { name: L('Missed sales') }), { click: true });
     await settle(page, 1500);
     await s.shot(page, 'missed-sales');
     await s.shot(page, 'missed-full', { fullPage: true });
@@ -331,7 +334,7 @@ const scenes = {
     await page.goto(`${R}/zones`);
     await settle(page, 2500);
     await s.shot(page, 'zones');
-    await s.aim(page, 'test', page.getByRole('button', { name: 'Test an address' }), { click: true });
+    await s.aim(page, 'test', page.getByRole('button', { name: L('Test an address') }), { click: true });
     await page.waitForTimeout(600);
     const map = await point(page, '.leaflet-container');
     for (const [name, fx, fy] of [['pin-1', 0.6, 0.45], ['pin-2', 0.07, 0.92]]) {
@@ -344,10 +347,10 @@ const scenes = {
     await page.goto(`${R}/branches`);
     await settle(page, 1000);
     await s.shot(page, 'branches');
-    await s.aim(page, 'busy-button', page.getByRole('button', { name: 'Too busy' }).first(), { click: true });
+    await s.aim(page, 'busy-button', page.getByRole('button', { name: L('Too busy') }).first(), { click: true });
     await page.waitForTimeout(800);
     await s.shot(page, 'busy-options');
-    await s.aim(page, 'busy-pick', page.getByRole('button', { name: '30 min', exact: true }), { click: true });
+    await s.aim(page, 'busy-pick', page.getByRole('button', { name: /^30/ }), { click: true });
     await page.waitForTimeout(1200);
     await s.shot(page, 'busy');
     s.save();
@@ -360,12 +363,12 @@ const scenes = {
     await page.goto(`${R}/menu/import`);
     await settle(page, 1000);
     await s.shot(page, 'start');
-    await s.aim(page, 'sheet', page.getByText('Spreadsheet', { exact: true }), { click: true });
+    await s.aim(page, 'sheet', page.getByText(L('Spreadsheet'), { exact: true }), { click: true });
     await page.waitForTimeout(500);
     await s.shot(page, 'sheet-tab');
     await page.setInputFiles('input[accept=".csv,text/csv"]', path.join(HERE, 'assets/new-dishes.csv'));
     await page.waitForTimeout(500);
-    await s.aim(page, 'load', page.getByRole('button', { name: 'Load the spreadsheet' }), { click: true });
+    await s.aim(page, 'load', page.getByRole('button', { name: L('Load the spreadsheet') }), { click: true });
     await page.waitForTimeout(2500);
     await settle(page, 800);
     await s.shot(page, 'review');
@@ -391,18 +394,18 @@ const scenes = {
     const { page } = await dashboard();
     await page.goto(`${R}/orders`);
     await settle(page, 1200);
-    await s.aim(page, 'on', page.getByRole('button', { name: /Agent ON/ }).first(), { click: true });
+    await s.aim(page, 'on', page.getByRole('button', { name: LR('Agent ON') }).first(), { click: true });
     await page.waitForTimeout(700);
     await s.shot(page, 'ask-off');
-    await page.getByPlaceholder(/Kitchen full/).fill('المطبخ مليان — طلبات كتير من الفروع');
+    await page.getByPlaceholder(LR('Kitchen full, Friday rush…')).fill('المطبخ مليان — طلبات كتير من الفروع');
     await s.shot(page, 'why', { cursor: null });
-    await s.aim(page, 'switch-off', page.getByRole('button', { name: 'Switch OFF' }), { click: true });
+    await s.aim(page, 'switch-off', page.getByRole('button', { name: L('Switch OFF') }), { click: true });
     await page.waitForTimeout(1500);
     await s.shot(page, 'off');
-    await s.aim(page, 'off-button', page.getByRole('button', { name: /Agent OFF/ }).first(), { click: true });
+    await s.aim(page, 'off-button', page.getByRole('button', { name: LR('Agent OFF') }).first(), { click: true });
     await page.waitForTimeout(700);
     await s.shot(page, 'ask-on');
-    await s.aim(page, 'switch-on', page.getByRole('button', { name: 'Switch ON' }), { click: true });
+    await s.aim(page, 'switch-on', page.getByRole('button', { name: L('Switch ON') }), { click: true });
     await page.waitForTimeout(1500);
     await s.shot(page, 'on-again');
     s.save();

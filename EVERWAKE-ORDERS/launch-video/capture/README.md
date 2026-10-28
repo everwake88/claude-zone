@@ -14,6 +14,7 @@ user, no passwords. **For filming only.**
 | `setup.sh` | Builds the filming database from scratch: the migrations, the showcase restaurant, the stand-ins (`supabase-stub.sql`) and the live-update triggers (`realtime.sql`) |
 | `local-supabase.mjs` | Sign-in, the database API (run as the signed-in user, so row level security applies), file storage and live updates — the parts of Supabase the dashboard uses |
 | `demo-data.mjs` | What the showcase lacks: more offers, Paymob connected, a driver signed in, and the featured customer, who orders by voice note and photo |
+| `start.sh` | After a restart: brings Postgres, the stand-in and the dashboard back up (skips what is already running) |
 | `capture.mjs` | Films each scene into `shots/<scene>/` with where the cursor goes; writes `shots/manifest.js` for the film |
 | `assets/` | The made-up restaurant's logo, the new dishes the import scene loads, where the pen circle goes on the menu photo |
 
@@ -40,6 +41,12 @@ SUPABASE_SERVICE_ROLE_KEY=<service> npx next build && npx next start -p 80 &
 # 4. film every scene (about 6 minutes), or only some: node capture.mjs menu places
 cd ../launch-video/capture && node capture.mjs
 ```
+
+Once it has all been built, `./start.sh` brings it back up after a restart.
+
+**In Arabic** (for the vertical cut): `FILM_LANG=ar SHOTS_DIR=shots-ar node capture.mjs`.
+The dashboard opens in Arabic, and the camera finds its buttons by their
+Arabic names, taken from the dashboard's own dictionary (`i18n-ar.ts`).
 
 Run `setup.sh` again before a full take: scenes change things (an order is
 accepted, a dish goes out of stock, a branch pauses), and every take should

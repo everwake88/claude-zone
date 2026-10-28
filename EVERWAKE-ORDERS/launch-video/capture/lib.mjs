@@ -11,6 +11,15 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 
 export const BASE = 'http://orders.everwake.tech';
+// FILM_LANG=ar films the dashboard in Arabic; L() turns a button's English
+// name into what is on screen, from the dashboard's own dictionary
+export const LANG = process.env.FILM_LANG || 'en';
+const AR = {};
+const dict = fs.readFileSync(new URL('../../dashboard/src/lib/i18n-ar.ts', import.meta.url), 'utf8');
+for (const m of dict.matchAll(/^\s*"((?:[^"\\]|\\.)*)":\s*"((?:[^"\\]|\\.)*)",?\s*$/gm)) AR[JSON.parse(`"${m[1]}"`)] = JSON.parse(`"${m[2]}"`);
+export const L = (en) => (LANG === 'ar' && AR[en]) || en;
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export const LR = (en, flags = '') => new RegExp(esc(L(en)), flags);
 export const SLUG = 'grill_house';
 export const R = `${BASE}/r/${SLUG}`;
 export const OUT = path.resolve(process.env.SHOTS_DIR || 'shots');
@@ -25,7 +34,7 @@ export async function launch() {
 }
 
 // a signed-in dashboard tab. `guides`: page guides to leave open.
-export async function dashboard({ width = 1600, height = 1000, scale = 1.5, lang = 'en', guides = [] } = {}) {
+export async function dashboard({ width = 1600, height = 1000, scale = 1.5, lang = LANG, guides = [] } = {}) {
   const b = await launch();
   const ctx = await b.newContext({ viewport: { width, height }, deviceScaleFactor: scale, locale: 'en-US', timezoneId: 'Africa/Cairo' });
   await ctx.addCookies([{ name: 'ew_lang', value: lang, domain: 'orders.everwake.tech', path: '/' }]);
