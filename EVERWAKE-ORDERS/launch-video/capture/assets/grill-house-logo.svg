@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- The made-up showcase restaurant's logo (database/tools/showcase_restaurant.sql) -->
+  <defs>
+    <radialGradient id="ember" cx="50%" cy="78%" r="70%">
+      <stop offset="0" stop-color="#FFD27A"/>
+      <stop offset="0.45" stop-color="#F28C28"/>
+      <stop offset="1" stop-color="#C0391B"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="248" fill="#2A1A14"/>
+  <circle cx="256" cy="256" r="226" fill="none" stroke="#E8A33A" stroke-width="6"/>
+  <path d="M256 92c22 48 78 74 78 142 0 46-35 80-78 80s-78-34-78-80c0-32 16-54 32-70 2 26 14 42 30 48-10-40 2-80 16-120z" fill="url(#ember)"/>
+  <path d="M256 196c14 26 38 40 38 72 0 22-17 38-38 38s-38-16-38-38c0-18 10-28 18-36 2 14 8 20 16 22-4-20 0-38 4-58z" fill="#FFE3A3"/>
+  <g stroke="#E8A33A" stroke-width="10" stroke-linecap="round">
+    <line x1="150" y1="338" x2="362" y2="338"/>
+    <line x1="166" y1="360" x2="346" y2="360"/>
+  </g>
+  <text x="256" y="424" text-anchor="middle" font-family="IBM Plex Sans Arabic, Noto Sans Arabic, sans-serif" font-weight="700" font-size="54" fill="#FFFFFF" direction="rtl">بيت المشويات</text>
+  <text x="256" y="462" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="22" letter-spacing="7" fill="#E8A33A">GRILL HOUSE</text>
+</svg>

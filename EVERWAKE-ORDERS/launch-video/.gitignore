@@ -1,2 +1,6 @@
 frame-*.png
+still-*.png
+preview-*.mp4
 .music.wav
+.film-music.wav
+.cues.json

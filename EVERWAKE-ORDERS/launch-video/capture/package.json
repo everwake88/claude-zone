@@ -1,0 +1,7 @@
+{
+  "name": "everwake-launch-capture",
+  "private": true,
+  "description": "Runs the real dashboard on the showcase restaurant and films it for the launch video.",
+  "type": "module",
+  "dependencies": { "pg": "8.13.1", "ws": "8.18.0" }
+}

@@ -1,0 +1,6 @@
+category_ar,category_en,name_ar,name_en,price,unit,description_ar,signature,choices
+المشويات,Grills,كباب حلة,Kebab Halla,520,kg,كباب حلة بالبصل والطماطم في الفخار,no,
+المشويات,Grills,سجق مشوي,Grilled Sausage,380,kg,سجق بلدي على الفحم,no,"الطعم*: عادي=0 | حار=0"
+الحلويات,Desserts,كنافة بالقشطة,Kunafa with Cream,85,portion,كنافة طازة بالقشطة والمكسرات,yes,
+المشروبات,Drinks,عصير قصب,Sugarcane Juice,40,portion,قصب طازة,no,"الحجم*: صغير=0 | كبير=15"
+المشروبات,Drinks,سموزي فراولة,Strawberry Smoothie,70,portion,فراولة وزبادي,no,

@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Everwake Orders — the full launch film</title>
+<!--
+  The full launch film. The dashboard on screen is the real one: frames
+  filmed by capture/capture.mjs (capture/shots/), framed in a browser
+  window with camera moves, a cursor and captions. The customer's phone is
+  drawn here. Every frame is a function of time: render(t) puts everything
+  where it is at t seconds; render-film.cjs steps it and records.
+  Open it in a browser to preview (plays itself; click to restart).
+-->
+<style>
+@font-face { font-family: "Plex Arabic"; font-weight: 400; src: url(fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Plex Arabic"; font-weight: 500; src: url(fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Plex Arabic"; font-weight: 600; src: url(fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2) format("woff2"); }
+:root {
+  --navy: #0B222E; --navy-deep: #071822; --navy-raised: #102C3A; --hair-dark: #2B4A59;
+  --gold: #B8913F; --gold-bright: #D4A94B; --on-navy-muted: #9FB3BC;
+  --wa-bg: #0B141A; --wa-bar: #1F2C34; --wa-in: #202C33; --wa-out: #005C4B;
+  --font: "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-ar: "Plex Arabic", "Inter", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--navy-deep); }
+body { font-family: var(--font); color: #fff; -webkit-font-smoothing: antialiased; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden;
+  background: radial-gradient(1500px 1000px at 70% 25%, #143749 0%, var(--navy) 45%, var(--navy-deep) 100%); }
+.layer { position: absolute; inset: 0; }
+.ar { font-family: var(--font-ar); direction: rtl; }
+.label { font-size: 19px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+
+/* ---- the browser window --------------------------------------------------- */
+#world { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; will-change: transform; }
+#win { position: absolute; left: 240px; top: 56px; width: 1440px; height: 940px; border-radius: 14px; overflow: hidden;
+  background: #F3F5F6; box-shadow: 0 40px 120px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
+#bar { height: 40px; background: #E4E8EB; display: flex; align-items: center; padding: 0 16px; gap: 8px; position: relative; }
+#bar i { width: 12px; height: 12px; border-radius: 50%; background: #FF5F57; }
+#bar i:nth-child(2) { background: #FEBC2E; } #bar i:nth-child(3) { background: #28C840; }
+#url { position: absolute; left: 50%; top: 7px; transform: translateX(-50%); height: 26px; min-width: 520px; padding: 0 16px; border-radius: 8px;
+  background: #fff; color: #3d4f57; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+#url svg { width: 12px; height: 12px; }
+#content { position: absolute; left: 0; top: 40px; width: 1440px; height: 900px; overflow: hidden; background: #F3F5F6; }
+#content img { position: absolute; left: 0; top: 0; width: 1440px; display: block; opacity: 0; }
+#content img.sticky-side, #content img.sticky-head { z-index: 5; }
+
+/* ---- the phone -------------------------------------------------------------- */
+#phone { position: absolute; width: 440px; height: 920px; border-radius: 62px; background: #05080a; padding: 14px;
+  box-shadow: 0 40px 120px rgba(0,0,0,.6), 0 0 0 2px #26363f inset; left: 0; top: 80px; opacity: 0; }
+#screen { position: relative; width: 412px; height: 892px; border-radius: 50px; overflow: hidden; background: var(--wa-bg); }
+.pmode { position: absolute; inset: 0; opacity: 0; }
+#pimg img { position: absolute; left: 0; top: 0; width: 412px; display: block; }
+.notch { position: absolute; top: 12px; left: 50%; width: 118px; height: 34px; margin-left: -59px; border-radius: 20px; background: #000; z-index: 9; }
+#tap { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; background: rgba(255,255,255,.45); opacity: 0; z-index: 10; }
+
+/* lock screen */
+#lock { background: radial-gradient(120% 80% at 50% 0%, #1d4a5e 0%, #0d2733 55%, #061219 100%); }
+#lock .clock { position: absolute; top: 96px; width: 100%; text-align: center; font-size: 92px; font-weight: 600; letter-spacing: -.02em; }
+#lock .date { position: absolute; top: 74px; width: 100%; text-align: center; font: 500 21px var(--font-ar); color: #d6e2e8; }
+#notes { position: absolute; left: 14px; right: 14px; top: 250px; bottom: 0; overflow: hidden; }
+.note { position: absolute; left: 0; right: 0; height: 74px; border-radius: 22px; background: rgba(245,248,250,.16);
+  backdrop-filter: blur(8px); padding: 11px 14px; display: flex; gap: 12px; align-items: center; }
+.note .ic { width: 38px; height: 38px; border-radius: 10px; background: #25D366; flex: none; display: grid; place-items: center; }
+.note .ic svg { width: 24px; height: 24px; }
+.note .tx { flex: 1; min-width: 0; }
+.note .hd { display: flex; justify-content: space-between; font-size: 14px; color: #dbe5ea; }
+.note .hd b { font-weight: 600; color: #fff; }
+.note .nmsg { font: 400 17px var(--font-ar); direction: rtl; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* WhatsApp chat */
+.wa-bar { position: absolute; top: 0; left: 0; right: 0; height: 122px; padding: 56px 18px 0; background: var(--wa-bar); display: flex; align-items: center; gap: 12px; z-index: 2; }
+.wa-bar img { width: 46px; height: 46px; border-radius: 50%; }
+.wa-name { font: 600 20px var(--font-ar); direction: rtl; }
+.wa-sub { font-size: 14px; color: #8696A0; margin-top: 1px; }
+.wa-view { position: absolute; top: 122px; bottom: 72px; left: 0; right: 0; overflow: hidden;
+  background: #0B141A radial-gradient(circle at 20% 20%, rgba(255,255,255,.025) 0 2px, transparent 3px) 0 0/34px 34px; }
+#chatInner { position: absolute; left: 0; right: 0; top: 0; padding: 0 14px; }
+.wa-input { position: absolute; bottom: 0; left: 0; right: 0; height: 72px; background: var(--wa-bar); display: flex; align-items: center; padding: 0 14px 6px; gap: 10px; }
+.wa-input div { flex: 1; height: 42px; border-radius: 21px; background: #2A3942; }
+.wa-input span { width: 42px; height: 42px; border-radius: 50%; background: #00A884; }
+.item { position: relative; }
+.msg { position: absolute; left: 0; right: 0; top: 0; display: flex; padding-bottom: 8px; }
+.msg.out { justify-content: flex-end; }
+.bubble { max-width: 330px; padding: 8px 12px 6px; border-radius: 13px; background: var(--wa-in); color: #E9EDEF;
+  font: 400 18px/1.48 var(--font-ar); direction: rtl; text-align: right; white-space: pre-line; transform-origin: left bottom; }
+.out .bubble { background: var(--wa-out); transform-origin: right bottom; }
+.bubble small { display: block; direction: ltr; text-align: left; font: 12px var(--font); color: #8696A0; margin-top: 1px; }
+.out .bubble small { color: #8EB8AE; }
+.bubble b { font-weight: 600; }
+.voice { width: 300px; direction: ltr; display: flex; align-items: center; gap: 10px; padding: 4px 2px 0; }
+.voice .play { width: 0; height: 0; border-left: 15px solid #d7e9e4; border-top: 9px solid transparent; border-bottom: 9px solid transparent; flex: none; margin-left: 4px; }
+.voice .wave { flex: 1; height: 30px; display: flex; align-items: center; gap: 2px; }
+.voice .wave i { flex: 1; background: #8EB8AE; border-radius: 2px; }
+.voice .wave i.on { background: #4FD1A5; }
+.voice .av { width: 40px; height: 40px; border-radius: 50%; background: #6b7c85; flex: none; display: grid; place-items: center; font: 600 16px var(--font-ar); }
+.vmeta { display: flex; justify-content: space-between; direction: ltr; font: 12px var(--font); color: #8EB8AE; padding: 0 2px 0 58px; }
+.photo img { display: block; width: 290px; border-radius: 9px; }
+.photo { padding: 4px 4px 6px; }
+.loc .map { width: 290px; height: 150px; border-radius: 9px; background-size: cover; position: relative; }
+.loc .map::after { content: ""; position: absolute; left: 50%; top: 46%; width: 24px; height: 24px; margin: -24px 0 0 -12px;
+  border-radius: 50% 50% 50% 0; background: #E5484D; transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+.loc p { font: 500 16px var(--font-ar); padding: 6px 4px 0; }
+.link .card { background: rgba(0,0,0,.22); border-radius: 9px; padding: 9px 11px; margin-bottom: 6px; direction: ltr; text-align: left; display: flex; gap: 10px; align-items: center; }
+.link .card img { width: 44px; height: 44px; border-radius: 8px; background: #fff; }
+.link .card b { display: block; font: 600 15px var(--font); color: #E9EDEF; }
+.link .card span { font: 13px var(--font); color: #8696A0; }
+.link a { color: #53BDEB; text-decoration: none; direction: ltr; unicode-bidi: plaintext; }
+.typing { display: inline-flex; gap: 5px; padding: 14px 16px; border-radius: 13px; background: var(--wa-in); }
+.typing span { width: 8px; height: 8px; border-radius: 50%; background: #8696A0; }
+
+/* ---- cursor ------------------------------------------------------------------ */
+#cursor { position: absolute; left: 0; top: 0; width: 30px; height: 30px; z-index: 40; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); opacity: 0; transform-origin: 4px 2px; }
+#ripple { position: absolute; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; border: 3px solid rgba(212,169,75,.95); z-index: 39; opacity: 0; }
+
+/* ---- captions ------------------------------------------------------------------ */
+.cap { position: absolute; opacity: 0; z-index: 30; }
+.cap.card { left: 56px; bottom: 46px; max-width: 760px; padding: 22px 30px 24px; border-radius: 20px;
+  background: rgba(7,24,34,.94); box-shadow: 0 24px 60px rgba(0,0,0,.45); border: 1px solid rgba(184,145,63,.35); }
+.cap.card .t { font-size: 38px; font-weight: 700; line-height: 1.12; letter-spacing: -.012em; margin-top: 8px; }
+.cap.card .s { font-size: 22px; line-height: 1.4; color: var(--on-navy-muted); margin-top: 8px; }
+.cap.side { left: 150px; top: 50%; width: 760px; transform: translateY(-50%); }
+.cap.side .t { font-size: 66px; font-weight: 700; line-height: 1.05; letter-spacing: -.02em; margin-top: 18px; }
+.cap.side .s { font-size: 29px; line-height: 1.42; color: var(--on-navy-muted); margin-top: 22px; }
+.cap .t .gold { color: var(--gold); }
+.cap.top { left: 50%; top: 92px; transform: translateX(-50%); text-align: center; width: 1500px; }
+.cap.top .t { font-size: 46px; font-weight: 700; margin-top: 10px; }
+
+/* ---- titles --------------------------------------------------------------------- */
+#intro, #outro { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; opacity: 0; z-index: 20; }
+#intro svg { width: 140px; height: 140px; margin-bottom: 40px; }
+#intro .h1 { font-size: 100px; font-weight: 700; line-height: 1.02; letter-spacing: -.02em; margin-top: 24px; }
+#intro .gold { color: var(--gold); }
+#outro img { width: 760px; }
+#outro .label { margin-top: 46px; font-size: 26px; }
+#outro .lead { margin-top: 24px; font-size: 42px; font-weight: 600; }
+#outro .url { margin-top: 56px; font-size: 27px; color: var(--on-navy-muted); letter-spacing: .04em; }
+#outro .tag { position: absolute; bottom: 64px; font-size: 20px; color: var(--on-navy-muted); }
+#opening { z-index: 25; }
+#opening .line { position: absolute; left: 150px; width: 820px; font-size: 64px; font-weight: 700; line-height: 1.08; letter-spacing: -.02em; opacity: 0; }
+#opening .line.small { font-size: 30px; font-weight: 500; color: var(--on-navy-muted); letter-spacing: 0; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <div id="win">
+      <div id="bar"><i></i><i></i><i></i>
+        <div id="url"><svg viewBox="0 0 12 12"><path d="M3 5V3.6a3 3 0 0 1 6 0V5" fill="none" stroke="#5c6e76" stroke-width="1.4"/><rect x="2" y="5" width="8" height="6" rx="1.4" fill="#5c6e76"/></svg><span id="urlText"></span></div>
+      </div>
+      <div id="content"></div>
+    </div>
+  </div>
+  <svg id="cursor" viewBox="0 0 24 24"><path d="M4 2l15 11-6.5 1.2L16 21l-3 1.4-3.4-6.9L4 19z" fill="#fff" stroke="#0B222E" stroke-width="1.4" stroke-linejoin="round"/></svg>
+  <div id="ripple"></div>
+
+  <div id="phone">
+    <div id="screen">
+      <div class="notch"></div>
+      <div class="pmode" id="lock">
+        <div class="date">الجمعة، ٣٠ أكتوبر</div>
+        <div class="clock">9:47</div>
+        <div id="notes"></div>
+      </div>
+      <div class="pmode" id="pchat">
+        <div class="wa-bar"><img id="waLogo" alt=""><div><div class="wa-name">بيت المشويات</div><div class="wa-sub">online</div></div></div>
+        <div class="wa-view"><div id="chatInner"></div></div>
+        <div class="wa-input"><div></div><span></span></div>
+      </div>
+      <div class="pmode" id="pimg"></div>
+      <div id="tap"></div>
+    </div>
+  </div>
+
+  <div class="layer" id="opening">
+    <div class="line small" id="op1" style="top:300px">9:47 PM · Friday</div>
+    <div class="line" id="op2" style="top:360px">Your WhatsApp is full of orders.</div>
+    <div class="line" id="op3" style="top:520px"><span style="color:var(--gold)">Who's answering?</span></div>
+  </div>
+
+  <div class="layer" id="intro">
+    <svg viewBox="-15.6371 -15.6371 31.2742 31.2742" aria-hidden="true">
+      <circle id="m-ring" r="15.1816" fill="none" stroke="#B8913F" stroke-width="0.9109" transform="rotate(-90)"/>
+      <path id="m-arc1" d="M -8.1601 4.9335 C -2.7227 -3.2890 2.7287 -3.2890 8.1601 4.9335" fill="none" stroke="#FFFFFF" stroke-width="1.67" stroke-linecap="round"/>
+      <path id="m-arc2" d="M -5.6953 7.5936 C -1.8984 1.3944 1.8945 1.3944 5.6914 7.5936" fill="none" stroke="#B8913F" stroke-width="1.2904" stroke-linecap="round"/>
+      <circle id="m-dot" cx="0" cy="-5.121" r="1.67" fill="#FFFFFF"/>
+    </svg>
+    <div class="label" id="i-label">Everwake Orders</div>
+    <div class="h1" id="i-h1">Your WhatsApp,<br><span class="gold">taking orders.</span></div>
+  </div>
+
+  <div class="layer" id="outro">
+    <img src="../../brand/logo/everwake-lockup.svg" alt="Everwake" id="o-logo">
+    <div class="label" id="o-label">Everwake Orders</div>
+    <div class="lead" id="o-lead">One AI host. Every restaurant. Every branch.</div>
+    <div class="url" id="o-url">everwake.tech</div>
+    <div class="tag" id="o-tag">Intelligent automation, built to be owned.</div>
+  </div>
+
+  <div class="cap" id="capA"></div>
+  <div class="cap" id="capB"></div>
+</div>
+
+<script src="capture/shots/manifest.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// helpers
+// ════════════════════════════════════════════════════════════════════════════
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const easeInOut = (x) => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const smooth = (x) => x * x * (3 - 2 * x);
+const back = (x) => { const c = 1.4; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const lastAt = (list, t) => { let r = -1; for (let i = 0; i < list.length; i++) if (list[i].t <= t) r = i; return r; };
+
+const SH = window.SHOTS;
+const ST = SH.__state;
+const ORDER = ST.order.no;
+const SHOTS = 'capture/shots';
+function S(scene, name) {
+  // a frame by its name, or by its file's number when two share a name ("04-busy")
+  const f = SH[scene] && (SH[scene].frames.find((x) => x.name === name) || SH[scene].frames.find((x) => x.file.startsWith(name + '.') || x.file === name + '.jpg'));
+  if (!f) throw new Error(`no frame ${scene}/${name}`);
+  return { ...f, scene, src: `${SHOTS}/${scene}/${f.file}` };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// geometry: the window, and a camera that frames a rectangle of the app
+// (app rectangles are in the dashboard's CSS pixels, 1600 × 1000)
+// ════════════════════════════════════════════════════════════════════════════
+const S0 = 0.9, WX = 240, WY = 96, CX = 960, CY = 546;
+const FULL = [0, 0, 1600, 1000];
+function camera(rect) {
+  const [x, y, w, h] = rect;
+  const z = clamp(Math.min(1500 / (w * S0), 860 / (h * S0)), 1, 2.4);
+  let px = WX + (x + w / 2) * S0, py = WY + (y + h / 2) * S0;
+  if (z > 1.001) {
+    const left = CX / z, right = (1920 - CX) / z, up = CY / z, down = (1080 - CY) / z;
+    px = 1440 >= left + right ? clamp(px, WX + left - 20, WX + 1440 - right + 20) : WX + 720;
+    py = 900 >= up + down ? clamp(py, WY - 40 + up - 10, WY + 900 - down + 10) : WY + 450;
+  } else { px = WX + 720; py = WY + 450; }
+  return { z, px, py };
+}
+const toScreen = (cam, x, y) => ({ x: CX + cam.z * (WX + x * S0 - cam.px), y: CY + cam.z * (WY + y * S0 - cam.py) });
+const pad = (r, p) => [r.left - p, r.top - p, r.w + 2 * p, r.h + 2 * p];
+
+// ════════════════════════════════════════════════════════════════════════════
+// the timeline — built once, in order, with a running clock T
+// ════════════════════════════════════════════════════════════════════════════
+const TL = { win: [], frames: [], urls: [], cam: [{ t: 0, rect: FULL, dur: 0 }], cur: [], caps: [], phone: [], mode: [], pscroll: [],
+             chat: [], taps: [], sfx: [] };
+let T = 0;
+const at = (t) => { T = t; };
+const wait = (d) => { T += d; };
+const cap = (t, c) => TL.caps.push({ t, c });
+const camTo = (t, rect, dur = 1.1) => TL.cam.push({ t, rect, dur });
+const sfx = (t, kind) => TL.sfx.push([+t.toFixed(3), kind]);
+
+function show(scene, name, dur, o = {}) {
+  const f = S(scene, name);
+  TL.frames.push({ t: T, src: f.src, scroll: o.scroll || null, sticky: o.sticky ? S(...o.sticky).src : null });
+  if (o.url) TL.urls.push({ t: T, url: o.url });
+  if (o.cam) camTo(T + (o.camAt || 0), o.cam === 'focus' ? pad(f.focus || f.box, o.pad ?? 70) : o.cam, o.camDur ?? 1.1);
+  if (o.cap !== undefined) cap(T + (o.capAt || 0), o.cap);
+  if (f.cursor && !o.noCursor) {
+    const arrive = T + (o.arrive ?? Math.min(0.62, dur - 0.3));
+    TL.cur.push({ t: arrive, x: f.cursor.x, y: f.cursor.y, click: !!f.click });
+    if (f.click) sfx(arrive + 0.06, 'click');
+  } else if (o.hideCursor) TL.cur.push({ t: T, hide: true });
+  if (o.sfx) sfx(T + (o.sfxAt || 0), o.sfx);
+  T += dur;
+  return f;
+}
+const card = (label, title, sub) => ({ style: 'card', label, title, sub });
+const side = (label, title, sub) => ({ style: 'side', label, title, sub });
+const winOn = (t0, t1) => { TL.win.push({ t0, t1 }); sfx(t0, 'whoosh'); };
+const R = '/r/grill_house';
+
+// ── 1. cold open: the phone fills with orders ───────────────────────────────
+const NOTES = [
+  ['عمر', 'عايز أطلب دليفري 🍗'], ['سارة', 'فيه توصيل للتجمع؟'], ['يوسف', '🎤 رسالة صوتية (0:12)'], ['مريم', '📷 صورة'],
+  ['أحمد', 'ممكن المنيو؟'], ['هبة', 'لسه فاتحين؟'], ['كريم', 'عايز 2 كيلو كفتة'], ['نادين', '🎤 رسالة صوتية (0:14)'],
+  ['مروان', 'عندي عزومة بكرة لـ20 فرد'], ['ليلى', 'الطلب اتأخر؟'], ['خالد', 'بكام الريش؟'], ['دينا', 'عايزة أحجز ترابيزة']
+];
+TL.phone.push({ t0: 0.2, t1: 7.4, x: 1290, y: 80, from: 'below' });
+TL.mode.push({ t: 0, mode: 'lock' });
+NOTES.forEach((n, i) => sfx(0.7 + i * 0.34, i % 3 ? 'pop' : 'send'));
+const INTRO_AT = 7.2, DRUMS_IN = 8.75;
+
+// ── 2. the agent, on the customer's phone ───────────────────────────────────
+const CHAT_AT = 10.6;
+at(CHAT_AT);
+TL.phone.push({ t0: CHAT_AT - 0.5, t1: CHAT_AT + 30.6, x: 1270, y: 80, from: 'right' });
+TL.mode.push({ t: CHAT_AT - 0.5, mode: 'chat' });
+const C = (dt, item) => { TL.chat.push({ t: CHAT_AT + dt, ...item }); if (item.who) sfx(CHAT_AT + dt, item.who === 'out' ? 'send' : 'pop'); };
+C(0.6, { who: 'out', kind: 'voice', secs: 14, play: [1.3, 3.0], time: '8:16 PM' });
+C(3.0, { typing: 4.0 });
+C(4.0, { who: 'in', html: 'مساء النور 🌙 سمعتك:\n• كيلو كفتة مشوية — 540ج\n• فرخة مشوية كاملة، ليمون وثوم — 530ج\nتحبي تزودي حاجة؟', time: '8:16 PM' });
+cap(CHAT_AT + 0.3, side('The agent', 'Hears voice notes.', 'She said her order out loud. The agent wrote it down — with the prices.'));
+C(6.6, { who: 'out', kind: 'photo', caption: 'وده كمان، اتنين 👆', time: '8:17 PM' });
+C(7.8, { typing: 8.8 });
+C(8.8, { who: 'in', html: 'ضفت 2 أم علي — 180ج 😋\nوطلبك عدّى 1000ج، فليكي خصم 10%.\nابعتيلي اللوكيشن وأنا أحدد أقرب فرع.', time: '8:17 PM' });
+cap(CHAT_AT + 6.6, side('The agent', 'Reads photos.', 'A picture of the menu with one dish circled — added twice, and the offer applied.'));
+C(11.4, { who: 'out', kind: 'location', time: '8:18 PM' });
+C(12.2, { typing: 13.0 });
+C(13.0, { who: 'in', html: 'التجمع الخامس ✅ هيوصلك من فرع التجمع خلال 35–50 دقيقة، والتوصيل 30ج.\nاسم حضرتك إيه؟ وهتدفعي كاش ولا أونلاين؟', time: '8:18 PM' });
+cap(CHAT_AT + 11.4, side('The agent', 'Finds the branch from a pin.', 'Zone, fee and delivery time — from your map, never a guess.'));
+C(15.2, { who: 'out', html: 'نادين، أونلاين', time: '8:19 PM' });
+C(15.8, { typing: 16.6 });
+C(16.6, { who: 'in', html: 'تمام يا نادين 👌\n*طلبك:*\n• كيلو كفتة مشوية — 540ج\n• فرخة مشوية كاملة، ليمون وثوم — 530ج\n• 2 أم علي — 180ج\nخصم 10% — 125ج-\nضريبة 14% — 157.5ج\nالتوصيل — 30ج\n*الإجمالي — 1,312.5ج*\n\nكده كله مظبوط؟', time: '8:19 PM' });
+cap(CHAT_AT + 15.2, side('The agent', 'Never invents a price.', 'Every line from your menu. Every offer from your rules.'));
+C(19.2, { who: 'out', html: 'تمام', time: '8:20 PM' });
+C(19.8, { typing: 20.4 });
+C(20.4, { who: 'in', html: `اتأكد طلبك رقم *${ORDER}* 🎉 هيوصلك خلال 35–50 دقيقة. ولينك الدفع وصلك في الرسالة اللي جاية.`, time: '8:20 PM' });
+C(21.4, { who: 'in', kind: 'link', html: `لينك الدفع لطلبك ${ORDER} — 1,312.5ج:`, url: `orders.everwake.tech/p/${ST.order.ref}`, time: '8:20 PM' });
+cap(CHAT_AT + 21.4, side('Online payment', 'Pays by card or wallet.', 'A Paymob link right in the chat — confirmed the moment it is paid.'));
+TL.taps.push({ t: CHAT_AT + 23.0, x: 160, y: 0, linkTap: true });
+TL.mode.push({ t: CHAT_AT + 23.3, mode: 'img', src: S('phones', 'paid').src, w: 390 });
+cap(CHAT_AT + 23.3, side('Online payment', '<span class="gold">Paid.</span>', 'The page the payment link lands on — and WhatsApp hears it too.'));
+TL.mode.push({ t: CHAT_AT + 26.2, mode: 'chat' });
+C(26.6, { who: 'out', html: 'دفعت ✅', time: '8:21 PM' });
+C(27.4, { who: 'in', html: `وصلنا الدفع لطلبك رقم ${ORDER} ✅ شكراً ليكي!`, time: '8:21 PM' });
+cap(CHAT_AT + 30.4, null);
+
+// ── 3. the order lands on the board ──────────────────────────────────────────
+at(CHAT_AT + 30.6);
+const BOARD_AT = T;
+show('orders', 'board', 1.4, { url: `${R}/orders`, cap: card('The dashboard', 'It lands on your board — ringing.'), capAt: 0.4 });
+show('orders', 'ring-0', 0.25, { sfx: 'ding' }); show('orders', 'ring-1', 0.25); show('orders', 'ring-2', 0.25); show('orders', 'ring-3', 0.35);
+show('orders', 'arrived', 1.9, { cam: 'focus', pad: 120 });
+show('orders', 'open', 1.0, { arrive: 0.6 });
+show('orders', 'details', 3.4, { cam: [1030, 70, 570, 560], camAt: 0.1, cap: card('Every order', 'Everything she asked for — already paid.', 'Items, choices, the offer, the Visa payment and the address.') });
+show('orders', 'accept', 1.2, { cam: 'focus', pad: 140, camAt: 0, arrive: 0.8 });
+show('orders', 'accept-dialog', 1.0, { cam: [450, 260, 700, 560], cap: card('One tap', 'Accept — and she hears it on WhatsApp.', 'With the time it will take.') });
+show('orders', 'eta', 0.9, { arrive: 0.5 });
+show('orders', 'accept-tell', 1.0, { arrive: 0.55 });
+show('orders', 'accepted', 1.8, { cam: 'focus', pad: 160 });
+show('orders', 'driver', 1.1, { arrive: 0.6, cap: card('Delivery', 'Pick a driver. Out it goes.', 'Your own drivers — each step is a WhatsApp message to her.') });
+show('orders', 'driver-set', 1.3);
+show('orders', 'out', 1.0, { arrive: 0.55 });
+if (SH.orders.frames.some((f) => f.name === 'out-dialog')) { show('orders', 'out-dialog', 0.9); show('orders', 'out-confirm', 0.8, { arrive: 0.45 }); }
+show('orders', 'on-the-way', 2.0, { cam: 'focus', pad: 160 });
+winOn(BOARD_AT, T + 0.1);
+camTo(T - 0.4, FULL, 0.6);
+
+// ── 4. the driver's phone ────────────────────────────────────────────────────
+const DRIVER_AT = T + 0.3;
+TL.phone.push({ t0: DRIVER_AT, t1: DRIVER_AT + 7.6, x: 1270, y: 80, from: 'right' });
+TL.mode.push({ t: DRIVER_AT, mode: 'img', src: S('phones', 'driver-full').src, w: 390 });
+TL.pscroll.push({ t: DRIVER_AT + 2.6, y: 0 }, { t: DRIVER_AT + 4.6, y: 770 });
+cap(DRIVER_AT + 0.2, side('Drivers', 'Your own drivers, with the map.', 'Signed in from a WhatsApp link. She is told when they leave — and again when they are close.'));
+cap(DRIVER_AT + 7.4, null);
+
+// ── 5. the inbox: what the agent heard and saw, questions, taking over ───────
+at(DRIVER_AT + 7.9);
+const INBOX_AT = T;
+show('inbox', 'open', 1.2, { url: `${R}/inbox`, arrive: 0.7, cap: card('The inbox', 'Every chat, live.', 'The agent\'s replies, your team\'s, and the customer\'s.'), capAt: 0.3 });
+show('inbox', 'scroll-0', 3.4, { cam: [565, 150, 740, 280], camAt: 0.5, cap: card('The inbox', 'What it heard, written down.', 'Every voice note, transcribed under the message.') });
+show('inbox', 'scroll-0', 3.0, { cam: [565, 440, 740, 380], camAt: 0.1, cap: card('The inbox', 'What it saw, described.', 'Every photo, read — dish names and prices copied exactly.') });
+camTo(T - 0.3, FULL, 0.8);
+show('question', 'open', 1.2, { arrive: 0.7 });
+show('question', 'card', 3.0, { cam: [560, 120, 1040, 210], camAt: 0.3, cap: card('Questions', 'It asks you when only you know.', 'A tray for 20 tomorrow at 4? One tap answers.') });
+show('question', 'yes', 1.0, { arrive: 0.6 });
+show('question', 'answered', 2.2, { cam: [900, 820, 700, 180], camAt: 0.2, cap: card('Questions', '…and tells the customer for you.') });
+camTo(T - 0.2, FULL, 0.7);
+show('takeover', 'open', 1.2, { arrive: 0.7 });
+show('takeover', 'chat', 2.6, { cam: [560, 120, 1040, 220], camAt: 0.2, cap: card('Taking over', 'An unhappy customer? Step in.', 'The agent flags it. You take the chat — it stays quiet.') });
+camTo(T, [560, 640, 1040, 360], 0.9);
+show('takeover', 'focus', 0.9, { arrive: 0.5 });
+const tf = SH.takeover.frames.filter((f) => f.name.startsWith('type-'));
+tf.forEach((f, i) => show('takeover', f.name, i === tf.length - 1 ? 0.7 : 0.38, { noCursor: true, hideCursor: i === 0 }));
+show('takeover', 'send', 0.9, { arrive: 0.5 });
+show('takeover', 'sent', 2.0, { cap: card('Taking over', 'Your reply, in your words.') });
+camTo(T, FULL, 0.8);
+show('takeover', 'hand-back', 1.2, { arrive: 0.8 });
+show('takeover', 'handed-back', 2.4, { cap: card('Taking over', 'Hand it back — it read what you said.', 'Forget to? It goes back by itself after the time you set.') });
+
+// ── 6. the overview ────────────────────────────────────────────────────────────
+show('overview', 'top', 4.6, { url: R, cam: [258, 140, 1330, 150], camAt: 0.3, hideCursor: true,
+  cap: card('Overview', 'What WhatsApp saved you this month.', 'Every order here kept the 25% a delivery app would have taken.') });
+camTo(T - 0.6, FULL, 0.7);
+
+// ── 7. the menu ─────────────────────────────────────────────────────────────
+show('menu', 'list', 2.6, { url: `${R}/menu`, cap: card('The menu', 'Your menu, live.', 'Every change reaches the agent on its very next message.') });
+show('menu', 'stock', 1.0, { arrive: 0.6 });
+const today = S('menu', 'today');
+show('menu', 'stock-menu', 1.6, { cam: [today.box.left - 260, today.box.top - 200, today.box.w + 520, 380], cap: card('Out of stock', 'Sold out? Say for how long.', 'An hour, three hours, today, or until you switch it back.') });
+show('menu', 'today', 0.9, { arrive: 0.5 });
+show('menu', 'sold-out', 2.0, { cam: 'focus', pad: 90 });
+camTo(T, FULL, 0.7);
+show('menu', 'edit', 1.0, { arrive: 0.6 });
+show('menu', 'editor', 2.2, { cam: [820, 0, 780, 760], cap: card('Every dish', 'Sizes, add-ons, and prices per branch.') });
+show('menu', 'tab-choices', 0.8, { arrive: 0.45 });
+show('menu', 'editor-choices', 2.2);
+show('menu', 'tab-branches', 0.8, { arrive: 0.45 });
+show('menu', 'editor-branches', 2.2);
+camTo(T, FULL, 0.7);
+show('menu', 'branch', 1.0, { arrive: 0.6 });
+show('menu', 'branch-menu', 2.8, { cap: card('Branches', 'Each branch can sell differently.', 'Its own dishes and prices — switch many at once.') });
+show('brand', 'picture', 3.6, { url: `${R}/menu/pages`, cam: [250, 420, 760, 580], camAt: 0.2, hideCursor: true,
+  cap: card('Menu pictures', 'Designed from your live menu.', 'With your logo and colour — sent when a customer asks for the menu.') });
+camTo(T - 0.3, FULL, 0.6);
+show('import', 'sheet-tab', 1.2, { url: `${R}/menu/import`, cap: card('Import', 'Bring a whole menu in.', 'From a PDF, photos, a link or a spreadsheet.') });
+show('import', 'load', 1.0, { arrive: 0.6 });
+show('import', 'review', 3.0, { cam: [260, 60, 1340, 700], camAt: 0.2, cap: card('Import', 'Check it, then publish.', 'Every dish, price, size and add-on — before anything changes.') });
+camTo(T - 0.2, FULL, 0.6);
+
+// ── 8. branches and zones ───────────────────────────────────────────────────
+show('places', 'branches', 2.2, { url: `${R}/branches`, hideCursor: true, cap: card('Branches', 'Every branch — hours, fees, seating.') });
+show('places', 'busy-button', 1.0, { arrive: 0.6 });
+show('places', 'busy-options', 1.8, { cam: [310, 210, 980, 560], cap: card('Too busy', 'Pause one branch for a while.', 'The agent offers another — and it starts again by itself.') });
+show('places', 'busy-pick', 0.9, { arrive: 0.5 });
+show('places', 'busy', 1.8, { cam: FULL });
+show('places', 'zones', 2.2, { url: `${R}/zones`, hideCursor: true, cap: card('Delivery zones', 'Drawn on a map, each with its fee.', 'A location pin decides the zone, the branch and the fee.') });
+show('places', 'test', 0.9, { arrive: 0.5 });
+show('places', 'pin-1-aim', 0.9, { arrive: 0.5, noCursor: false });
+const pinNote = { t: T };
+show('places', 'pin-1', 2.4, { cam: [900, 80, 700, 480], camAt: 0.5, cap: card('Delivery zones', 'Test any spot before you go live.', 'Zone → branch → fee: exactly what the agent will use.') });
+camTo(T, FULL, 0.6);
+show('places', 'pin-2-aim', 0.9, { arrive: 0.5 });
+show('places', 'pin-2', 2.4, { cam: [900, 80, 700, 480], camAt: 0.5, cap: card('Delivery zones', 'Outside every zone?', 'The agent offers pickup instead of promising a delivery.') });
+camTo(T - 0.2, FULL, 0.6);
+
+// ── 9. bookings and customers ───────────────────────────────────────────────
+show('bookings', 'list', 2.2, { url: `${R}/reservations`, hideCursor: true, cap: card('Table bookings', 'Booked in the chat, confirmed by you.') });
+show('bookings', 'confirm', 1.0, { arrive: 0.6 });
+show('bookings', 'confirmed', 2.0, { cap: card('Table bookings', 'Confirm — they hear it on WhatsApp.') });
+show('customers', 'list', 2.0, { url: `${R}/customers`, hideCursor: true, cap: card('Customers', 'Everyone who wrote, remembered.', 'Last order, addresses — even when WhatsApp hides the number.') });
+show('customers', 'open', 1.0, { arrive: 0.6 });
+show('customers', 'customer', 2.4, { cam: [1100, 0, 500, 640], camAt: 0.1 });
+camTo(T - 0.2, FULL, 0.6);
+
+// ── 10. growing ──────────────────────────────────────────────────────────────
+show('growth', 'top', 3.0, { url: `${R}/growth`, hideCursor: true, cam: [258, 300, 1330, 560], camAt: 0.3,
+  cap: card('Get customers', 'Win your customers back from the apps.', 'A link and QR code for every branch, bag, flyer and post.') });
+camTo(T, FULL, 0.6);
+show('growth', 'full', 3.4, { sticky: ['growth', 'top'], scroll: [{ t: 0.4, y: 0 }, { t: 1.8, y: 317 }],
+  cap: card('Get customers', 'See what each one brought.', 'Chats, orders, sales — and the commission you kept.'), capAt: 0.6 });
+show('pages', 'offers', 2.6, { url: `${R}/offers`, cap: card('Offers', 'WhatsApp-only deals, applied by the cart.', 'Percent or amount off, free delivery, a free dish, promo codes.') });
+
+// ── 11. analytics ────────────────────────────────────────────────────────────
+show('analytics', 'sales', 3.0, { url: `${R}/analytics`, cam: [258, 200, 1330, 340], camAt: 0.3,
+  cap: card('Analytics', 'What WhatsApp ordering brings in.', 'Orders, revenue, chats that ordered — and commission saved.') });
+camTo(T, FULL, 0.6);
+show('analytics', 'sales-full', 2.8, { sticky: ['analytics', 'sales'], scroll: [{ t: 0.3, y: 0 }, { t: 1.8, y: 439 }] });
+show('analytics', 'missed', 1.0, { arrive: 0.6 });
+show('analytics', 'missed-sales', 2.8, { cap: card('Analytics', 'And the sales you missed.', 'Carts left, out of the delivery area, written while closed.') });
+
+// ── 12. settings ────────────────────────────────────────────────────────────
+show('pages', 'agent', 2.4, { url: `${R}/settings/agent`, hideCursor: true, cap: card('Settings', 'Give the agent its name and voice.', 'And the facts it may tell customers.') });
+show('pages', 'messages', 2.4, { url: `${R}/settings/messages`, cap: card('Settings', 'Every automatic message, in your words.') });
+show('pages', 'payments', 2.4, { url: `${R}/settings/payments`, cap: card('Settings', 'Paymob, connected.', 'Card or mobile wallet, through a link.') });
+show('pages', 'report', 2.6, { url: `${R}/settings/report`, cam: [990, 120, 610, 560], camAt: 0.3, cap: card('Settings', 'A daily report on WhatsApp.', 'The day in one message, to the owner.') });
+camTo(T - 0.2, FULL, 0.5);
+
+// ── 13. Arabic ───────────────────────────────────────────────────────────────
+show('arabic', 'orders', 1.7, { url: `${R}/orders`, cap: card('العربية', 'Arabic or English — for the whole team.') });
+show('arabic', 'overview', 1.5, { url: R });
+show('arabic', 'menu', 1.5, { url: `${R}/menu` });
+show('arabic', 'analytics', 1.6, { url: `${R}/analytics` });
+
+// ── 14. the agent switch ─────────────────────────────────────────────────────
+show('switch', 'on', 1.1, { url: `${R}/orders`, arrive: 0.7, cap: card('The agent switch', 'Kitchen full? One switch.') });
+show('switch', 'ask-off', 1.6, { cam: [400, 230, 800, 560] });
+show('switch', 'why', 1.2);
+show('switch', 'switch-off', 0.9, { arrive: 0.5 });
+const BREAK_AT = T;
+show('switch', 'off', 2.6, { cam: FULL, cap: card('The agent switch', 'Off: one warm apology for everyone.', 'Each person who writes is remembered.') });
+show('switch', 'off-button', 1.1, { arrive: 0.7 });
+show('switch', 'ask-on', 1.6, { cam: [400, 230, 800, 560] });
+show('switch', 'switch-on', 0.9, { arrive: 0.5 });
+const BREAK_END = T;
+show('switch', 'on-again', 2.4, { cam: FULL, cap: card('The agent switch', 'On: they all hear you are back.') });
+winOn(INBOX_AT, T + 0.1);
+cap(T - 0.2, null);
+
+// ── outro ────────────────────────────────────────────────────────────────────
+const OUTRO_AT = T + 0.6;
+const DURATION = OUTRO_AT + 9;
+window.DURATION = DURATION;
+window.TL = TL;
+window.MARKS = { CHAT_AT, BOARD_AT, DRIVER_AT, INBOX_AT, BREAK_AT, BREAK_END, OUTRO_AT };
+window.CUES = { duration: DURATION, drums_in: DRUMS_IN, break: [BREAK_AT + 0.4, BREAK_END + 0.1], outro: OUTRO_AT + 1, sfx: TL.sfx.sort((a, b) => a[0] - b[0]) };
+
+// ════════════════════════════════════════════════════════════════════════════
+// building the DOM
+// ════════════════════════════════════════════════════════════════════════════
+const IMGS = new Map();
+function contentImg(src, cls = '') {
+  const key = src + '|' + cls;
+  if (!IMGS.has(key)) {
+    const img = new Image();
+    img.src = src; img.className = cls; img.decoding = 'sync';
+    $('content').appendChild(img);
+    IMGS.set(key, img);
+  }
+  return IMGS.get(key);
+}
+const PIMGS = new Map();
+function phoneImg(src) {
+  if (!PIMGS.has(src)) { const img = new Image(); img.src = src; $('pimg').appendChild(img); PIMGS.set(src, img); }
+  return PIMGS.get(src);
+}
+
+function buildNotes() {
+  const box = $('notes');
+  const wa = '<svg viewBox="0 0 24 24"><path fill="#fff" d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3zm4.6 12.6c-.2.6-1.1 1.1-1.6 1.2-.4.1-1 .1-1.6-.1a13 13 0 0 1-5.2-4.6c-.4-.6-.9-1.6-.9-2.5s.5-1.5.7-1.7c.2-.2.4-.3.6-.3h.4c.1 0 .3 0 .5.4l.7 1.6c.1.1.1.3 0 .4l-.3.5-.3.3c-.1.1-.2.3-.1.5.2.3.7 1.1 1.4 1.7.9.8 1.7 1.1 2 1.2.2.1.4.1.5-.1l.7-.8c.2-.2.3-.2.5-.1l1.6.8c.2.1.4.2.4.3.1.1.1.6-.1 1.2z"/></svg>';
+  NOTES.forEach(([who, msg], i) => {
+    const d = document.createElement('div');
+    d.className = 'note';
+    d.innerHTML = `<div class="ic">${wa}</div><div class="tx"><div class="hd"><span><b>WhatsApp</b></span><span>now</span></div>
+      <div class="nmsg"><b>${who}</b> · ${msg}</div></div>`;
+    box.appendChild(d);
+  });
+}
+
+const md = (s) => s.replace(/\*([^*]+)\*/g, '<b>$1</b>');
+function buildChat() {
+  $('waLogo').src = `${SHOTS}/assets/grill-house-logo.png`;
+  const inner = $('chatInner');
+  const zones = S('places', 'zones').src;
+  for (const m of TL.chat) {
+    const item = document.createElement('div');
+    item.className = 'item';
+    const row = document.createElement('div');
+    if (m.typing) {
+      row.className = 'msg in';
+      row.innerHTML = '<div class="bubble typing"><span></span><span></span><span></span></div>';
+    } else {
+      row.className = 'msg ' + m.who;
+      let body = '';
+      if (m.kind === 'voice') {
+        const bars = Array.from({ length: 34 }, (_, i) => `<i style="height:${6 + Math.round(22 * Math.abs(Math.sin(i * 1.7) * Math.cos(i * .45)))}px"></i>`).join('');
+        body = `<div class="voice"><div class="av">ن</div><div class="play"></div><div class="wave">${bars}</div></div><div class="vmeta"><span>0:${m.secs}</span></div>`;
+      } else if (m.kind === 'photo') {
+        body = `<div class="photo"><img src="${SHOTS}/assets/photo-nadeen.jpg"></div>${md(m.caption)}`;
+      } else if (m.kind === 'location') {
+        body = `<div class="loc"><div class="map" style="background-image:url('${zones}');background-size:1100px auto;background-position:-560px -420px"></div><p>📍 الموقع الحالي</p></div>`;
+      } else if (m.kind === 'link') {
+        body = `<div class="link"><div class="card"><img src="${SHOTS}/assets/grill-house-logo.png"><div><b>بيت المشويات · Pay 1,312.5 EGP</b><span>Card or mobile wallet</span></div></div>${md(m.html)}\n<a>${m.url}</a>\nاللينك شغال لحد ساعة من دلوقتي.</div>`;
+      } else body = md(m.html);
+      row.innerHTML = `<div class="bubble${m.kind ? ' k-' + m.kind : ''}">${body}<small>${m.time}${m.who === 'out' ? ' ✓✓' : ''}</small></div>`;
+    }
+    item.appendChild(row);
+    inner.appendChild(item);
+    m.item = item; m.row = row; m.bubble = row.firstChild;
+    if (m.kind === 'voice') m.bars = [...row.querySelectorAll('.wave i')];
+    if (m.kind === 'link') m.linkEl = row.querySelector('a');
+  }
+}
+function measureChat() { for (const m of TL.chat) m.h = m.row.offsetHeight; }
+
+// ════════════════════════════════════════════════════════════════════════════
+// rendering one moment
+// ════════════════════════════════════════════════════════════════════════════
+function camAt(t) {
+  let state = camera(FULL), from = FULL;
+  for (const k of TL.cam) {
+    if (k.t > t) break;
+    const p = k.dur ? easeInOut(prog(t, k.t, k.t + k.dur)) : 1;
+    const r = from.map((v, i) => lerp(v, k.rect[i], p));
+    state = camera(r);
+    from = p >= 1 ? k.rect : r;
+  }
+  return state;
+}
+
+function visible(list, t, fadeIn = .6, fadeOut = .6) {
+  for (const w of list) if (t >= w.t0 && t <= w.t1 + fadeOut) return { w, k: Math.min(easeOut(prog(t, w.t0, w.t0 + fadeIn)), 1 - easeInOut(prog(t, w.t1, w.t1 + fadeOut))) };
+  return null;
+}
+
+function renderWindow(t) {
+  const v = visible(TL.win, t, .7, .7);
+  const world = $('world');
+  if (!v) { world.style.opacity = 0; return null; }
+  const cam = camAt(t);
+  world.style.opacity = v.k;
+  const lift = (1 - v.k) * 90;
+  world.style.transform = `translate(${CX - cam.z * cam.px}px, ${CY - cam.z * cam.py + lift}px) scale(${cam.z})`;
+
+  const i = lastAt(TL.frames, t);
+  for (const img of IMGS.values()) img.style.opacity = 0;
+  const showFrame = (f, alpha, z) => {
+    const img = contentImg(f.src);
+    let y = 0;
+    if (f.scroll) {
+      y = f.scroll[0].y;
+      for (let k = 1; k < f.scroll.length; k++) y = lerp(y, f.scroll[k].y, easeInOut(prog(t - f.t, f.scroll[k - 1].t, f.scroll[k].t)));
+    }
+    img.style.opacity = alpha; img.style.zIndex = z;
+    img.style.transform = `translateY(${-y * S0}px)`;
+    if (f.sticky) {
+      const side = contentImg(f.sticky, 'sticky-side'), head = contentImg(f.sticky, 'sticky-head');
+      side.style.clipPath = `inset(0 ${(1600 - 240) * S0}px 0 0)`; head.style.clipPath = `inset(0 0 ${(1000 - 56) * S0}px ${240 * S0}px)`;
+      side.style.opacity = head.style.opacity = alpha; side.style.zIndex = head.style.zIndex = z + 1;
+    }
+  };
+  if (i >= 0) {
+    const f = TL.frames[i];
+    const a = smooth(prog(t, f.t, f.t + .22));
+    if (i > 0 && a < 1) showFrame(TL.frames[i - 1], 1, 1);
+    showFrame(f, i > 0 ? a : 1, 2);
+  }
+  const u = lastAt(TL.urls, t);
+  $('urlText').textContent = 'orders.everwake.tech' + (u >= 0 ? TL.urls[u].url : '');
+  return cam;
+}
+
+function renderCursor(t, cam) {
+  const cur = $('cursor'), rip = $('ripple');
+  cur.style.opacity = 0; rip.style.opacity = 0;
+  if (!cam || $('world').style.opacity < .99) return;
+  const list = TL.cur;
+  let p = -1;
+  for (let k = 0; k < list.length; k++) if (list[k].t <= t) p = k;
+  const n = p + 1 < list.length ? list[p + 1] : null;
+  const prev = p >= 0 ? list[p] : null;
+  let pos = null, alpha = 1;
+  if (n && !n.hide) {
+    const start = Math.max(prev ? prev.t + .15 : -1, n.t - .6);
+    if (t >= start) {
+      const from = prev && !prev.hide ? prev : { x: n.x + 120, y: n.y + 160 };
+      const k = easeInOut(prog(t, start, n.t));
+      pos = { x: lerp(from.x, n.x, k), y: lerp(from.y, n.y, k) };
+      if (!prev || prev.hide) alpha = prog(t, start, start + .25);
+    }
+  }
+  if (!pos && prev && !prev.hide) pos = prev;
+  if (!pos) return;
+  // hide when the window changes scene (no cursor waiting on the next one)
+  if (prev && !n && t - prev.t > 2.5) return;
+  const s = toScreen(cam, pos.x, pos.y);
+  const press = prev && prev.click && t - prev.t < .16 && t >= prev.t ? .82 : 1;
+  cur.style.opacity = alpha;
+  cur.style.transform = `translate(${s.x - 4}px, ${s.y - 2}px) scale(${press})`;
+  if (prev && prev.click && t - prev.t >= 0 && t - prev.t < .55) {
+    const k = prog(t - prev.t, 0, .55);
+    const ps = toScreen(cam, prev.x, prev.y);
+    rip.style.opacity = 1 - k;
+    rip.style.transform = `translate(${ps.x}px, ${ps.y}px) scale(${.4 + k * 1.1})`;
+    rip.style.left = '0px'; rip.style.top = '0px';
+  }
+}
+
+function renderPhone(t) {
+  const ph = $('phone');
+  const v = visible(TL.phone, t, .7, .6);
+  if (!v) { ph.style.opacity = 0; return; }
+  const k = v.k;
+  const dx = v.w.from === 'right' ? (1 - k) * 260 : 0, dy = v.w.from === 'below' ? (1 - k) * 220 : 0;
+  ph.style.opacity = k;
+  ph.style.left = v.w.x - 220 + 'px';
+  ph.style.transform = `translate(${dx}px, ${dy}px)`;
+
+  // which screen: lock, chat or a picture
+  const mi = lastAt(TL.mode, t);
+  const cur = TL.mode[mi], prev = mi > 0 ? TL.mode[mi - 1] : null;
+  const a = smooth(prog(t, cur.t, cur.t + .35));
+  const layers = { lock: $('lock'), chat: $('pchat'), img: $('pimg') };
+  for (const el of Object.values(layers)) el.style.opacity = 0;
+  if (prev && a < 1 && prev.mode !== cur.mode) layers[prev.mode].style.opacity = 1;
+  layers[cur.mode].style.opacity = prev && prev.mode !== cur.mode ? a : 1;
+  for (const img of PIMGS.values()) img.style.opacity = 0;
+  for (const m of [prev, cur]) {
+    if (!m || m.mode !== 'img') continue;
+    const img = phoneImg(m.src);
+    img.style.opacity = 1;
+    let y = 0;
+    const sc = TL.pscroll.filter((s) => s.t >= m.t - 1 && s.t <= m.t + 30);
+    if (m === cur && sc.length > 1) { y = sc[0].y; for (let q = 1; q < sc.length; q++) y = lerp(y, sc[q].y, easeInOut(prog(t, sc[q - 1].t, sc[q].t))); }
+    img.style.transform = `translateY(${-y * 412 / m.w}px)`;
+  }
+  if (cur.mode === 'lock' || (prev && prev.mode === 'lock')) renderLock(t);
+  if (cur.mode === 'chat' || (prev && prev.mode === 'chat')) renderChat(t);
+
+  const tap = $('tap');
+  tap.style.opacity = 0;
+  for (const tp of TL.taps) {
+    if (t >= tp.t && t < tp.t + .5) {
+      const k2 = prog(t, tp.t, tp.t + .5);
+      let x = tp.x, y = tp.y;
+      if (tp.linkTap) {
+        const m = TL.chat.find((c) => c.kind === 'link');
+        const r = m.linkEl.getBoundingClientRect(), sr = $('screen').getBoundingClientRect();
+        x = r.left - sr.left + r.width / 2; y = r.top - sr.top + r.height / 2;
+      }
+      tap.style.opacity = .9 * (1 - k2);
+      tap.style.left = x + 'px'; tap.style.top = y + 'px';
+      tap.style.transform = `scale(${.5 + k2 * .9})`;
+    }
+  }
+}
+
+function renderLock(t) {
+  const items = [...$('notes').children];
+  const shown = NOTES.map((_, i) => easeOut(prog(t, .7 + i * .34, .7 + i * .34 + .3)));
+  // newest on top: each new note pushes the others down
+  items.forEach((el, i) => {
+    let y = 0;
+    for (let j = i + 1; j < items.length; j++) y += shown[j] * 82;
+    el.style.opacity = shown[i];
+    el.style.transform = `translateY(${y - (1 - shown[i]) * 30}px) scale(${.94 + .06 * shown[i]})`;
+  });
+}
+
+function renderChat(t) {
+  let total = 0;
+  for (const m of TL.chat) {
+    let k;
+    if (m.typing) k = easeOut(prog(t, m.t, m.t + .25)) * (1 - prog(t, m.typing - .15, m.typing));
+    else k = easeOut(prog(t, m.t, m.t + .35));
+    m.item.style.height = (m.h * k) + 'px';
+    const pop = m.typing ? k : back(prog(t, m.t, m.t + .4));
+    m.bubble.style.opacity = k;
+    m.bubble.style.transform = `scale(${lerp(.6, 1, clamp(pop, 0, 1.1))})`;
+    if (m.typing) m.bubble.querySelectorAll('span').forEach((s, i) => { s.style.transform = `translateY(${Math.sin(t * 9 - i * 1.1) * 3.5}px)`; });
+    if (m.bars) {
+      const played = prog(t, CHAT_AT + m.play[0], CHAT_AT + m.play[1]);
+      m.bars.forEach((b, i) => b.classList.toggle('on', i / m.bars.length < played));
+    }
+    total += m.h * k;
+  }
+  const view = 892 - 122 - 72;
+  $('chatInner').style.top = Math.min(12, view - total - 4) + 'px';
+}
+
+let capKey = ['', ''];
+function capHTML(c) {
+  return `<div class="label">${c.label || ''}</div><div class="t">${c.title}</div>${c.sub ? `<div class="s">${c.sub}</div>` : ''}`;
+}
+function renderCaps(t) {
+  const i = lastAt(TL.caps, t);
+  const slots = [$('capA'), $('capB')];
+  slots.forEach((s) => { s.style.opacity = 0; });
+  if (i < 0) return;
+  const put = (idx, alpha, rise) => {
+    const c = TL.caps[idx].c;
+    const slot = slots[idx % 2];
+    if (!c) return;
+    const key = idx + c.title;
+    if (capKey[idx % 2] !== key) { slot.className = 'cap ' + c.style; slot.innerHTML = capHTML(c); capKey[idx % 2] = key; }
+    slot.style.opacity = alpha;
+    const base = c.style === 'side' ? 'translateY(-50%) ' : c.style === 'top' ? 'translateX(-50%) ' : '';
+    slot.style.transform = base + `translateY(${rise}px)`;
+  };
+  const cur = TL.caps[i];
+  const k = easeOut(prog(t, cur.t, cur.t + .5));
+  if (i > 0 && k < 1) put(i - 1, 1 - k, -10 * k);
+  put(i, k, (1 - k) * 18);
+}
+
+function renderOpening(t) {
+  const op = $('opening');
+  const out = 1 - prog(t, INTRO_AT - .4, INTRO_AT + .2);
+  op.style.opacity = out;
+  [['op1', .5], ['op2', 1.5], ['op3', 3.6]].forEach(([id, a]) => {
+    const k = easeOut(prog(t, a, a + .8));
+    $(id).style.opacity = k;
+    $(id).style.transform = `translateY(${(1 - k) * 30}px)`;
+  });
+}
+
+function renderIntro(t) {
+  const el = $('intro');
+  const k = prog(t, INTRO_AT, INTRO_AT + .3) * (1 - prog(t, CHAT_AT - 1.2, CHAT_AT - .4));
+  el.style.opacity = k;
+  if (k <= 0) return;
+  const s = t - INTRO_AT;
+  const ring = $('m-ring'), L = 2 * Math.PI * 15.1816;
+  ring.style.strokeDasharray = L;
+  ring.style.strokeDashoffset = L * (1 - easeInOut(prog(s, .1, 1.1)));
+  for (const [id, a] of [['m-arc1', .5], ['m-arc2', .7]]) {
+    const p = $(id), l = p.getTotalLength();
+    p.style.strokeDasharray = l; p.style.strokeDashoffset = l * (1 - easeOut(prog(s, a, a + .5)));
+  }
+  $('m-dot').style.transformOrigin = '0 -5.121px';
+  $('m-dot').style.transform = `scale(${clamp(back(prog(s, 1.0, 1.35)), 0, 1.3)})`;
+  for (const [id, a] of [['i-label', 1.0], ['i-h1', DRUMS_IN - INTRO_AT - .2]]) {
+    const q = easeOut(prog(s, a, a + .7));
+    $(id).style.opacity = q; $(id).style.transform = `translateY(${(1 - q) * 40}px)`;
+  }
+}
+
+function renderOutro(t) {
+  const el = $('outro');
+  const s = t - OUTRO_AT;
+  el.style.opacity = s < 0 ? 0 : 1 - prog(t, DURATION - 1.2, DURATION);
+  if (s < 0) return;
+  const lg = easeOut(prog(s, .1, 1.1));
+  $('o-logo').style.opacity = lg; $('o-logo').style.transform = `scale(${lerp(.92, 1, lg)})`;
+  for (const [id, a] of [['o-label', .8], ['o-lead', 1.1], ['o-url', 1.6], ['o-tag', 2.0]]) {
+    const q = easeOut(prog(s, a, a + .8));
+    $(id).style.opacity = q; $(id).style.transform = `translateY(${(1 - q) * 24}px)`;
+  }
+}
+
+window.render = async function (t) {
+  renderOpening(t);
+  renderIntro(t);
+  renderPhone(t);
+  const cam = renderWindow(t);
+  renderCursor(t, cam);
+  renderCaps(t);
+  renderOutro(t);
+  // pictures must be ready before the frame is taken
+  const pending = [...IMGS.values(), ...PIMGS.values()].filter((i) => i.style.opacity > 0 && !i.complete);
+  if (pending.length) await Promise.all(pending.map((i) => i.decode().catch(() => {})));
+};
+
+window.ready = (async () => {
+  for (const w of [400, 500, 600]) await document.fonts.load(`${w} 20px "Plex Arabic"`, 'عربي');
+  await document.fonts.ready;
+  buildNotes();
+  buildChat();
+  await Promise.all([...document.images].map((i) => i.decode().catch(() => {})));
+  measureChat();
+  await window.render(0);
+})();
+
+if (!navigator.webdriver) {
+  window.ready.then(() => {
+    let start = performance.now();
+    document.addEventListener('click', () => { start = performance.now(); });
+    const loop = async (now) => { await window.render(((now - start) / 1000) % DURATION); requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>
