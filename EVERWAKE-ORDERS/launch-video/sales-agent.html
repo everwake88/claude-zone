@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>AI Sales Agent</title>
 <!--
-  Everwake's AI sales agent for e-commerce: a 16:9 film for LinkedIn.
+  Everwake's AI sales agent for E-commerce: a 16:9 film for LinkedIn.
   Every store, customer, product, price and number in it is made up.
 
   Like film.html, the page is a timeline: window.render(t) draws any moment,
@@ -309,7 +309,12 @@ body { font-family: var(--en); color: #fff; -webkit-font-smoothing: antialiased;
 #s10 .line .g { color: var(--gold-b); }
 #s10 .sub { left: 0; right: 0; top: 590px; text-align: center; font: 400 32px/1.3 var(--en); color: var(--on-muted); }
 #s10 .stack { left: 0; right: 0; top: 690px; display: flex; justify-content: center; gap: 14px; }
-#s10 .stack div { font: 600 24px/1 var(--en); color: #fff; padding: 14px 20px; border-radius: 999px; border: 1px solid var(--hair-d); background: rgba(255,255,255,.05); white-space: nowrap; }
+#s10 .stack { align-items: center; gap: 18px; }
+#s10 .stack div { display: flex; align-items: center; gap: 14px; font: 600 30px/1 var(--en); color: #fff; padding: 14px 26px 14px 16px; border-radius: 999px; border: 1px solid var(--hair-d); background: rgba(255,255,255,.05); white-space: nowrap; }
+#s10 .stack div.plus { border: 0; background: none; padding: 0; color: var(--gold-b); font-size: 36px; }
+#s10 .stack .icons { display: flex; gap: 6px; }
+#s10 .stack .ico { width: 40px; height: 40px; }
+#s10 .stack .lang { width: 40px; height: 40px; border-radius: 50%; background: var(--gold-b); color: var(--deep); display: grid; place-items: center; font: 700 17px/1 var(--ar); }
 #s10 .cta { left: 0; right: 0; top: 820px; display: flex; justify-content: center; }
 #s10 .cta div { font: 700 36px/1 var(--en); color: var(--deep); background: var(--gold-b); padding: 24px 40px; border-radius: 999px; }
 #s10 .orb { position: absolute; }
@@ -515,9 +520,9 @@ CleanBot S9 للحين في سلتك
 <section class="scene dark" id="s10"><div class="cam">
   <div class="orbs"></div>
   <img class="abs lock" src="../../brand/logo/everwake-lockup.svg" alt="Everwake">
-  <div class="abs line">AI sales agents for <span class="g">e-commerce.</span></div>
+  <div class="abs line">AI sales agents for <span class="g">E-commerce.</span></div>
   <div class="abs sub">White-label, one setup per client, every store covered.</div>
-  <div class="abs stack"><div>WhatsApp Cloud API</div><div>Instagram</div><div>Shopify</div><div>n8n</div><div>Gulf · Egyptian · Levantine · English</div></div>
+  <div class="abs stack"><div><span class="icons"><svg class="ico wa"></svg><svg class="ico ig"></svg><svg class="ico ms"></svg><svg class="ico web"></svg></span>Your social channels</div><div class="plus">+</div><div><svg class="ico bag"></svg>Your online store</div><div class="plus">+</div><div><span class="lang ltr">ع&thinsp;A</span>Any dialect, any language</div></div>
   <div class="abs cta"><div>Book a free demo · everwake.tech</div></div>
 </div></section>
 
@@ -570,9 +575,16 @@ const cue = (t, kind) => SFX.push([+t.toFixed(3), kind]);
 // icons
 const WA = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#25D366"/><path d="M8.7 6.9c.3-.3.8-.3 1 .1l1.1 2c.2.3.1.7-.2 1l-.7.6c.7 1.3 1.7 2.3 3 3l.6-.7c.3-.3.7-.4 1-.2l2 1.1c.4.2.4.7.1 1l-1 1c-.7.6-1.7.7-2.5.3-2.3-1.1-4.2-3-5.3-5.3-.4-.8-.3-1.8.3-2.5z" fill="#fff"/></svg>';
 const IG = '<svg viewBox="0 0 24 24"><defs><linearGradient id="igg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#F58529"/><stop offset=".5" stop-color="#DD2A7B"/><stop offset="1" stop-color="#8134AF"/></linearGradient></defs><rect x="1" y="1" width="22" height="22" rx="6.5" fill="url(#igg)"/><rect x="5.5" y="5.5" width="13" height="13" rx="4" fill="none" stroke="#fff" stroke-width="1.8"/><circle cx="12" cy="12" r="3.1" fill="none" stroke="#fff" stroke-width="1.8"/><circle cx="16.4" cy="7.6" r="1.1" fill="#fff"/></svg>';
+const MS = '<svg viewBox="0 0 24 24"><defs><linearGradient id="msg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0099FF"/><stop offset=".6" stop-color="#A033FF"/><stop offset="1" stop-color="#FF5280"/></linearGradient></defs><path d="M12 1.5C6.1 1.5 1.5 5.9 1.5 11.6c0 3 1.2 5.6 3.3 7.4v3.5l3.2-1.8c1.2.3 2.5.5 4 .5 5.9 0 10.5-4.4 10.5-10.1S17.9 1.5 12 1.5z" fill="url(#msg)"/><path d="M5.8 14.4l3.4-5.4 3 2.3 3.2-2.3-3.4 5.4-3-2.3z" fill="#fff"/></svg>';
+const WEB = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#16384A"/><circle cx="12" cy="12" r="7" fill="none" stroke="#fff" stroke-width="1.5"/><ellipse cx="12" cy="12" rx="3" ry="7" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M5 12h14" stroke="#fff" stroke-width="1.5"/></svg>';
+const BAG = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#D4A94B"/><path d="M7.2 9h9.6l-.8 8.2H8z" fill="#071822"/><path d="M9.6 9V7.8a2.4 2.4 0 0 1 4.8 0V9" fill="none" stroke="#071822" stroke-width="1.6"/></svg>';
+// every Instagram icon gets its own gradient id: an id shared with a hidden scene draws nothing
+let igN = 0;
+const ig = () => IG.replaceAll('igg', `igg${++igN}`);
 function fillIcons() {
   $$('svg.ico.wa').forEach((s) => { s.outerHTML = WA.replace('<svg', `<svg class="${s.getAttribute('class')}" style="${s.getAttribute('style') || ''}"`); });
-  $$('svg.ico.ig').forEach((s) => { s.outerHTML = IG.replace('<svg', `<svg class="${s.getAttribute('class')}" style="${s.getAttribute('style') || ''}"`); });
+  $$('svg.ico.ig').forEach((s) => { s.outerHTML = ig().replace('<svg', `<svg class="${s.getAttribute('class')}" style="${s.getAttribute('style') || ''}"`); });
+  [['ms', MS], ['web', WEB], ['bag', BAG]].forEach(([c, svg]) => $$(`svg.ico.${c}`).forEach((s) => { s.outerHTML = svg.replace('<svg', `<svg class="${s.getAttribute('class')}"`); }));
 }
 // product art, drawn simply so nothing is borrowed
 const VACUUM = (size) => `<svg width="${size}" height="${size}" viewBox="0 0 100 100"><circle cx="50" cy="52" r="40" fill="#1E2A30"/><circle cx="50" cy="52" r="40" fill="none" stroke="#3a4b54" stroke-width="3"/><circle cx="50" cy="40" r="10" fill="#2f3f47" stroke="#4d626c" stroke-width="2"/><path d="M22 64 Q50 80 78 64" fill="none" stroke="#D4A94B" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="40" r="3" fill="#6fe3c4"/></svg>`;
@@ -659,7 +671,7 @@ s1.init = (s) => {
   s.flies = S1_MSGS.map(([txt, ch, en], i) => {
     const el = document.createElement('div');
     el.className = 'fly';
-    el.innerHTML = `<div class="pill${en ? ' en' : ''}" dir="${en ? 'ltr' : 'rtl'}">${ch === 'wa' ? WA.replace('<svg', '<svg class="ico"') : IG.replace('<svg', '<svg class="ico"')}<span>${txt}</span></div>`;
+    el.innerHTML = `<div class="pill${en ? ' en' : ''}" dir="${en ? 'ltr' : 'rtl'}">${ch === 'wa' ? WA.replace('<svg', '<svg class="ico"') : ig().replace('<svg', '<svg class="ico"')}<span>${txt}</span></div>`;
     field.appendChild(el);
     const a = i * 2.39996, rad = 0.55 + 0.45 * rnd();
     // the flood accelerates: each message leaves sooner than the last
@@ -991,7 +1003,7 @@ s7.init = (s) => {
   const rows = $('.rows', s.el);
   s.rowEls = S7_ROWS.map(([ini, col, name, ch, pv, tm, bk, bt, en]) => {
     const r = document.createElement('div'); r.className = 'r';
-    r.innerHTML = `<div class="av" style="background:${col}">${ini}${ch === 'wa' ? WA : IG}</div>
+    r.innerHTML = `<div class="av" style="background:${col}">${ini}${ch === 'wa' ? WA : ig()}</div>
       <div style="min-width:0"><div class="nm">${name}</div><div class="pv ${en ? 'en' : 'ar'}">${pv}</div></div>
       <div class="rt"><div class="tm">${tm}</div>${bk ? `<span class="bdg ${bk}">${bt}</span>` : ''}</div>`;
     rows.appendChild(r); return r;
@@ -1117,7 +1129,7 @@ const s10 = scene('s10', 8.6, 'izoom', 'none', (t, s) => {
   set($('.line', s.el), { o: tw(t, 0.6, 0.35, 0, 1, E.lin), y: tw(t, 0.6, 0.5, 30, 0) + tw(t, 4.4, 0.7, 0, -40, E.io3) });
   set($('.sub', s.el), { o: tw(t, 1.0, 0.4, 0, 1, E.lin), y: tw(t, 1.0, 0.5, 24, 0) + tw(t, 4.4, 0.7, 0, -40, E.io3), b: tw(t, 1.0, 0.4, 6, 0) });
   let at = 4.7;
-  $$('.stack div', s.el).forEach((d) => { const on = t >= at; set(d, { y: on ? 40 * (1 - E.o4(P(t, at, 0.2))) : 40, o: on ? 1 : 0 }); at += 0.07; });
+  $$('.stack > div', s.el).forEach((d) => { const on = t >= at; set(d, { y: on ? 40 * (1 - E.o4(P(t, at, 0.2))) : 40, o: on ? 1 : 0 }); at += 0.12; });
   set($('.stack', s.el), { y: -40 });
   set($('.cta', s.el), { o: tw(t, 5.3, 0.35, 0, 1, E.lin), y: tw(t, 5.3, 0.45, 30, -40), s: 0.96 + 0.04 * E.back(P(t, 5.3, 0.5)) });
 });

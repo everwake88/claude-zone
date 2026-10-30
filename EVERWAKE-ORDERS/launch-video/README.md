@@ -93,7 +93,7 @@ the way LinkedIn plays it.
 | 0:59 | The **dashboard**: conversations from both channels, a customer handed to the team, the team's reply arriving on his phone, handed back to the AI |
 | 1:11 | **Campaigns**: best customers ranked, an approved template, test run off, approved, sent; an opt-out confirmed |
 | 1:23 | A month's results (demo data) |
-| 1:29 | Everwake: AI sales agents for e-commerce, the stack, *Book a free demo* |
+| 1:29 | Everwake: AI sales agents for E-commerce: your social channels + your online store + any dialect or language, *Book a free demo* |
 
 What the agent says follows the method on the website's agent page (a price
 ladder inside the budget, one question at a time, objections answered without
