@@ -72,7 +72,8 @@ You need:
 cd "EVERWAKE-ORDERS/dashboard"
 docker build -t everwake-dashboard \
   --build-arg NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co \
-  --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=... .
+  --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
+  --build-arg NEXT_PUBLIC_SITE_URL=https://orders.example.com .
 docker run -d --restart unless-stopped -p 3000:3000 --env-file .env --name everwake-dashboard everwake-dashboard
 ```
 Put it behind your HTTPS proxy (Caddy, Traefik or Nginx), the same way n8n is.
