@@ -6,6 +6,7 @@
 | `everwake-orders-vertical.mp4` | 0:59 | **The vertical cut** for Reels, TikTok and WhatsApp Status, in Egyptian Arabic |
 | `everwake-orders-launch.mp4` | 0:46 | The short teaser, drawn rather than filmed |
 | `everwake-sales-agent.mp4` | 1:38 | **The AI sales agent** (WhatsApp and Instagram) for LinkedIn: for any e-commerce brand and the agencies that serve them |
+| `everwake-sales-agent-4x5.mp4` | 1:38 | The same film in 4:5 (1080×1350) for LinkedIn on phones |
 
 The film and the teaser are 1920×1080, the vertical cut 1080×1920; all 30 fps. The music and sounds are generated (`music.py`),
 so there is nothing to license. The restaurant in them, "بيت المشويات" (Grill
@@ -102,8 +103,13 @@ one direction of travel, cut-the-curve between scenes, an inverse zoom only for
 the dashboard's and the end's arrival, an oversized cursor whose clicks cause
 what happens next.
 
+The 4:5 cut is the same page opened with `?format=45`: the same scenes and
+text sizes, with what sat side by side stacked (the dashboard shows one panel at
+a time, the list sliding away as the chat comes in).
+
 ```sh
 node render-film.cjs --page sales-agent.html                # everwake-sales-agent.mp4
+node render-film.cjs --page sales-agent.html --format 45    # everwake-sales-agent-4x5.mp4
 node render-film.cjs --page sales-agent.html --stills 40,70 # still-40.png …
 ```
 

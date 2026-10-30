@@ -289,8 +289,8 @@ body { font-family: var(--en); color: #fff; -webkit-font-smoothing: antialiased;
 #s8 .opt { left: 1250px; top: 560px; width: 560px; border-radius: 22px; background: var(--wa-bg); padding: 22px; box-shadow: 0 30px 80px rgba(11,34,46,.45); }
 #s8 .opt .ol { font: 600 18px/1 var(--en); color: var(--wa-meta); margin-bottom: 14px; }
 #s8 .opt .pm { padding: 12px 16px 10px; border-radius: 14px; font: 500 22px/1.5 var(--ar); color: var(--wa-text); white-space: pre-line; direction: rtl; text-align: right; }
-#s8 .opt .pm.out { background: var(--wa-out); margin-left: 260px; }
-#s8 .opt .pm.in { background: var(--wa-in); margin-right: 60px; margin-top: 12px; }
+#s8 .opt .pm.cout { background: var(--wa-out); margin-left: 260px; }
+#s8 .opt .pm.cin { background: var(--wa-in); margin-right: 60px; margin-top: 12px; }
 #s8 .opt .tag { margin-top: 14px; font: 700 18px/1 var(--en); color: #8fe0b7; }
 
 /* ---------- 9. results ---------- */
@@ -306,7 +306,7 @@ body { font-family: var(--en); color: #fff; -webkit-font-smoothing: antialiased;
 /* ---------- 10. end ---------- */
 #s10 .lock { left: 560px; top: 340px; width: 800px; }
 #s10 .line { left: 0; right: 0; top: 500px; text-align: center; font: 800 64px/1.1 var(--en); letter-spacing: -.02em; }
-#s10 .line .g { color: var(--gold-b); }
+#s10 .line .g { color: var(--gold-b); white-space: nowrap; }
 #s10 .sub { left: 0; right: 0; top: 590px; text-align: center; font: 400 32px/1.3 var(--en); color: var(--on-muted); }
 #s10 .stack { left: 0; right: 0; top: 690px; display: flex; justify-content: center; gap: 14px; }
 #s10 .stack { align-items: center; gap: 18px; }
@@ -319,6 +319,68 @@ body { font-family: var(--en); color: #fff; -webkit-font-smoothing: antialiased;
 #s10 .cta div { font: 700 36px/1 var(--en); color: var(--deep); background: var(--gold-b); padding: 24px 40px; border-radius: 999px; }
 #s10 .orb { position: absolute; }
 #s10 .mini { border-radius: 20px; background: var(--raised); border: 1px solid var(--hair-d); padding: 20px 26px; font: 600 30px/1.3 var(--en); color: #fff; white-space: nowrap; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+
+/* ---------- 4:5 for LinkedIn mobile (1080×1350): render-film.cjs --format 45 ----------
+   Same film, same text sizes; what sat side by side is stacked. */
+html.f45, html.f45 body, html.f45 #root { width: 1080px; height: 1350px; }
+.f45 .cap { left: 70px; top: 70px; width: 940px; }
+.f45 .store { right: auto; left: 70px; top: 320px; }
+.f45 #s1 .fly { left: 540px; top: 640px; }
+.f45 #s1 .clock { left: 70px; top: 70px; }
+.f45 #s1 .head { left: 50px; right: 50px; top: 420px; font-size: 104px; }
+.f45 #s1 .tag { left: 90px; right: 90px; top: 830px; }
+.f45 #s2 .grp { left: 70px; top: 400px; width: 940px; }
+.f45 #s2 .reply { left: 70px; top: 935px; width: 940px; }
+.f45 #s3 .shot { zoom: .8; left: 87.5px; top: 500px; }   /* zoom scales left/top too */
+.f45 #s3 .match { left: 560px; top: 400px; width: 450px; display: block; }
+.f45 #s3 .match .thumb { margin-bottom: 18px; }
+.f45 #s3 .reply { left: 70px; top: 960px; width: 940px; }
+.f45 #s4 .card { width: 940px; height: 195px; padding: 20px 24px; }
+.f45 #s4 .card .dl { margin-bottom: 12px; }
+.f45 #s4 .card .bub { font-size: 29px; padding: 12px 20px 10px; }
+.f45 #s4 .card .bub.a { margin-top: 0; }
+.f45 #s5 .plan { left: 70px; top: 360px; width: 940px; height: auto; padding: 22px 26px 24px; }
+.f45 #s5 .goal { margin-top: 12px; padding-bottom: 12px; font-size: 28px; }
+.f45 #s5 .row { margin-top: 12px; align-items: center; }
+.f45 #s5 .row .st { margin-top: 0; }
+.f45 #s5 .row > div:last-child { display: flex; align-items: baseline; gap: 16px; }
+.f45 #s5 .row .k { width: 150px; flex: none; }
+.f45 #s5 .row .v { font-size: 25px; margin-top: 0; }
+.f45 #s5 .chat { left: 70px; top: 735px; width: 940px; height: 565px; }
+.f45 #s5 .tychip { left: 760px; top: 1312px; }
+.f45 #s5 .paid { left: 120px; top: 1180px; width: 840px; }
+.f45 #s6 .axis, .f45 #s6 .fill { left: 0; top: 720px; }
+.f45 #s6 .axis { width: 2700px; }
+.f45 #s6 .tick { top: 702px; }
+.f45 #s6 .card { top: 790px; width: 520px; margin-left: -260px; }
+.f45 #s6 .cart .hd { font-size: 19px; letter-spacing: .08em; }
+.f45 #s6 .cart { left: 70px; top: 380px; width: 460px; }
+.f45 #s6 .dial { left: 560px; top: 360px; width: 460px; height: 460px; }
+.f45 #s6 .rem { left: 170px; top: 880px; width: 740px; }
+.f45 .dash .brand { left: 70px; top: 50px; }
+.f45 .dash .title { left: 70px; top: 88px; font-size: 46px; }
+.f45 .dcap { right: auto; left: 70px; top: 170px; width: 940px; text-align: left; }
+.f45 .dcap h2 { font-size: 50px; }
+.f45 #s7 .list, .f45 #s7 .chatp { left: 70px; top: 290px; width: 940px; height: 1010px; }
+.f45 #s7 .r .pv { max-width: 560px; }
+.f45 #s7 .phone { zoom: .8; left: 75px; top: 987px; }
+.f45 #s8 .hdr { height: 290px; }
+.f45 #s8 .form { left: 70px; top: 300px; width: 940px; }
+.f45 #s8 .side { zoom: .85; left: 518px; top: 365px; width: 600px; }
+.f45 #s8 .side .sum { display: none; }
+.f45 #s8 .stat { left: 70px; top: 1120px; width: 940px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.f45 #s8 .stat div { padding: 16px 20px; }
+.f45 #s8 .stat b { font-size: 36px; }
+.f45 #s8 .stat div.g { grid-column: span 2; }
+.f45 #s8 .opt { left: 440px; top: 330px; width: 570px; }
+.f45 #s9 .kpis { left: 70px; top: 330px; width: 940px; grid-template-columns: 1fr 1fr; grid-template-rows: 300px 260px 260px; }
+.f45 #s9 .kpi.big { grid-row: auto; grid-column: 1 / -1; }
+.f45 #s9 .kpi.big b { margin-top: 30px; font-size: 120px; }
+.f45 #s10 .lock { left: 190px; top: 300px; width: 700px; }
+.f45 #s10 .line { left: 60px; right: 60px; top: 440px; }
+.f45 #s10 .sub { left: 80px; right: 80px; top: 600px; font-size: 30px; }
+.f45 #s10 .stack { top: 700px; flex-direction: column; gap: 10px; }
+.f45 #s10 .cta { top: 1110px; }
 </style>
 </head>
 <body>
@@ -498,8 +560,8 @@ CleanBot S9 للحين في سلتك
   </div>
   <div class="dcap" data-lab="Campaigns" data-h="Campaigns, *approved by you.*"></div>
   <div class="stat"><div><small>SENT</small><b class="k-sent">0</b></div><div><small>REPLIED</small><b class="k-rep">0</b></div><div><small>ORDERS</small><b class="k-ord">0</b></div><div class="g"><small>REVENUE</small><b class="k-rev">0 SAR</b></div><div><small>OPTED OUT</small><b class="k-opt">0</b></div></div>
-  <div class="abs opt"><div class="ol">A customer replies</div><div class="pm out">إلغاء</div>
-    <div class="pm in">تم، وقفنا لك رسائل العروض ✅
+  <div class="abs opt"><div class="ol">A customer replies</div><div class="pm cout">إلغاء</div>
+    <div class="pm cin">تم، وقفنا لك رسائل العروض ✅
 وتقدر تكلّمنا بأي وقت إذا احتجت مساعدة.</div><div class="tag">✓ Opted out · never messaged again</div></div>
   <svg class="cursor" viewBox="0 0 24 24"><path d="M5 2.5 L5 19.5 L9.6 15.2 L12.8 21.8 L15.4 20.6 L12.3 14.1 L18.6 14.1 Z" fill="#1c1c1c" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg>
 </div></div></section>
@@ -528,6 +590,12 @@ CleanBot S9 للحين في سلتك
 
 </div>
 <script>
+// ---------------------------------------------------------------- format
+// ?format=45 is the 4:5 cut for LinkedIn mobile (render-film.cjs --format 45)
+const F45 = new URLSearchParams(location.search).get('format') === '45';
+if (F45) document.documentElement.classList.add('f45');
+const W = F45 ? 1080 : 1920, H = F45 ? 1350 : 1080;
+
 // ---------------------------------------------------------------- helpers
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -565,6 +633,11 @@ function pop(el, t, t0, dy = 26) {
   const p = P(t, t0, 0.42);
   set(el, { y: dy * (1 - E.o3(p)), s: 0.94 + 0.06 * E.back(p), o: P(t, t0, 0.12) });
   return true;
+}
+function spot(el, root) {
+  let x = 0, y = 0;
+  for (let e = el; e && e !== root; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; }
+  return { x: x + el.offsetWidth / 2, y: y + el.offsetHeight / 2, left: x, top: y, w: el.offsetWidth, h: el.offsetHeight };
 }
 const chars = (s) => Array.from(s);
 const typed = (s, t, t0, cps) => chars(s).slice(0, Math.max(0, Math.floor((t - t0) * cps))).join('');
@@ -676,7 +749,7 @@ s1.init = (s) => {
     const a = i * 2.39996, rad = 0.55 + 0.45 * rnd();
     // the flood accelerates: each message leaves sooner than the last
     const t0 = -0.6 + 2.2 * (1 - Math.pow(1 - i / S1_MSGS.length, 1.5));
-    return { el, x: Math.cos(a) * 820 * rad, y: Math.sin(a) * 360 * rad, t0, d: 1.6 + 0.4 * rnd() };
+    return { el, x: Math.cos(a) * (F45 ? 430 : 820) * rad, y: Math.sin(a) * (F45 ? 520 : 360) * rad, t0, d: 1.6 + 0.4 * rnd() };
   });
   $('.head', s.el).innerHTML = 'Your best salesperson<br>'.split(' ').map((w) => `<span class="w">${w} </span>`).join('').replace('<br> ', '') +
     '';
@@ -695,7 +768,7 @@ const s2 = scene('s2', 9.6, 'curve', 'curve', (t, s) => {
   // the voice note: arrives, plays, is understood
   const grp = $('.grp', s.el);
   const k = nudge(P(t, 5.9, 0.9));
-  set(grp, { x: -240 * k, s: 1 - 0.34 * k, y: tw(t, 0.12, 0.5, 40, 0), o: tw(t, 0.12, 0.2, 0, 1, E.lin) });
+  set(grp, { x: F45 ? 0 : -240 * k, s: F45 ? 1 : 1 - 0.34 * k, y: tw(t, 0.12, 0.5, 40, 0), o: tw(t, 0.12, 0.2, 0, 1, E.lin) });
   const played = P(t, 0.9, 2.6);
   s.bars.forEach((b, i) => { b.style.background = i / s.bars.length < played ? '#E9EDEF' : '#5f7480'; });
   $('.dur', s.el).textContent = played > 0 && played < 1 ? `0:${String(Math.floor(played * 21)).padStart(2, '0')}` : '0:21';
@@ -790,7 +863,10 @@ const s4 = scene('s4', 7.2, 'curve', 'curve', (t, s) => {
     at += g; g *= 0.85;
   });
 });
-s4.init = (s) => { [0, 1, 2, 3].forEach((i) => cue(s.t0 + 2.0 + i * 0.32, 'pop')); };
+s4.init = (s) => {
+  if (F45) $$('.card', s.el).forEach((c, i) => { c.style.left = '70px'; c.style.top = `${360 + i * 215}px`; });
+  [0, 1, 2, 3].forEach((i) => cue(s.t0 + 2.0 + i * 0.32, 'pop'));
+};
 
 // ===== 5 · the close =================================================
 const S5_MSGS = [
@@ -803,6 +879,7 @@ const S5_MSGS = [
 ];
 // which plan rows each agent reply carries out
 const S5_ROWS = { 1: [0, 1, 2], 3: [3, 4] };
+const S5_CHAT_H = F45 ? 565 : 690, S5_ROOM = F45 ? 170 : 230;
 const s5 = scene('s5', 14.2, 'curve', 'curve', (t, s) => {
   capIn($('.cap', s.el), t, 0.05);
   // the plan streams in: goal first, then each line with a spinner that turns to a check when the chat does it
@@ -823,7 +900,7 @@ const s5 = scene('s5', 14.2, 'curve', 'curve', (t, s) => {
     pop(m.el, t, m.t, 20);
     if (t >= m.t) off = m.off - (m.off - (i ? s.msgs[i - 1].off : 0)) * (1 - E.o3(P(t, m.t, 0.45)));
   });
-  off += 230 * E.io3(P(t, 10.75, 0.5));   // room for the payment
+  off += S5_ROOM * E.io3(P(t, 10.75, 0.5));   // room for the payment
   s.stack.style.transform = `translateY(${-off}px)`;
   const typing = s.msgs.some((m, i) => m.side === 'a' && t > m.t - 0.75 && t < m.t);
   $('.tychip', s.el).style.opacity = typing ? 1 : 0;
@@ -848,7 +925,7 @@ s5.init = (s) => {
     s.stack.appendChild(el);
     el.style.top = `${y}px`;
     const h = el.offsetHeight;
-    const m = { el, t, side, off: Math.max(0, y + h - 690) };
+    const m = { el, t, side, off: Math.max(0, y + h - S5_CHAT_H) };
     y += h + 22;
     cue(s.t0 + t, side === 'a' ? 'send' : 'pop');
     if (S5_ROWS[i]) S5_ROWS[i].forEach((r, k) => { s.rows[r].doneAt = t + 0.25 + k * 0.18; });
@@ -859,11 +936,12 @@ s5.init = (s) => {
 };
 
 // ===== 6 · after the sale ============================================
+const S6_X = F45 ? [540, 1100, 1660, 2220] : [1160, 1920, 2680, 3440], S6_STEP = F45 ? 560 : 760, S6_AX = F45 ? 0 : 220, S6_LAB = F45 ? 580 : 330;
 const S6_STAGES = [
-  { x: 1160, at: 0.7, lab: 'Paid', sub: '9:16 PM', txt: 'شكراً يا مريم 🎉 طلبك #4821 اتأكد\n• سيروم فيتامين سي 30 مل\n• غسول جل للبشرة الدهنية\nهيوصلك خلال يومين' },
-  { x: 1920, at: 2.2, lab: 'Shipped', sub: 'NEXT DAY · 11:02 AM', txt: 'طلبك #4821 خرج من المخزن 📦\nرقم التتبع: BX-55102' },
-  { x: 2680, at: 3.7, lab: 'Out for delivery', sub: 'DAY 2 · 1:40 PM', txt: 'المندوب في الطريق 🚚\nهيكلمك قبل ما يوصل' },
-  { x: 3440, at: 5.2, lab: 'Delivered', sub: 'DAY 2 · 3:05 PM', txt: 'طلبك وصل ✅ نتمنى يعجبك\nولو احتجتي أي حاجة إحنا هنا 🌸' },
+  { x: S6_X[0], at: 0.7, lab: 'Paid', sub: '9:16 PM', txt: 'شكراً يا مريم 🎉 طلبك #4821 اتأكد\n• سيروم فيتامين سي 30 مل\n• غسول جل للبشرة الدهنية\nهيوصلك خلال يومين' },
+  { x: S6_X[1], at: 2.2, lab: 'Shipped', sub: 'NEXT DAY · 11:02 AM', txt: 'طلبك #4821 خرج من المخزن 📦\nرقم التتبع: BX-55102' },
+  { x: S6_X[2], at: 3.7, lab: 'Out for delivery', sub: 'DAY 2 · 1:40 PM', txt: 'المندوب في الطريق 🚚\nهيكلمك قبل ما يوصل' },
+  { x: S6_X[3], at: 5.2, lab: 'Delivered', sub: 'DAY 2 · 3:05 PM', txt: 'طلبك وصل ✅ نتمنى يعجبك\nولو احتجتي أي حاجة إحنا هنا 🌸' },
 ];
 const S6_SPLIT = 7.0;
 const s6 = scene('s6', 12.2, 'curve', 'izoom', (t, s) => {
@@ -871,16 +949,15 @@ const s6 = scene('s6', 12.2, 'curve', 'izoom', (t, s) => {
   const capA = $('.capA', s.el);
   if (t < S6_SPLIT) capIn(capA, t, 0.05); else capOut(capA, t, S6_SPLIT);
   let camx = 0;
-  S6_STAGES.forEach((st, i) => { if (i) camx -= 760 * E.io3(P(t, st.at - 0.75, 0.75)); });
+  S6_STAGES.forEach((st, i) => { if (i) camx -= S6_STEP * E.io3(P(t, st.at - 0.75, 0.75)); });
   const world = $('.world', s.el);
   // part A leaves with the same leftward motion
   const leave = P(t, S6_SPLIT - 0.05, 0.34);
   world.style.transform = `translate3d(${camx - 230 * E.i4(leave)}px,0,0)`;
   world.style.opacity = 1 - leave;
-  const fillTo = S6_STAGES.reduce((acc, st, i) => (t >= st.at - 0.1 ? st.x : acc), 220);
-  const prev = S6_STAGES.reduce((acc, st, i) => (t >= st.at - 0.1 && i ? S6_STAGES[i - 1].x : acc), 220);
-  const cur = S6_STAGES.findIndex((st) => t < st.at - 0.1);
-  s.fill.style.width = `${Math.max(0, fillTo - 220)}px`;
+  const fillTo = S6_STAGES.reduce((acc, st, i) => (t >= st.at - 0.1 ? st.x : acc), S6_AX);
+    const cur = S6_STAGES.findIndex((st) => t < st.at - 0.1);
+  s.fill.style.width = `${Math.max(0, fillTo - S6_AX)}px`;
   S6_STAGES.forEach((st, i) => {
     const on = t >= st.at - 0.1;
     s.ticks[i].classList.toggle('on', on);
@@ -919,7 +996,7 @@ s6.init = (s) => {
   S6_STAGES.forEach((st) => {
     const tk = document.createElement('div'); tk.className = 'abs tick'; tk.style.left = `${st.x}px`; world.appendChild(tk); s.ticks.push(tk);
     const lb = document.createElement('div'); lb.className = 'abs tl'; lb.style.left = `${st.x}px`; lb.innerHTML = `${st.lab}<small>${st.sub}</small>`;
-    lb.style.top = '330px'; world.appendChild(lb); s.labels.push(lb);
+    lb.style.top = `${S6_LAB}px`; world.appendChild(lb); s.labels.push(lb);
     const cd = document.createElement('div'); cd.className = 'abs card'; cd.style.left = `${st.x}px`;
     cd.innerHTML = `<div class="who agent" style="justify-content:flex-start">✦ Sent on WhatsApp</div><div class="bub a">${st.txt}</div>`;
     world.appendChild(cd); s.cards.push(cd);
@@ -962,8 +1039,9 @@ const s7 = scene('s7', 12.6, 'izoom', 'curve', (t, s) => {
   // the list keeps living: a new message lands on @lina.styles
   set(s.rowEls[2].querySelector('.bdg'), { s: t > 1.0 ? 1 + 0.25 * (1 - E.o3(P(t, 1.0, 0.35))) : 1 });
   // cursor (oversized-cursor): enters from below, clicks Khaled, then the reply box, then Send, then Hand back
-  const C = s.cursor, path = [
-    [0.0, 900, 1180], [0.9, 900, 1180], [1.6, 470, 330], [3.3, 460, 337], [3.9, 1150, 978], [6.1, 1160, 990], [6.6, 1720, 975], [9.1, 1735, 985], [9.7, 1730, 282], [11.2, 1740, 290], [11.9, 2040, 520],
+  const q = s.pos, C = s.cursor, path = [
+    [0.0, W * 0.47, H + 100], [0.9, W * 0.47, H + 100], [1.6, q.row.x, q.row.y], [3.3, q.row.x - 10, q.row.y + 7], [3.9, q.inp.x, q.inp.y], [6.1, q.inp.x + 10, q.inp.y + 12],
+    [6.6, q.send.x, q.send.y], [9.1, q.send.x + 15, q.send.y + 10], [9.7, q.back.x, q.back.y], [11.2, q.back.x + 10, q.back.y + 8], [11.9, W + 120, q.back.y + 240],
   ];
   let cx = path[0][1], cy = path[0][2];
   for (let i = 1; i < path.length; i++) {
@@ -979,8 +1057,14 @@ const s7 = scene('s7', 12.6, 'izoom', 'curve', (t, s) => {
   s.rowEls[0].style.background = open ? '#EEF3F5' : 'transparent';
   $('.empty', s.el).style.opacity = open ? 0 : 1;
   $('.ch', s.el).style.opacity = open ? 1 : 0;
+  if (F45) {
+    // one panel at a time: the list leaves left on the click, the chat arrives from the right (cut-the-curve)
+    const out = P(t, 1.75, 0.3), inn = P(t, 2.05, 0.34);
+    set($('.list', s.el), { x: -230 * E.i4(out), o: 1 - out });
+    set($('.chatp', s.el), { x: t < 2.05 ? 0 : 230 * (1 - E.o4(inn)), o: t < 2.05 ? 0 : 0.35 + 0.65 * clamp(inn / 0.4) });
+  }
   s.dms.forEach((d) => pop(d.el, t, d.t, 10));
-  s.stk.style.transform = `translateY(${-90 * E.o3(P(t, 8.5, 0.45))}px)`;
+  s.stk.style.transform = `translateY(${-(F45 ? 0 : 90) * E.o3(P(t, 8.5, 0.45))}px)`;
   const handed = t >= 9.85;
   const mode = $('.mode', s.el);
   mode.textContent = handed ? '✦ AI agent active' : 'AI paused · team handling';
@@ -1028,6 +1112,8 @@ s7.init = (s) => {
   const PM = [['in', 7.3, S7_REPLY, 120], ['out', 8.5, 'تسلم، مشكورين 🙏', 290]];
   s.pms = PM.map(([side, t, txt, top]) => { const el = document.createElement('div'); el.className = `pm ${side}`; el.style.top = `${top}px`; el.textContent = txt; scr.appendChild(el); return { el, t }; });
   s.cursor = $('.cursor', s.el);
+  const r0 = spot(s.rowEls[0], s.el);
+  s.pos = { row: { x: r0.left + 200, y: r0.y }, inp: spot($('.inp', s.el), s.el), send: spot($('.send', s.el), s.el), back: spot($('.back', s.el), s.el) };
   [1.75, 3.95, 6.7, 9.85].forEach((c) => cue(s.t0 + c, 'click'));
   cue(s.t0 + 2.0, 'pop'); cue(s.t0 + 2.25, 'pop'); cue(s.t0 + 7.3, 'ding'); cue(s.t0 + 8.5, 'pop');
 };
@@ -1059,6 +1145,7 @@ const s8 = scene('s8', 11.4, 'curve', 'curve', (t, s) => {
   const pb = $('.prev .pb', s.el);
   pb.innerHTML = (t >= 6.0 ? S8_PREVIEW : 'هلا {{name}} 👋\nجهزنا لك عرض خاص.') + '<div class="mt">10:04</div>';
   if (t >= 6.0) set(pb, { s: 1 + 0.04 * (1 - E.o3(P(t, 6.0, 0.4))) });
+  if (F45) { const sd = $('.side', s.el); if (t < 6.0) set(sd, { o: 0 }); else set(sd, { o: P(t, 6.0, 0.15) * (1 - P(t, 8.0, 0.25)), y: 30 * (1 - E.o3(P(t, 6.0, 0.4))) }); }
   const live = t >= 6.85;
   $('.mode .bx', s.el).innerHTML = live ? '' : '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="#2E7D5B" stroke-width="3.5" stroke-linecap="round"/></svg>';
   $('.mt', s.el).textContent = live ? 'Live — send to customers' : 'Test run — send nothing';
@@ -1077,7 +1164,7 @@ const s8 = scene('s8', 11.4, 'curve', 'curve', (t, s) => {
   $('.k-opt', s.el).textContent = t >= 10.0 ? '1' : '0';
   pop($('.opt', s.el), t, 9.4, 30);
   // cursor: name, type chip, code, send mode, create, approve
-  const C = s.cursor, path = [[0.0, 700, 1180], [0.85, 520, s.pos.name], [2.15, s.pos.typeX, s.pos.type], [2.65, 360, s.pos.code], [4.4, 700, s.pos.tplPre], [6.3, 160 + 15, s.pos.mode], [7.0, 600, s.pos.go], [7.9, 605, s.pos.go + 2]];
+  const q = s.pos, C = s.cursor, path = [[0.0, W * 0.36, H + 100], [0.85, q.nameX, q.name], [2.15, q.typeX, q.type], [2.65, q.codeX, q.code], [4.4, q.tplX, q.tplPre], [6.3, q.modeX, q.mode], [7.0, q.goX, q.go], [7.9, q.goX + 5, q.go + 2]];
   let cx = path[0][1], cy = path[0][2];
   for (let i = 1; i < path.length; i++) { const [ta, xa, ya] = path[i - 1], [tb, xb, yb] = path[i]; if (t >= ta) { const p = E.o3(P(t, ta, Math.min(0.6, tb - ta))); cx = xa + (xb - xa) * p; cy = ya + (yb - ya) * p; } }
   if (t > 8.3) cy += 700 * E.i2(P(t, 8.3, 0.7));
@@ -1095,10 +1182,10 @@ s8.init = (s) => {
   const y = (el) => { let v = 0; for (let e = el; e && e !== s.el; e = e.offsetParent) v += e.offsetTop; return v; };
   const mid = (sel) => y($(sel, s.el)) + $(sel, s.el).offsetHeight / 2;
   const go = $('.go', s.el);
-  s.scroll = y(go) + go.offsetHeight - 870;
-  const typeChip = $$('.c-type div', s.el)[3];
-  s.pos = { name: mid('.f-name'), type: mid('.c-type'), typeX: 110 + typeChip.offsetLeft + typeChip.offsetWidth / 2, code: mid('.f-code'),
-            tplPre: mid('.tpl .sel') - s.scroll, mode: mid('.mode .bx') - s.scroll, go: mid('.go') - s.scroll };
+  s.scroll = y(go) + go.offsetHeight - (F45 ? 1100 : 870);
+  const sp = (sel) => spot($(sel, s.el), s.el);
+  s.pos = { name: mid('.f-name'), nameX: sp('.f-name').left + 410, type: mid('.c-type'), typeX: spot($$('.c-type div', s.el)[3], s.el).x, code: mid('.f-code'), codeX: sp('.f-code').left + 250,
+            tplPre: mid('.tpl .sel') - s.scroll, tplX: sp('.tpl .sel').left + 590, mode: mid('.mode .bx') - s.scroll, modeX: sp('.mode .bx').x, go: mid('.go') - s.scroll, goX: sp('.go').x };
   [0.9, 2.3, 2.7, 6.85, 7.3, 8.1].forEach((c) => cue(s.t0 + c, 'click'));
   cue(s.t0 + 8.3, 'sparkle'); cue(s.t0 + 9.4, 'pop');
 };
@@ -1113,6 +1200,8 @@ const s9 = scene('s9', 6.4, 'curve', 'izoom', (t, s) => {
 s9.init = (s) => { cue(s.t0 + 0.9, 'riser'); cue(s.t0 + 2.9, 'sparkle'); };
 
 // ===== 10 · end ======================================================
+// in S10_ORBS order: voice, photos, dialects, objection, paid, cart
+const S10_ORBS_45 = [[-230, -520], [-250, 170], [-230, 330], [200, -440], [250, 250], [200, 410]];
 const S10_ORBS = [
   ['<span style="color:#D4A94B">🎤</span> Voice notes, understood', -650, -330, 'L'], ['📷 Photos, matched', -720, -60, 'L'], ['Gulf · Egyptian · Levantine', -560, 200, 'L'],
   ['✓ Objection handled, no discount', 560, -330, 'R'], ['<span style="color:#8fe0b7">✓</span> Paid · 630 EGP', 700, -60, 'R'], ['Cart recovered · 1,999 SAR', 600, 200, 'R'],
@@ -1123,7 +1212,7 @@ const s10 = scene('s10', 8.6, 'izoom', 'none', (t, s) => {
     const t0 = 0.6 + i * 0.07;
     const from = o.side === 'L' ? -1400 : 1400;
     const pin = E.o4(P(t, t0, 0.7)), out = E.i3(P(t, 4.4, 0.6));
-    set(o.el, { x: 960 + o.x + from * (1 - pin) + from * 0.6 * out - o.w / 2, y: 540 + o.y - o.h / 2, o: (t >= t0 ? 1 : 0) * (1 - out) });
+    set(o.el, { x: W / 2 + o.x + from * (1 - pin) + from * 0.6 * out - o.w / 2, y: H / 2 + o.y - o.h / 2, o: (t >= t0 ? 1 : 0) * (1 - out) });
   });
   set($('.lock', s.el), { o: 1, y: tw(t, 4.4, 0.7, 0, -40, E.io3) });
   set($('.line', s.el), { o: tw(t, 0.6, 0.35, 0, 1, E.lin), y: tw(t, 0.6, 0.5, 30, 0) + tw(t, 4.4, 0.7, 0, -40, E.io3) });
@@ -1135,7 +1224,8 @@ const s10 = scene('s10', 8.6, 'izoom', 'none', (t, s) => {
 });
 s10.init = (s) => {
   const box = $('.orbs', s.el);
-  s.orbs = S10_ORBS.map(([html, x, y, side]) => { const el = document.createElement('div'); el.className = 'orb mini'; el.innerHTML = html; box.appendChild(el); return { el, x, y, side, w: el.offsetWidth, h: el.offsetHeight }; });
+  s.orbs = S10_ORBS.map(([html, x, y, side], i) => {
+    if (F45) [x, y] = S10_ORBS_45[i]; const el = document.createElement('div'); el.className = 'orb mini'; el.innerHTML = html; box.appendChild(el); return { el, x, y, side, w: el.offsetWidth, h: el.offsetHeight }; });
   cue(s.t0 + 1.3, 'impact'); cue(s.t0 + 5.3, 'sparkle');
 };
 

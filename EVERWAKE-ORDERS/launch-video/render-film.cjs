@@ -7,6 +7,7 @@
 //   node render-film.cjs --from 40 --to 60       → a preview of part of it
 //   node render-film.cjs --page vertical.html    → the vertical cut (it sets its own size)
 //   node render-film.cjs --page sales-agent.html → everwake-sales-agent.mp4, the chat agent film
+//   … --format 45                                → its 4:5 cut for LinkedIn mobile (1080×1350), …-4x5.mp4
 //   … --voice vo.wav                             → mix a voice-over in, the music ducking under it
 //
 // Needs Playwright (with Chromium), ffmpeg, and Python 3 with numpy.
@@ -20,15 +21,16 @@ const FPS = 30;
 const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : null; };
 const PAGE = arg('--page') || 'film.html';
 const BASE = PAGE.replace(/\.html$/, '');
-const NAME = PAGE === 'film.html' ? 'everwake-orders-film' : PAGE === 'vertical.html' ? 'everwake-orders-vertical' : 'everwake-' + BASE;
+const F45 = arg('--format') === '45';
+const NAME = (PAGE === 'film.html' ? 'everwake-orders-film' : PAGE === 'vertical.html' ? 'everwake-orders-vertical' : 'everwake-' + BASE) + (F45 ? '-4x5' : '');
 
 (async () => {
   const browser = await chromium.launch();
-  const size = PAGE === 'vertical.html' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+  const size = F45 ? { width: 1080, height: 1350 } : PAGE === 'vertical.html' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
   const page = await browser.newPage({ viewport: size });
   page.on('pageerror', (e) => { console.error('page error:', e.message); process.exitCode = 1; });
   page.on('console', (m) => { if (m.type() === 'error') console.error('console:', m.text()); });
-  await page.goto('file://' + path.join(__dirname, PAGE), { waitUntil: 'load' });
+  await page.goto('file://' + path.join(__dirname, PAGE) + (F45 ? '?format=45' : ''), { waitUntil: 'load' });
   await page.evaluate(() => window.ready);
   const duration = await page.evaluate(() => window.DURATION);
   console.log(`film: ${duration.toFixed(1)}s`);
