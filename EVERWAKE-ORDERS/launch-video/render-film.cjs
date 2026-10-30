@@ -8,6 +8,7 @@
 //   node render-film.cjs --page vertical.html    → the vertical cut (it sets its own size)
 //   node render-film.cjs --page sales-agent.html → everwake-sales-agent.mp4, the chat agent film
 //   … --format 45                                → its 4:5 cut for LinkedIn mobile (1080×1350), …-4x5.mp4
+//   node render-film.cjs --page desk.html        → everwake-desk.mp4, the desk film (4:5)
 //   … --voice vo.wav                             → mix a voice-over in, the music ducking under it
 //
 // Needs Playwright (with Chromium), ffmpeg, and Python 3 with numpy.
@@ -26,7 +27,7 @@ const NAME = (PAGE === 'film.html' ? 'everwake-orders-film' : PAGE === 'vertical
 
 (async () => {
   const browser = await chromium.launch();
-  const size = F45 ? { width: 1080, height: 1350 } : PAGE === 'vertical.html' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+  const size = F45 || PAGE === 'desk.html' ? { width: 1080, height: 1350 } : PAGE === 'vertical.html' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
   const page = await browser.newPage({ viewport: size });
   page.on('pageerror', (e) => { console.error('page error:', e.message); process.exitCode = 1; });
   page.on('console', (m) => { if (m.type() === 'error') console.error('console:', m.text()); });

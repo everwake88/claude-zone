@@ -7,6 +7,7 @@
 | `everwake-orders-launch.mp4` | 0:46 | The short teaser, drawn rather than filmed |
 | `everwake-sales-agent.mp4` | 1:38 | **The AI sales agent** (WhatsApp and Instagram) for LinkedIn: for any e-commerce brand and the agencies that serve them |
 | `everwake-sales-agent-4x5.mp4` | 1:38 | The same film in 4:5 (1080×1350) for LinkedIn on phones |
+| `everwake-desk.mp4` | 1:47 | **The desk** in 4:5 for LinkedIn: comments and DMs answered by the AI, then one desk that runs the human team |
 
 The film and the teaser are 1920×1080, the vertical cut 1080×1920; all 30 fps. The music and sounds are generated (`music.py`),
 so there is nothing to license. The restaurant in them, "بيت المشويات" (Grill
@@ -115,6 +116,46 @@ node render-film.cjs --page sales-agent.html --stills 40,70 # still-40.png …
 
 No footage needed. The music is `music.py`'s calm style (100 BPM, D major,
 soft drums, no claps), quiet enough to sit under the captions.
+
+## The desk film
+
+1080×1350 (4:5), for LinkedIn. Everwake's AI agents plus the desk where the
+human team works, shown for any electronics or retail store. The desk on screen
+is the real one (`2b-desk`), filmed in demo mode in Everwake's colours; the
+store ("Volta Electronics"), the customers, agents, orders and numbers are all
+made up. How the screens were filmed, and how to film them again, is in
+`desk-capture/README.md`.
+
+| Time | Scene |
+|---|---|
+| 0:00 | Messages from WhatsApp, Messenger and Instagram pour into one tray → *Your customers write everywhere. Your team answers from one place.* |
+| 0:06 | A **Facebook post**: three comments, each answered publicly within seconds, each in different words |
+| 0:15 | The **DM** that follows: the price once, specs turned into reasons, one question, two options inside the budget; handed to the team as a sale |
+| 0:27 | **How it fits**: every channel → the AI agent → sales / complaint / order tracking / inquiry → the desk → Ready agents, least busy first, never more than 25 each; replies go back to the customer's app |
+| 0:38 | An agent goes **Ready** and the sale lands in her queue |
+| 0:46 | The **AI's note** on top of the chat, her reply typed and sent |
+| 0:54 | **The 15-minute rule**: reminders at 5 and 8 minutes, the chat moves at 10 and every minute after, LATE at 15 and the team lead alerted |
+| 1:08 | **Teamwork**: a complaint handed to a colleague with a note; he accepts |
+| 1:16 | The **live floor** for team leads: who is ready, who is busy, what is waiting |
+| 1:23 | **Track a late reply**: every agent it passed through, and why each didn't answer |
+| 1:33 | **Reports**: first-reply time, on-time rate, by source and category, per agent |
+| 1:40 | Everwake: *AI agents that sell. A desk that runs your team.* *Book a free demo* |
+
+The 15-minute chain is drawn rather than filmed (in the real desk it takes 15
+minutes); everything else is the desk's own screens. The desk rules shown
+(Ready only, least busy first, 25 at most, reminders at 5 and 8, moving at 10,
+late at 15) are the desk's real ones. The AI's replies follow the Meta comments
+and DM agent: a public reply in rotating wording, then one private message, then
+the sales method (price once, specs into reasons, a budget question, two
+options).
+
+```sh
+node render-film.cjs --page desk.html                # everwake-desk.mp4 (4:5)
+node render-film.cjs --page desk.html --stills 30,60 # still-30.png …
+```
+
+The music is `music.py`'s calm style, with the drums dropping out for the
+15-minute rule.
 
 ## The teaser
 

@@ -1,0 +1,18 @@
+
+/* ---------- Everwake skin (for the film) ---------- */
+@font-face { font-family: "Plex Arabic"; font-weight: 400; src: url(../fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Plex Arabic"; font-weight: 500; src: url(../fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Plex Arabic"; font-weight: 600; src: url(../fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Plex Arabic"; font-weight: 700; src: url(../fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2) format("woff2"); }
+:root {
+  --brand: #0B222E; --brand-strong: #071822; --brand-wash: #F6F0E2; --brand-ink: #8A6B23; --on-brand: #fff;
+  --bg: #F3F5F6; --surface-2: #F7F9FA; --surface-3: #E9EDEF; --line: #DFE5E8; --line-strong: #CBD5DA;
+  --text: #0B222E; --text-2: #51666F; --text-3: #7F9098;
+  --bubble-ai: #F6F0E2; --bubble-agent: #0B222E;
+  --ring: 0 0 0 3px rgba(184, 145, 63, .3);
+  --font: Inter, "Plex Arabic", ui-sans-serif, system-ui, sans-serif;
+}
+.brand__mark, .boot__logo { background: #0B222E; padding: 4px; }
+.brand__mark img { width: 100%; height: 100%; display: block; }
+.boot__logo { background: #0B222E url(../img/mark.svg) center / 70% no-repeat; }
+.login__art .brand__mark { background: #0B222E; }
