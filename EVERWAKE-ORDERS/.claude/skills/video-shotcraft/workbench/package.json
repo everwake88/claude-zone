@@ -1,0 +1,27 @@
+{
+  "name": "shotcraft-workbench",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "test:themes": "node scripts/test-themes.mjs",
+    "gen": "node scripts/gen-index.mjs",
+    "prepare": "node scripts/gen-index.mjs",
+    "predev": "node scripts/gen-index.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/gen-index.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "open": "node scripts/open.mjs",
+    "parity": "node scripts/parity.mjs"
+  },
+  "dependencies": {
+    "gsap": "^3.14.2",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "~5.9.0",
+    "vite": "^6.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "promo-template",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx hyperframes preview",
+    "render": "npx hyperframes render --output out/promo.mp4",
+    "lint": "npx hyperframes lint",
+    "validate": "npx hyperframes validate",
+    "inspect": "npx hyperframes inspect"
+  },
+  "dependencies": {
+    "gsap": "^3.14.2"
+  }
+}
