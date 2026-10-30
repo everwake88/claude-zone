@@ -6,6 +6,7 @@
 //   node render-film.cjs --stills 12,45.5,80     → still-12.png … to check moments
 //   node render-film.cjs --from 40 --to 60       → a preview of part of it
 //   node render-film.cjs --page vertical.html    → the vertical cut (it sets its own size)
+//   node render-film.cjs --page sales-agent.html → everwake-sales-agent.mp4, the chat agent film
 //   … --voice vo.wav                             → mix a voice-over in, the music ducking under it
 //
 // Needs Playwright (with Chromium), ffmpeg, and Python 3 with numpy.
@@ -18,7 +19,8 @@ const path = require('path');
 const FPS = 30;
 const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : null; };
 const PAGE = arg('--page') || 'film.html';
-const NAME = PAGE === 'film.html' ? 'everwake-orders-film' : 'everwake-orders-' + PAGE.replace(/\.html$/, '');
+const BASE = PAGE.replace(/\.html$/, '');
+const NAME = PAGE === 'film.html' ? 'everwake-orders-film' : PAGE === 'vertical.html' ? 'everwake-orders-vertical' : 'everwake-' + BASE;
 
 (async () => {
   const browser = await chromium.launch();
@@ -26,7 +28,7 @@ const NAME = PAGE === 'film.html' ? 'everwake-orders-film' : 'everwake-orders-' 
   const page = await browser.newPage({ viewport: size });
   page.on('pageerror', (e) => { console.error('page error:', e.message); process.exitCode = 1; });
   page.on('console', (m) => { if (m.type() === 'error') console.error('console:', m.text()); });
-  await page.goto('file://' + path.join(__dirname, PAGE));
+  await page.goto('file://' + path.join(__dirname, PAGE), { waitUntil: 'load' });
   await page.evaluate(() => window.ready);
   const duration = await page.evaluate(() => window.DURATION);
   console.log(`film: ${duration.toFixed(1)}s`);

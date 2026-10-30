@@ -8,7 +8,12 @@ order bell, the clicks and the message pops sit on top, on the film's cues.
   python3 music.py cues.json out.wav
 
 cues.json: {"duration": s, "drums_in": s, "break": [start, end], "outro": s,
-            "sfx": [[time, "ding" | "click" | "pop" | "send" | "whoosh"], ...]}
+            "sfx": [[time, "ding" | "click" | "pop" | "send" | "whoosh" |
+                     "impact" | "riser" | "sparkle"], ...],
+            "style": "calm"}
+
+"style": "calm" is a quieter bed to talk over: 100 BPM in D major
+(Dmaj7 - Bm7 - Gmaj7 - A), a soft kick and hats, no claps, no bell.
 """
 import json
 import sys
@@ -17,12 +22,13 @@ import wave
 import numpy as np
 
 SR = 48000
-BPM = 112
+cues = json.load(open(sys.argv[1]))
+CALM = cues.get('style') == 'calm'
+BPM = 100 if CALM else 112
 BEAT = 60 / BPM
 BAR = 4 * BEAT
 rng = np.random.default_rng(7)
 
-cues = json.load(open(sys.argv[1]))
 DUR = float(cues['duration'])
 N = int(DUR * SR) + SR
 DRUMS_IN = float(cues['drums_in'])
@@ -98,6 +104,14 @@ CHORDS = [
     [55, 59, 62, 67],   # G3 B3 D4 G4  (G)
 ]
 ROOTS = [45, 41, 48, 43]  # A2 F2 C3 G2
+if CALM:
+    CHORDS = [
+        [54, 57, 61, 62],   # F#3 A3 C#4 D4  (Dmaj7)
+        [54, 57, 59, 62],   # F#3 A3 B3 D4   (Bm7)
+        [54, 59, 62, 66],   # F#3 B3 D4 F#4  (Gmaj7)
+        [52, 57, 61, 64],   # E3 A3 C#4 E4   (A)
+    ]
+    ROOTS = [50, 47, 43, 45]  # D3 B2 G2 A2
 bars = int(np.ceil(DUR / BAR)) + 1
 
 
@@ -147,7 +161,7 @@ bell = stem()
 MOTIF = [(0, 76), (1, 74), (2, 72), (3.5, 69), (6, 67), (7, 69), (8, 72)]
 for b in range(0, bars, 8):
     t0 = b * BAR
-    if t0 < DRUMS_IN or t0 >= OUTRO:
+    if CALM or t0 < DRUMS_IN or t0 >= OUTRO:
         continue
     for beat, m in MOTIF:
         s = tone(hz(m), 1.6, partials=[(1, 1), (2.76, 0.18), (5.4, 0.05)])
@@ -184,9 +198,9 @@ for i in range(n_beats):
     t = i * BEAT
     if not drums_on(t):
         continue
-    place(drums, kick, t, 0.42)
+    place(drums, kick, t, 0.26 if CALM else 0.42)
     kick_times.append(t)
-    if i % 4 in (1, 3):
+    if i % 4 in (1, 3) and not CALM:
         place(drums, clap, t, 0.07)
     place(drums, hat, t + BEAT / 2, 0.05, pan=0.3)
     if i % 2:
@@ -230,6 +244,22 @@ for t, kind in cues.get('sfx', []):
         tt = np.arange(int(0.5 * SR)) / SR
         s = spectral(rng.standard_normal(len(tt)), lo=500, hi=4000) * np.sin(np.pi * tt / tt[-1]) ** 2
         place(sfx, s, t - 0.25, 0.035)
+    elif kind == 'impact':
+        # a low thump with a little air on top, for things that land
+        tt = np.arange(int(0.9 * SR)) / SR
+        s = np.sin(2 * np.pi * np.cumsum(38 + 70 * np.exp(-tt * 18)) / SR) * np.exp(-tt * 5)
+        s += 0.25 * spectral(rng.standard_normal(len(tt)), lo=200, hi=2500) * np.exp(-tt * 14)
+        place(sfx, s * env(len(s), 0.002, 0.2, len(s)), t, 0.2)
+    elif kind == 'riser':
+        # builds for 1.6 s and ends on the cue
+        rl = 1.6
+        tt = np.arange(int(rl * SR)) / SR
+        s = spectral(rng.standard_normal(len(tt)), lo=800, hi=7000) * (tt / rl) ** 2.4
+        place(sfx, s, t - rl, 0.045)
+    elif kind == 'sparkle':
+        for k, m in enumerate((93, 97, 100, 105)):
+            s = tone(hz(m), 0.8, partials=[(1, 1), (2.7, 0.2)])
+            place(sfx, s * np.exp(-np.arange(len(s)) / SR * 6) * env(len(s), 0.002, 0.1, len(s)), t + k * 0.045, 0.04, pan=(-0.4, 0.4)[k % 2])
 sfx += 0.15 * reverb(sfx, seconds=1.2)
 
 mix = music + sfx
@@ -238,6 +268,8 @@ tt = np.arange(N) / SR
 mix *= np.clip(tt / 1.0, 0, 1) * np.clip((DUR - tt) / 6.0, 0, 1)
 mix = np.tanh(1.15 * mix)
 mix *= 0.89 / max(1e-6, np.max(np.abs(mix)))
+if CALM:
+    mix *= 0.55          # about -16 LUFS: a bed under captions, not a track
 mix = mix[:, : int(DUR * SR)]
 
 with wave.open(sys.argv[2], 'wb') as w:

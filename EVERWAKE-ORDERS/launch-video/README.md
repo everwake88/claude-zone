@@ -5,6 +5,7 @@
 | `everwake-orders-film.mp4` | 3:38 | **The full film.** The real dashboard, every feature, with music |
 | `everwake-orders-vertical.mp4` | 0:59 | **The vertical cut** for Reels, TikTok and WhatsApp Status, in Egyptian Arabic |
 | `everwake-orders-launch.mp4` | 0:46 | The short teaser, drawn rather than filmed |
+| `everwake-sales-agent.mp4` | 1:38 | **The AI sales agent** (WhatsApp and Instagram) for LinkedIn: for any e-commerce brand and the agencies that serve them |
 
 The film and the teaser are 1920×1080, the vertical cut 1080×1920; all 30 fps. The music and sounds are generated (`music.py`),
 so there is nothing to license. The restaurant in them, "بيت المشويات" (Grill
@@ -71,6 +72,43 @@ node render-film.cjs --page vertical.html --voice vo.wav   # with a voice-over, 
 
 The voice file should run the full 59.5 seconds, each line starting at its
 time in the script.
+
+## The AI sales agent film
+
+1920×1080, for LinkedIn. Not Everwake Orders: the chat sales agent, shown for
+any store. Everything in it is made up: Volta Home, Bloom Beauty, the
+customers, products, prices and the month's numbers. The dashboard is
+white-labelled ("YOUR BRAND"), drawn after the real one and filled with that
+made-up data. The captions carry the story, so it works with the sound off,
+the way LinkedIn plays it.
+
+| Time | Scene |
+|---|---|
+| 0:00 | Messages flood in at 11:47 PM → *Your best salesperson never sleeps.* |
+| 0:07 | A **voice note** in Gulf Arabic: heard, understood (pet hair, mop, budget), answered with three options inside the budget and one question |
+| 0:16 | A **photo** from an influencer's story, Egyptian Arabic: matched to the catalogue, in stock, priced |
+| 0:25 | **Dialects**: the same question in Gulf, Egyptian, Levantine and English, each answered in kind |
+| 0:32 | **The close**: a sales plan beside the chat; the price objection handled without a discount, one upsell, the payment link, paid (+40% basket) |
+| 0:46 | **Order updates** along a timeline, then an **abandoned cart** reminded in the evening window and recovered |
+| 0:59 | The **dashboard**: conversations from both channels, a customer handed to the team, the team's reply arriving on his phone, handed back to the AI |
+| 1:11 | **Campaigns**: best customers ranked, an approved template, test run off, approved, sent; an opt-out confirmed |
+| 1:23 | A month's results (demo data) |
+| 1:29 | Everwake: AI sales agents for e-commerce, the stack, *Book a free demo* |
+
+What the agent says follows the method on the website's agent page (a price
+ladder inside the budget, one question at a time, objections answered without
+discounting, one upsell). Shots follow the video skills in `.claude/skills/`:
+one direction of travel, cut-the-curve between scenes, an inverse zoom only for
+the dashboard's and the end's arrival, an oversized cursor whose clicks cause
+what happens next.
+
+```sh
+node render-film.cjs --page sales-agent.html                # everwake-sales-agent.mp4
+node render-film.cjs --page sales-agent.html --stills 40,70 # still-40.png …
+```
+
+No footage needed. The music is `music.py`'s calm style (100 BPM, D major,
+soft drums, no claps), quiet enough to sit under the captions.
 
 ## The teaser
 
