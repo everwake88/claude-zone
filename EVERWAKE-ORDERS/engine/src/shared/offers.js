@@ -28,6 +28,8 @@ function applyOffers(lines, offers, ctx) {
     if (!offerActiveNow(o, ctx.now, ctx.branchId)) continue;
     if (o.promo_code && !codes.includes(String(o.promo_code).toUpperCase())) continue;
     if (o.first_order_only && Number(ctx.ordersCount || 0) > 0) continue;
+    // loyalty: only their every Nth order (the 10th, the 20th…)
+    if (o.every_nth_order && (Number(ctx.ordersCount || 0) + 1) % Number(o.every_nth_order) !== 0) continue;
     const scoped = o.scope === 'items' ? paid.filter(l => (o.item_codes || []).includes(l.code))
                  : o.scope === 'categories' ? paid.filter(l => (o.category_ids || []).map(String).includes(String(l.category_id)))
                  : paid;

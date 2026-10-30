@@ -503,8 +503,30 @@ function buildOutbox() {
             [1320, 600], { timeout: 30000, retry: false }));
   w.add(code('Record Result', 'outbox/record_result.js', [1540, 500]));
   w.add(pg('Save Result', b64sql('outbox_result'), '={{ [ $json.b64_result ] }}', [1760, 500]));
+  // the restaurants' own systems: signed webhooks for orders and stock (016)
+  w.add(pg('Claim Webhooks', 'select everwake.integration_claim(25) as r;', null, [440, 900], { alwaysOutputData: true }));
+  w.add(code('One Webhook Per Item', 'integrations/split_events.js', [660, 900]));
+  w.add({ name: 'Sign Webhook', type: 'n8n-nodes-base.crypto', typeVersion: 1, position: [880, 900],
+          parameters: { action: 'hmac', type: 'SHA256', value: '={{ $json.body }}', dataPropertyName: 'signature',
+                        secret: '={{ $json.secret }}', encoding: 'hex' } });
+  w.add({ name: 'Send Webhook', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: [1100, 900],
+          parameters: { method: 'POST', url: '={{ $json.url }}',
+                        sendHeaders: true,
+                        headerParameters: { parameters: [
+                          { name: 'X-Everwake-Event', value: '={{ $json.event }}' },
+                          { name: 'X-Everwake-Delivery', value: '={{ String($json.id) }}' },
+                          { name: 'X-Everwake-Signature', value: '=sha256={{ $json.signature }}' }] },
+                        sendBody: true, contentType: 'raw', rawContentType: 'application/json', body: '={{ $json.body }}',
+                        options: { timeout: 15000, response: { response: { fullResponse: true, neverError: true, responseFormat: 'text' } } } },
+          onError: 'continueRegularOutput', alwaysOutputData: true });
+  w.add(code('Webhook Result', 'integrations/record_result.js', [1320, 900]));
+  w.add(pg('Save Webhook Result', b64sql('integration_result'), '={{ [ $json.b64_result ] }}', [1540, 900]));
+  w.add(sticky('Sticky — Webhooks', '### The restaurant\'s own system (POS / ERP / CRM)\nEvery order and every dish switched off or on is POSTed to the URL set in Settings → Integrations, signed: `X-Everwake-Signature: sha256=<HMAC-SHA256 of the body with the endpoint\'s secret>`. Not 2xx → tried again after 1, 2, 4… minutes.',
+               [400, 1080], 1300, 140, 6));
   w.chain('Every Minute', 'Housekeeping', 'Claim Batch');
-  w.link('Ping From Dashboard', 'Claim Batch');
+  w.link('Housekeeping', 'Claim Webhooks');
+  w.link('Ping From Dashboard', 'Claim Batch'); w.link('Ping From Dashboard', 'Claim Webhooks');
+  w.chain('Claim Webhooks', 'One Webhook Per Item', 'Sign Webhook', 'Send Webhook', 'Webhook Result', 'Save Webhook Result');
   w.chain('Claim Batch', 'One Item Per Message', 'Send Loop');
   w.link('Send Loop', 'Done', 0); w.link('Send Loop', 'Route: Text?', 1);
   w.link('Route: Text?', 'Evolution — Send Text', 0); w.link('Route: Text?', 'Evolution — Send Media', 1);

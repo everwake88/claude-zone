@@ -1194,3 +1194,30 @@ test('a voice note and a photo: understood before the agent answers, and a quick
   const lostDone = (await runCode('main/media_understood.js', { input: { error: { message: 'no file' } }, nodes: { 'Prepare Media': lostPrep } }))[0];
   assert.equal(lostDone.understood, '[voice note — it could not be played]');
 });
+
+test('webhooks to the restaurant\'s own system: one per delivery, 2xx is delivered, anything else is tried again', async () => {
+  const due = [{ id: 7, url: 'https://pos.example/hook', secret: 's3cret', event: 'order.created', body: '{"id":7}' }];
+  for (const r of [due, JSON.stringify(due)]) {
+    const items = await runCode('integrations/split_events.js', { input: { r } });
+    assert.deepEqual(items, [{ id: 7, url: 'https://pos.example/hook', secret: 's3cret', event: 'order.created', body: '{"id":7}' }]);
+  }
+  assert.deepEqual(await runCode('integrations/split_events.js', { input: { r: [] } }), []);
+  const ok = (await runCode('integrations/record_result.js', { input: { statusCode: 204 }, nodes: { 'Sign Webhook': { id: 7 } } }))[0];
+  assert.deepEqual(unb64(ok.b64_result), { id: 7, ok: true, status_code: 204, error: null });
+  const bad = (await runCode('integrations/record_result.js', { input: { statusCode: 500, statusMessage: 'Server Error' }, nodes: { 'Sign Webhook': { id: 7 } } }))[0];
+  assert.deepEqual(unb64(bad.b64_result), { id: 7, ok: false, status_code: 500, error: 'Server Error' });
+});
+
+test('loyalty: an offer for every Nth order applies on that order only', async () => {
+  const src = readFileSync(new URL('../src/shared/offers.js', import.meta.url), 'utf8');
+  const { applyOffers } = new Function(src + '\nreturn { applyOffers };')();
+  const toMinGlobal = globalThis.toMin; globalThis.toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
+  const offer = { id: 'o1', title_ar: 'كل عاشر طلب خصم 50ج', kind: 'amount_off', scope: 'order', value: 50, every_nth_order: 10 };
+  const lines = [{ code: 'M001', line_total: 300, quantity: 1, unit: 'portion' }];
+  const at = (n) => applyOffers(lines, [offer], { now: { day: 1, minutes: 600 }, ordersCount: n, deliveryFee: 0 }).item_discount;
+  assert.equal(at(8), 0);
+  assert.equal(at(9), 50, 'their 10th order');
+  assert.equal(at(10), 0);
+  assert.equal(at(19), 50, 'their 20th');
+  globalThis.toMin = toMinGlobal;
+});

@@ -101,6 +101,12 @@ const pendingLines = pending.map(p => {
     + (done.length ? ` · answered: ${done.join(', ')}` : '')
     + ` · still needs: ${left.join('; ') || '?'}`;
 });
+// what customers usually order with the dishes in this cart (the last 90 days)
+const pairs = obj(ctx.pairs);
+const pairLines = cartItems.filter(i => arr(pairs[i.code]).length).slice(0, 4).map(i => {
+  const names = arr(pairs[i.code]).map(c => obj(menuItems[c]).name || c).filter(n => n && !cartItems.some(x => (x.display_name || x.item_name) === n));
+  return names.length ? `  people who order ${i.display_name || i.item_name} often add: ${names.join('، ')}` : '';
+}).filter(Boolean);
 const discountLines = arr(activeOrder.applied_offers).map(a => `  offer applied: ${a.title}${num(a.amount) ? ' −' + money$(a.amount) : ''}${a.gift ? ` (free ${a.gift.name})` : ''}`);
 
 // ---- offers running now ------------------------------------------------------------
@@ -108,6 +114,7 @@ const offersNow = arr(allLookup.offers).filter(o => offerActiveNow(o, now, branc
 const promoCodes = arr(ledger.promo_codes).map(c => str(c).toUpperCase());
 const offerLines = offersNow.map(o => {
   const cond = [o.min_subtotal ? `orders over ${money$(o.min_subtotal)}` : '', o.first_order_only ? 'first order only' : '',
+                o.every_nth_order ? `every ${o.every_nth_order}th order — this customer's next order is their #${num(customer.orders_count) + 1}` : '',
                 arr(o.item_codes).length ? `on ${arr(o.item_codes).join(', ')}` : '',
                 arr(o.category_names).length ? `on ${arr(o.category_names).join('، ')}` : '',
                 o.time_from && o.time_to ? `${String(o.time_from).slice(0, 5)}–${String(o.time_to).slice(0, 5)} only` : '',
@@ -388,6 +395,7 @@ const facts = [
   'CART (the only truth — not the chat):',
   cartLines.length ? cartLines.join('\n') : '- (empty)',
   ...discountLines,
+  ...pairLines,
   cartLines.length ? `  subtotal ${money$(activeOrder.subtotal)}${num(activeOrder.discount_total) ? ' · discount −' + money$(activeOrder.discount_total) : ''} · ${activeOrder.vat == null ? 'taxes/fees: the branch adds its fees (amount not published)' : `VAT ${branch ? fmt(branch.vat_percent) : ''}% ${money$(activeOrder.vat)}`} · delivery ${activeOrder.delivery_fee == null ? (mode === 'pickup' ? '0 (pickup)' : 'to be confirmed by the branch') : money$(activeOrder.delivery_fee)} · total ${money$(activeOrder.total)}` : '',
   cartItems.some(i => i.extra_charge) ? `  a preparation charge the branch has not published is still to be added for: ${cartItems.filter(i => i.extra_charge).map(i => i.display_name || i.item_name).join('، ')}` : '',
   stale.length ? `  ⚠ NO LONGER AVAILABLE (switched off by the restaurant since it went in the cart): ${stale.join('، ')} — tell the customer, offer an alternative, and update the cart` : '',

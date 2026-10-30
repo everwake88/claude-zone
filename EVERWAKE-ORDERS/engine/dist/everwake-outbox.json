@@ -287,6 +287,158 @@
         }
       },
       "id": "cf360a18-8911-5c17-abad-2d99d55307c0"
+    },
+    {
+      "name": "Claim Webhooks",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        900
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.integration_claim(25) as r;",
+        "options": {}
+      },
+      "alwaysOutputData": true,
+      "id": "aaaa6d89-5f0e-557e-ad3b-c74027719811"
+    },
+    {
+      "name": "One Webhook Per Item",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        900
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Outbox · NODE: One Webhook Per Item\n// The deliveries due to the restaurants' own systems (POS / ERP / CRM):\n// one item each, ready to be signed and sent.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201554354929 → 01554354929\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\n// a villa or a house has no floor or apartment to ask for\nconst HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;\n// …and nobody climbs to a flat when the customer comes down for it or lowers a basket\n// (\"هنزل السبت\", \"حد هينزل يستلم\", \"لما توصل متطلعش\")\nconst COMES_DOWN_RE = /السبت|سبت|هنزل|هينزل|هننزل|حنزل|نازل|نازلين|هستلم تحت|هنستلم تحت|استلم تحت|متطلعش|ما تطلعش|مش محتاج تطلع|تحت البيت|تحت العمارة|على الباب تحت|comes? down|basket/i;\nconst fieldNeeded = (f, d) => !(['address_floor', 'address_apartment'].includes(f)\n  && (HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' '))\n      || !!str(d.comes_down)\n      || COMES_DOWN_RE.test([d.address_notes, d.order_notes].map(str).join(' '))));\n// a weight the Egyptian way: 0.5 → نص كيلو, 1.5 → كيلو ونص\nconst kiloText = (q) => {\n  const n = Math.round(num(q) * 100) / 100, whole = Math.floor(n), part = Math.round((n - whole) * 100) / 100;\n  const frac = { 0.25: 'ربع', 0.5: 'نص', 0.75: 'تلت تربع' }[part];\n  if (part && !frac) return `${fmt(n)} كيلو`;\n  if (!whole) return `${frac} كيلو`;\n  const w = whole === 1 ? 'كيلو' : whole === 2 ? '2 كيلو' : `${whole} كيلو`;\n  return frac ? `${w} و${frac}` : w;\n};\nconst r = row($input.first().json);\nconst due = Array.isArray(r) ? r : arr(obj($input.first().json).r);\nreturn due.map(e => ({ json: { id: e.id, url: e.url, secret: e.secret, event: e.event, body: e.body } }));\n"
+      },
+      "id": "7f6421dc-bc9b-5270-ac91-b5877e3b211a"
+    },
+    {
+      "name": "Sign Webhook",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        880,
+        900
+      ],
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.body }}",
+        "dataPropertyName": "signature",
+        "secret": "={{ $json.secret }}",
+        "encoding": "hex"
+      },
+      "id": "28f35505-8928-534a-a27c-fe74eb44cff6"
+    },
+    {
+      "name": "Send Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1100,
+        900
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Everwake-Event",
+              "value": "={{ $json.event }}"
+            },
+            {
+              "name": "X-Everwake-Delivery",
+              "value": "={{ String($json.id) }}"
+            },
+            {
+              "name": "X-Everwake-Signature",
+              "value": "=sha256={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "34407949-a426-55bb-a7b5-3351f3bb711c"
+    },
+    {
+      "name": "Webhook Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        900
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE — Outbox · NODE: Webhook Result\n// What the restaurant's system answered: 2xx is delivered; anything else\n// is tried again later (1, 2, 4… minutes), then shown as failed.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201554354929 → 01554354929\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\n// a villa or a house has no floor or apartment to ask for\nconst HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;\n// …and nobody climbs to a flat when the customer comes down for it or lowers a basket\n// (\"هنزل السبت\", \"حد هينزل يستلم\", \"لما توصل متطلعش\")\nconst COMES_DOWN_RE = /السبت|سبت|هنزل|هينزل|هننزل|حنزل|نازل|نازلين|هستلم تحت|هنستلم تحت|استلم تحت|متطلعش|ما تطلعش|مش محتاج تطلع|تحت البيت|تحت العمارة|على الباب تحت|comes? down|basket/i;\nconst fieldNeeded = (f, d) => !(['address_floor', 'address_apartment'].includes(f)\n  && (HOUSE_RE.test([d.address_building, d.address_street, d.address_notes, d.address_landmark].map(str).join(' '))\n      || !!str(d.comes_down)\n      || COMES_DOWN_RE.test([d.address_notes, d.order_notes].map(str).join(' '))));\n// a weight the Egyptian way: 0.5 → نص كيلو, 1.5 → كيلو ونص\nconst kiloText = (q) => {\n  const n = Math.round(num(q) * 100) / 100, whole = Math.floor(n), part = Math.round((n - whole) * 100) / 100;\n  const frac = { 0.25: 'ربع', 0.5: 'نص', 0.75: 'تلت تربع' }[part];\n  if (part && !frac) return `${fmt(n)} كيلو`;\n  if (!whole) return `${frac} كيلو`;\n  const w = whole === 1 ? 'كيلو' : whole === 2 ? '2 كيلو' : `${whole} كيلو`;\n  return frac ? `${w} و${frac}` : w;\n};\nconst sent = $('Sign Webhook').first().json;\nconst r = obj($input.first().json);\nconst code = Number(r.statusCode || 0);\nconst ok = code >= 200 && code < 300;\nreturn [{ json: { b64_result: b64({ id: sent.id, ok, status_code: code || null,\n                                    error: ok ? null : str(r.error && (r.error.message || r.error) || r.statusMessage || '').slice(0, 300) || null }) } }];\n"
+      },
+      "id": "1bf8aa77-d8db-597b-a6ac-a55cfd32d2e0"
+    },
+    {
+      "name": "Save Webhook Result",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1540,
+        900
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_DB",
+          "name": "Everwake DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select everwake.integration_result(convert_from(decode($1::text, 'base64'), 'UTF8')::jsonb) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $json.b64_result ] }}"
+        }
+      },
+      "id": "890854c7-4646-510e-ac9b-bc88fb092bc2"
+    },
+    {
+      "name": "Sticky — Webhooks",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        400,
+        1080
+      ],
+      "parameters": {
+        "content": "### The restaurant's own system (POS / ERP / CRM)\nEvery order and every dish switched off or on is POSTed to the URL set in Settings → Integrations, signed: `X-Everwake-Signature: sha256=<HMAC-SHA256 of the body with the endpoint's secret>`. Not 2xx → tried again after 1, 2, 4… minutes.",
+        "width": 1300,
+        "height": 140,
+        "color": 6
+      },
+      "id": "16f89104-ec01-5519-ab5d-fa40961aca08"
     }
   ],
   "pinData": {},
@@ -309,6 +461,11 @@
             "node": "Claim Batch",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Claim Webhooks",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -318,6 +475,66 @@
         [
           {
             "node": "Claim Batch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Claim Webhooks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Webhooks": {
+      "main": [
+        [
+          {
+            "node": "One Webhook Per Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One Webhook Per Item": {
+      "main": [
+        [
+          {
+            "node": "Sign Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Webhook": {
+      "main": [
+        [
+          {
+            "node": "Webhook Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Result": {
+      "main": [
+        [
+          {
+            "node": "Save Webhook Result",
             "type": "main",
             "index": 0
           }

@@ -208,7 +208,7 @@ begin
            'free_item_code', (select i.code from everwake.menu_items i where i.id = o.free_item_id),
            'free_item_name', (select i.name_ar from everwake.menu_items i where i.id = o.free_item_id),
            'free_item_qty', o.free_item_qty,
-           'promo_code', o.promo_code, 'first_order_only', o.first_order_only,
+           'promo_code', o.promo_code, 'first_order_only', o.first_order_only, 'every_nth_order', o.every_nth_order,
            'stackable', o.stackable, 'priority', o.priority,
            'starts_at', o.starts_at, 'ends_at', o.ends_at, 'days_of_week', to_jsonb(o.days_of_week),
            'time_from', o.time_from, 'time_to', o.time_to)

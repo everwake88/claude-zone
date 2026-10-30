@@ -497,6 +497,34 @@ begin
           or (nullif(p ->> 'merchant_order_id', '') is null and provider_order_id = nullif(p ->> 'provider_order_id', '')::bigint))
    order by id desc limit 1 for update;
   if not found then return jsonb_build_object('ok', true, 'matched', false); end if;
+
+  -- a QR checkout (016): no order yet — the money arriving makes it
+  if pay.order_id is null and pay.checkout_id is not null then
+    if v_back then
+      update everwake.payments set status = 'refunded', raw = p, updated_at = now() where id = pay.id and status = 'paid';
+      update everwake.orders set payment_status = 'refunded', updated_at = now()
+       where checkout_id = pay.checkout_id and payment_status = 'paid';
+      return jsonb_build_object('ok', true, 'matched', true, 'status', 'refunded');
+    end if;
+    if v_pend then return jsonb_build_object('ok', true, 'matched', true, 'status', 'pending'); end if;
+    if not v_ok then
+      update everwake.payments set attempts = attempts + 1, last_error = left(coalesce(nullif(p ->> 'error', ''), 'declined'), 300),
+                                   raw = p, updated_at = now() where id = pay.id;
+      return jsonb_build_object('ok', true, 'matched', true, 'status', 'declined');
+    end if;
+    if (p ->> 'amount_cents')::bigint is distinct from round(pay.amount * 100)::bigint then
+      update everwake.payments set last_error = 'AMOUNT_MISMATCH ' || (p ->> 'amount_cents'), raw = p, updated_at = now() where id = pay.id;
+      return jsonb_build_object('ok', true, 'matched', true, 'status', 'amount_mismatch');
+    end if;
+    update everwake.payments
+       set status = 'paid', paid_at = coalesce(paid_at, now()), transaction_id = nullif(p ->> 'transaction_id', '')::bigint,
+           method = nullif(p ->> 'method', ''), card_brand = nullif(p ->> 'card_brand', ''), card_last4 = nullif(p ->> 'card_last4', ''),
+           last_error = null, raw = p, updated_at = now()
+     where id = pay.id;
+    return jsonb_build_object('ok', true, 'matched', true, 'status', 'paid')
+           || everwake.qr_checkout_paid(pay.checkout_id, 'card', null);
+  end if;
+
   select * into o from everwake.orders where id = pay.order_id for update;
   select * into t from everwake.tenants where id = pay.tenant_id;
   v_amt := everwake.money_text(pay.amount, t.currency_symbol_ar);

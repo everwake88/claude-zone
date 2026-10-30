@@ -170,6 +170,7 @@ declare
   base      jsonb;
   v_q       everwake.messages%rowtype;
   v_quote   text;
+  v_link    jsonb;
 begin
   select * into ch from everwake.whatsapp_channels
    where provider = coalesce(nullif(p ->> 'provider', ''), 'evolution')
@@ -303,6 +304,13 @@ begin
   base := base || jsonb_build_object(
     'customer_id', cust.id, 'conversation_id', conv.id, 'message_id', v_msg,
     'wa_id', cust.wa_id, 'reply_to', cust.reply_to, 'phone_hidden', cust.phone_hidden);
+
+  -- "tell me on WhatsApp when it's ready", from a QR order's waiting page (016): the message carries
+  -- the order's code; this chat is linked to it and answered here, no agent needed
+  if v_text ~* 'Q-[0-9a-f]{10}' then
+    v_link := everwake.qr_link_whatsapp(t.id, cust.id, cust.wa_id, conv.id, v_text);
+    if v_link is not null then return base || v_link; end if;
+  end if;
 
   if cust.is_blocked then
     return base || jsonb_build_object('route', 'ignore', 'reason', 'blocked');
@@ -732,6 +740,10 @@ begin
                order by pc.last_message_at desc limit 1),
     -- table bookings (010): the rules, the one in progress, and what is coming up
     'reservation_setup', everwake.reservation_setup(p_tenant),
+    -- what customers usually order with the dishes in this cart (016)
+    'pairs', everwake.item_pairs(p_tenant, coalesce((select array_agg(i ->> 'code') from everwake.orders o,
+                                                       jsonb_array_elements(coalesce(o.cart -> 'items', '[]'::jsonb)) i
+                                                      where o.tenant_id = p_tenant and o.wa_id = p_wa and o.status = 'draft'), '{}')),
     -- what the agent asked the team in the last day, and their answers (014)
     'team_questions', coalesce((
        select jsonb_agg(jsonb_build_object('id', q.id, 'question', q.question, 'asked_at', q.asked_at, 'status', q.status,

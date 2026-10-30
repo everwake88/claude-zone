@@ -83,6 +83,8 @@ declare
 begin
   select * into conv from everwake.conversations where tenant_id = p_tenant and wa_id = p_wa;
   if not found then
+    -- an order from a QR code whose customer never asked for WhatsApp (016): nothing to send
+    if p_wa like 'qr-%' then return jsonb_build_object('skipped', true); end if;
     raise exception 'no conversation with % for this restaurant', p_wa;
   end if;
   select * into cust from everwake.customers where id = conv.customer_id;
@@ -376,6 +378,7 @@ declare
   v_sent  boolean := false;
   v_bname text;
   v_line  text;
+  v_q     jsonb;
 begin
   select * into o from everwake.orders where id = p_order for update;
   if not found then raise exception 'order not found'; end if;
@@ -433,9 +436,9 @@ begin
                        else ' ' || btrim(p_note) || '.' end,
         'name', ''));
       v_body := concat_ws(E'\n', nullif(btrim(coalesce(v_body, '')), ''), v_line);
-      perform everwake.queue_customer_message(o.tenant_id, o.wa_id, 'order_status', v_body,
-                                              p_user => everwake.current_user_id());
-      v_sent := true;
+      v_q := everwake.queue_customer_message(o.tenant_id, o.wa_id, 'order_status', v_body,
+                                             p_user => everwake.current_user_id());
+      v_sent := not coalesce((v_q ->> 'skipped')::boolean, false);
     end if;
   end if;
 
@@ -519,7 +522,7 @@ end $$;
 create or replace function everwake.housekeeping()
 returns jsonb language plpgsql as $$
 declare
-  n_release int; n_locks int; n_stuck int; n_buf int; n_snap int := 0; n_busy int; n_rep int; n_pay int;
+  n_release int; n_locks int; n_stuck int; n_buf int; n_snap int := 0; n_busy int; n_rep int; n_pay int; n_qr int;
   r record;
 begin
   -- a takeover nobody touched for a while goes back to the agent
@@ -565,7 +568,15 @@ begin
   -- online payments: one reminder, then the link expires and the branch is told (011)
   n_pay := everwake.payment_due();
 
+  -- QR carts nobody paid for in time (016): gone from the cashier's list, their links closed
+  with gone as (
+    update everwake.qr_checkouts set status = 'expired'
+     where status = 'awaiting_payment' and expires_at < now() returning id)
+  update everwake.payments p set status = 'expired', updated_at = now()
+    from gone where p.checkout_id = gone.id and p.status in ('creating', 'pending');
+  get diagnostics n_qr = row_count;
+
   return jsonb_build_object('takeovers_released', n_release, 'locks_cleared', n_locks, 'outbox_requeued', n_stuck,
                             'buffer_cleared', n_buf, 'busy_cleared', n_busy, 'snapshots_rebuilt', n_snap,
-                            'reports_queued', n_rep, 'payments_due', n_pay);
+                            'reports_queued', n_rep, 'payments_due', n_pay, 'qr_payments_expired', n_qr);
 end $$;
