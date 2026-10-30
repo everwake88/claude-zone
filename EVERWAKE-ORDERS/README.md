@@ -37,6 +37,8 @@ rows in the database, not a copy of the workflows.
   - Menu editor with an out-of-stock switch (for an hour, for today, or until switched back), per-branch prices and photos.
   - AI menu import from a PDF, photos, a link, pasted text or a spreadsheet.
   - Offers and promo codes, branches with hours and a "too busy" pause, delivery zones drawn on a map, customers, analytics with "commission saved", and every automatic message in the restaurant's own words.
+- **Ordering in the branch.** A QR code on the counter and each table: the branch's menu on the customer's phone, pay by card or at the counter, then a waiting page that counts down and rings when it's ready (and WhatsApp, if they want). The kitchen gets it on its own screen with a hold-to-talk button ("123 ready", "the kofta is finished"), and a TV shows the numbers that are ready. Loyalty ("every 10th order") works there and on WhatsApp.
+- **Their own system stays.** Every order goes to the restaurant's POS, ERP or CRM (signed webhooks), and that system can mark dishes sold out and move orders here (an API key).
 - **The agent switch.** Turn it OFF when the kitchen is full: everyone who writes gets one warm apology and is remembered. Turn it ON and they all get "we're back, order now".
 
 Every save in the dashboard reaches the agent on its very next message.

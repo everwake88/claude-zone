@@ -1,5 +1,5 @@
 'use client';
-import { Banknote, Bike, Check, ChefHat, Clock, Copy, CreditCard, MapPin, MessageCircle, Package, Phone, Send, Store, X } from 'lucide-react';
+import { Banknote, Bike, Check, ChefHat, Clock, Copy, CreditCard, MapPin, MessageCircle, Package, Phone, QrCode, Send, Store, UtensilsCrossed, X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Drawer, Field, Input, Modal, PageHeader, Select, Spinner, Textarea, useAction, useToast } from '@/components/ui';
@@ -29,13 +29,14 @@ const COLUMNS: { key: string; title: string; statuses: OrderStatus[] }[] = [
 
 // what each order can do next, and what the customer hears (Settings → Messages)
 function nextSteps(o: Order): { status: OrderStatus; label: string; variant: 'primary' | 'positive' | 'gold' }[] {
-  const pickup = o.delivery_method === 'pickup';
+  // collected at the branch, or (from a table's QR code) served at the table
+  const pickup = o.delivery_method === 'pickup' || o.delivery_method === 'dine_in';
   switch (o.status) {
     case 'placed': return [{ status: 'accepted', label: 'Accept', variant: 'positive' }];
     case 'accepted': return [{ status: 'preparing', label: 'Preparing', variant: 'primary' },
                              pickup ? { status: 'ready', label: 'Ready for pickup', variant: 'gold' } : { status: 'out_for_delivery', label: 'Out for delivery', variant: 'gold' }];
     case 'preparing': return [pickup ? { status: 'ready', label: 'Ready for pickup', variant: 'gold' } : { status: 'out_for_delivery', label: 'Out for delivery', variant: 'gold' }];
-    case 'ready': return [{ status: 'picked_up', label: 'Picked up', variant: 'positive' }];
+    case 'ready': return [{ status: 'picked_up', label: o.delivery_method === 'dine_in' ? 'Served' : 'Picked up', variant: 'positive' }];
     case 'out_for_delivery': return [{ status: 'delivered', label: 'Delivered', variant: 'positive' }];
     default: return [];
   }
@@ -132,9 +133,13 @@ export default function OrdersBoard() {
                         <p className="font-semibold">{o.order_no}</p>
                         <p className="text-xs text-muted">{clock(o.placed_at, tenant.timezone)} · {timeAgo(o.placed_at)}{o.branch_id && branches.length > 1 ? ` · ${branchName[o.branch_id]}` : ''}</p>
                       </div>
-                      <Badge tone={o.delivery_method === 'pickup' ? 'navy' : 'gold'}>
-                        {o.delivery_method === 'pickup' ? <><Store className="size-3" /> {t('Pickup')}</> : <><Bike className="size-3" /> {t('Delivery')}</>}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge tone={o.delivery_method === 'delivery' ? 'gold' : 'navy'}>
+                          {o.delivery_method === 'dine_in' ? <><UtensilsCrossed className="size-3" /> {t('Table {n}', { n: o.table_label || '' })}</>
+                            : o.delivery_method === 'pickup' ? <><Store className="size-3" /> {t('Pickup')}</> : <><Bike className="size-3" /> {t('Delivery')}</>}
+                        </Badge>
+                        {o.source === 'qr' && <Badge><QrCode className="size-3" /> QR</Badge>}
+                      </div>
                     </div>
                     <p className="mt-2 text-sm font-medium" dir="auto">{displayName(o.customer as never)}</p>
                     <ul className="mt-1 space-y-0.5 text-sm text-muted" dir="auto">
@@ -253,7 +258,8 @@ function OrderDrawer({ order, onClose, base, branchName, onCancel, onChanged }:
       <div className="space-y-5 text-sm">
         <div className="flex flex-wrap gap-2">
           <Badge tone="gold">{statusLabel(order.status)}</Badge>
-          <Badge>{order.delivery_method === 'pickup' ? t('Pickup') : t('Delivery')}</Badge>
+          <Badge>{order.delivery_method === 'dine_in' ? t('Table {n}', { n: order.table_label || '' }) : order.delivery_method === 'pickup' ? t('Pickup') : t('Delivery')}</Badge>
+          {order.source === 'qr' && <Badge><QrCode className="size-3" /> {t('Ordered from the QR code')}</Badge>}
           {order.branch_id && <Badge><Store className="size-3" /> {branchName[order.branch_id]}</Badge>}
           <Badge><Clock className="size-3" /> {dateTime(order.placed_at, tenant.timezone)}</Badge>
           {order.eta_text && <Badge>{t('ETA {eta}', { eta: order.eta_text })}</Badge>}
@@ -337,8 +343,8 @@ function OrderDrawer({ order, onClose, base, branchName, onCancel, onChanged }:
             {events.map(e => (
               <li key={e.id} className="flex items-center gap-2">
                 {PAY_EVENT[e.status] ? <CreditCard className={cx('size-4', e.status === 'payment_expired' ? 'text-critical' : 'text-gold-ink')} />
-                  : e.status === 'placed' ? <Package className="size-4 text-gold" /> : e.status === 'rejected' || e.status === 'cancelled' ? <X className="size-4 text-critical" /> : e.status === 'accepted' || e.status === 'preparing' ? <ChefHat className="size-4" /> : <Check className="size-4 text-positive" />}
-                <span>{PAY_EVENT[e.status] ? t(PAY_EVENT[e.status]) : statusLabel(e.status as OrderStatus)}</span>
+                  : e.status === 'note' ? <MessageCircle className="size-4 text-gold-ink" /> : e.status === 'placed' ? <Package className="size-4 text-gold" /> : e.status === 'rejected' || e.status === 'cancelled' ? <X className="size-4 text-critical" /> : e.status === 'accepted' || e.status === 'preparing' ? <ChefHat className="size-4" /> : <Check className="size-4 text-positive" />}
+                <span>{PAY_EVENT[e.status] ? t(PAY_EVENT[e.status]) : e.status === 'note' ? t('Note to the customer') : statusLabel(e.status as OrderStatus)}</span>
                 <span className="text-muted">{clock(e.created_at, tenant.timezone)} · {e.by_role === 'agent' ? t('by the agent') : t(e.by_role)}{e.notified ? ' · ' + t('customer told') : ''}</span>
                 {e.note && <span className="text-muted" dir="auto">— {e.note}</span>}
               </li>

@@ -2,12 +2,14 @@
 import QRCode from 'qrcode';
 import { inkOf, logoBackground, mix, onColor } from './menu-art';
 
-// A printable card with the restaurant's WhatsApp QR code: for the bags that
-// go out with delivery-app orders, the counter, flyers. A6 at 300 dpi.
+// A printable card with a QR code: the restaurant's WhatsApp for the bags
+// that go out with delivery-app orders and flyers, or the branch's menu to
+// order from at the counter and on each table. A6 at 300 dpi.
 export const CARD_W = 1240, CARD_H = 1748;
 
 export interface CardInput {
   link: string; title: string; headline: string; offer: string; branch: string | null; phone: string;
+  place?: string | null;   // in place of the WhatsApp number, e.g. ترابيزة 7
   logo: HTMLImageElement | null; color: string; font: string;
 }
 
@@ -87,11 +89,12 @@ export async function drawCard(p: CardInput): Promise<HTMLCanvasElement> {
 
   // the branch and the number
   ctx.fillStyle = ink; ctx.font = F(800, 54);
-  if (p.branch) ctx.fillText(`فرع ${p.branch}`, W / 2, H - 230);
+  if (p.branch) ctx.fillText(`فرع ${p.branch}`, W / 2, H - 180);
   ctx.fillStyle = '#1F1A17'; ctx.font = F(700, 46);
-  ctx.save(); ctx.direction = 'ltr'; ctx.fillText(`WhatsApp  ${p.phone}`, W / 2, H - 150); ctx.restore();
+  if (p.place) ctx.fillText(p.place, W / 2, H - 112);
+  else if (p.phone) { ctx.save(); ctx.direction = 'ltr'; ctx.fillText(`WhatsApp  ${p.phone}`, W / 2, H - 112); ctx.restore(); }
   ctx.fillStyle = '#857A70'; ctx.font = F(600, 32);
-  ctx.fillText(p.title, W / 2, H - 80);
+  ctx.fillText(p.title, W / 2, H - 56);
   return c;
 }
 

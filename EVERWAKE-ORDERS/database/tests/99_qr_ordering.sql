@@ -135,6 +135,8 @@ begin
   perform everwake.integration_result(jsonb_build_object('id', r -> 1 ->> 'id', 'ok', false, 'status_code', 500));
   assert (select status from everwake.integration_events where id = (r -> 0 ->> 'id')::bigint) = 'sent';
   assert (select status from everwake.integration_events where id = (r -> 1 ->> 'id')::bigint) = 'queued';
+  r := everwake.integration_test(ep);
+  assert (select event from everwake.integration_events where id = (r ->> 'id')::bigint) = 'test', r::text;
 
   k := everwake.api_key_create(t, 'POS') ->> 'key';
   assert everwake.api_key_tenant(k) = t and everwake.api_key_tenant('ew_wrong') is null;
@@ -142,4 +144,40 @@ begin
   assert (r ->> 'ok')::boolean, r::text;
   r := everwake.api_set_order_status(t, o.order_no, 'picked_up');
   assert r ->> 'status' = 'picked_up', r::text;
+  -- a POS that cannot take webhooks asks for what changed, and for the menu's codes
+  r := everwake.api_orders(t, now() - interval '1 hour');
+  assert exists (select 1 from jsonb_array_elements(r -> 'orders') x where x ->> 'order_no' = o.order_no and x ->> 'status' = 'picked_up'), r::text;
+  assert r ->> 'until' is not null;
+  r := everwake.api_menu(t, 'zamalek');
+  assert (r ->> 'ok')::boolean and exists (select 1 from jsonb_array_elements(r -> 'items') x where x ->> 'code' = v_kofta), r::text;
+  assert everwake.api_menu(t, 'nowhere') ->> 'error' = 'BRANCH_NOT_FOUND';
+end $$;
+
+-- the cashier taps Paid on the kitchen screen, signed in as staff: the order is
+-- made at commit, and queued for the restaurant's own system with it
+do $$
+declare
+  t uuid := (select id from everwake.tenants where slug = 'nile_grill');
+  kofta text := (select code from everwake.menu_items where tenant_id = (select id from everwake.tenants where slug = 'nile_grill') and name_ar = 'كفتة مشوية');
+  r jsonb;
+begin
+  r := everwake.qr_checkout_create(jsonb_build_object(
+         'code', (select code from everwake.qr_codes where tenant_id = t and table_label is null and is_active limit 1),
+         'cart', jsonb_build_object('items', jsonb_build_array(jsonb_build_object('code', kofta, 'item_name', 'كفتة مشوية',
+                   'display_name', 'كفتة مشوية', 'unit', 'kg', 'quantity', 0.5, 'unit_price', 480, 'line_total', 240))),
+         'payment_method', 'cash', 'totals', jsonb_build_object('subtotal', 240, 'total', 240)));
+  assert (r ->> 'ok')::boolean, r::text;
+  perform set_config('test.checkout', (select id from everwake.qr_checkouts where token = r ->> 'token')::text, false);
+end $$;
+set role authenticated;
+select set_config('request.jwt.claims', '{"sub":"33333333-3333-3333-3333-333333333333","email":"cashier@nile.example"}', false);
+select everwake.qr_cashier_paid(current_setting('test.checkout')::bigint);
+reset role;
+select set_config('request.jwt.claims', '', false);
+do $$
+begin
+  assert exists (select 1 from everwake.integration_events ev
+                   join everwake.qr_checkouts c on c.id = current_setting('test.checkout')::bigint
+                   join everwake.orders o on o.id = c.order_id
+                  where ev.event = 'order.created' and ev.payload ->> 'order_no' = o.order_no), 'queued by a staff member''s tap';
 end $$;

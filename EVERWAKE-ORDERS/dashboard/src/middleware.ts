@@ -35,7 +35,9 @@ export async function middleware(request: NextRequest) {
 
   // customers' payment pages and Paymob's notices need no sign-in (the link route checks its own callers)
   const open = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/api/health')
-    || path.startsWith('/p/') || path.startsWith('/api/pay/');
+    || path.startsWith('/p/') || path.startsWith('/api/pay/')
+    // ordering in the branch from a QR code (customers), and the restaurant's own system (an API key)
+    || path.startsWith('/q/') || path.startsWith('/api/q/') || path.startsWith('/api/v1/');
   if (!user && !open) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';

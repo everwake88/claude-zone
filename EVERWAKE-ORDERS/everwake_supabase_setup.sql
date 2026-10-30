@@ -6813,7 +6813,7 @@ revoke execute on function everwake.media_understood(jsonb) from public, anon, a
 -- ---------------------------------------------------------------------
 -- QR codes: one per branch counter, or one per table
 -- ---------------------------------------------------------------------
-create table everwake.qr_codes (
+create table if not exists everwake.qr_codes (
   id          uuid primary key default gen_random_uuid(),
   tenant_id   uuid not null references everwake.tenants(id) on delete cascade,
   branch_id   uuid not null references everwake.branches(id) on delete cascade,
@@ -6824,10 +6824,10 @@ create table everwake.qr_codes (
   created_at  timestamptz not null default now(),
   unique (branch_id, table_label)
 );
-create index qr_codes_tenant_idx on everwake.qr_codes (tenant_id, branch_id);
+create index if not exists qr_codes_tenant_idx on everwake.qr_codes (tenant_id, branch_id);
 
 -- a cart from a QR code, priced by the server, waiting for its money
-create table everwake.qr_checkouts (
+create table if not exists everwake.qr_checkouts (
   id              bigint generated always as identity primary key,
   tenant_id       uuid not null references everwake.tenants(id) on delete cascade,
   branch_id       uuid not null references everwake.branches(id) on delete cascade,
@@ -6854,26 +6854,26 @@ create table everwake.qr_checkouts (
   expires_at      timestamptz not null,
   paid_at         timestamptz
 );
-create index qr_checkouts_waiting_idx on everwake.qr_checkouts (tenant_id, branch_id, status) where status = 'awaiting_payment';
+create index if not exists qr_checkouts_waiting_idx on everwake.qr_checkouts (tenant_id, branch_id, status) where status = 'awaiting_payment';
 
 alter table everwake.orders
-  add column qr_token     text unique,     -- the customer's waiting page
-  add column table_label  text,            -- served at this table
-  add column ready_by     timestamptz,     -- the time it was promised for
-  add column checkout_id  bigint references everwake.qr_checkouts(id) on delete set null;
+  add column if not exists qr_token     text unique,     -- the customer's waiting page
+  add column if not exists table_label  text,            -- served at this table
+  add column if not exists ready_by     timestamptz,     -- the time it was promised for
+  add column if not exists checkout_id  bigint references everwake.qr_checkouts(id) on delete set null;
 
 -- a card payment for a QR checkout has no order yet: the order is made when the money arrives
 alter table everwake.payments alter column order_id drop not null;
-alter table everwake.payments add column checkout_id bigint references everwake.qr_checkouts(id) on delete cascade;
+alter table everwake.payments add column if not exists checkout_id bigint references everwake.qr_checkouts(id) on delete cascade;
 
 -- loyalty: an offer for every Nth order (the 10th, the 20th…)
-alter table everwake.offers add column every_nth_order int check (every_nth_order is null or every_nth_order >= 2);
+alter table everwake.offers add column if not exists every_nth_order int check (every_nth_order is null or every_nth_order >= 2);
 
 -- ---------------------------------------------------------------------
 -- Integrations: the restaurant's own system hears about orders and stock
 -- (signed webhooks) and can switch dishes off / move orders on (API keys)
 -- ---------------------------------------------------------------------
-create table everwake.integration_endpoints (
+create table if not exists everwake.integration_endpoints (
   id          uuid primary key default gen_random_uuid(),
   tenant_id   uuid not null references everwake.tenants(id) on delete cascade,
   label       text,
@@ -6885,7 +6885,7 @@ create table everwake.integration_endpoints (
   last_error  text,
   created_at  timestamptz not null default now()
 );
-create table everwake.integration_events (
+create table if not exists everwake.integration_events (
   id           bigint generated always as identity primary key,
   tenant_id    uuid not null references everwake.tenants(id) on delete cascade,
   endpoint_id  uuid not null references everwake.integration_endpoints(id) on delete cascade,
@@ -6898,9 +6898,9 @@ create table everwake.integration_events (
   created_at   timestamptz not null default now(),
   sent_at      timestamptz
 );
-create index integration_events_due_idx on everwake.integration_events (status, next_try_at) where status in ('queued', 'sending');
+create index if not exists integration_events_due_idx on everwake.integration_events (status, next_try_at) where status in ('queued', 'sending');
 
-create table everwake.api_keys (
+create table if not exists everwake.api_keys (
   id           uuid primary key default gen_random_uuid(),
   tenant_id    uuid not null references everwake.tenants(id) on delete cascade,
   label        text,
@@ -7401,9 +7401,11 @@ begin
   return n;
 end $$;
 
--- orders: queued after the statement, so the order's lines are already there
+-- orders: queued after the statement, so the order's lines are already there.
+-- Both run as the owner: a deferred trigger fires at commit, as whoever is
+-- signed in (a cashier), who may not queue deliveries or read the secrets.
 create or replace function everwake.orders_to_integrations()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql security definer set search_path = everwake, pg_temp as $$
 begin
   if new.status = 'draft' or new.order_no is null then return null; end if;
   if not exists (select 1 from everwake.integration_endpoints e where e.tenant_id = new.tenant_id and e.is_active) then return null; end if;
@@ -7415,11 +7417,12 @@ begin
   end if;
   return null;
 end $$;
+drop trigger if exists orders_integrations on everwake.orders;
 create constraint trigger orders_integrations after insert or update on everwake.orders
   deferrable initially deferred for each row execute function everwake.orders_to_integrations();
 
 create or replace function everwake.stock_to_integrations()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql security definer set search_path = everwake, pg_temp as $$
 declare v_code text; v_name text; v_branch text;
 begin
   if not exists (select 1 from everwake.integration_endpoints e where e.tenant_id = new.tenant_id and e.is_active) then return null; end if;
@@ -7439,8 +7442,10 @@ begin
   end if;
   return null;
 end $$;
+drop trigger if exists menu_items_integrations on everwake.menu_items;
 create trigger menu_items_integrations after update on everwake.menu_items
   for each row execute function everwake.stock_to_integrations();
+drop trigger if exists menu_item_branches_integrations on everwake.menu_item_branches;
 create trigger menu_item_branches_integrations after insert or update on everwake.menu_item_branches
   for each row execute function everwake.stock_to_integrations();
 
@@ -7534,6 +7539,53 @@ begin
   return everwake.set_order_status(v_id, p_status, p_note, true, null);
 end $$;
 
+-- "Send a test" in the settings: one delivery to that address, whatever events it takes
+create or replace function everwake.integration_test(p_endpoint uuid)
+returns jsonb language plpgsql security definer set search_path = everwake, pg_temp as $$
+declare e everwake.integration_endpoints%rowtype; v bigint;
+begin
+  select * into e from everwake.integration_endpoints where id = p_endpoint;
+  if not found then return jsonb_build_object('ok', false, 'error', 'NOT_FOUND'); end if;
+  perform everwake.require_role(e.tenant_id, array['owner', 'manager']);
+  insert into everwake.integration_events (tenant_id, endpoint_id, event, payload)
+  values (e.tenant_id, e.id, 'test', jsonb_build_object('message', 'Everwake can reach your system.'))
+  returning id into v;
+  return jsonb_build_object('ok', true, 'id', v);
+end $$;
+
+-- for a system that cannot receive webhooks (a POS behind the shop's router):
+-- it asks every minute for what changed since its last ask
+create or replace function everwake.api_orders(p_tenant uuid, p_since timestamptz, p_limit int default 100)
+returns jsonb language sql stable as $$
+  select jsonb_build_object(
+    'orders', coalesce(jsonb_agg(everwake.order_payload(o) || jsonb_build_object('updated_at', o.updated_at) order by o.updated_at), '[]'::jsonb),
+    'until', max(o.updated_at))
+    from (select * from everwake.orders
+           where tenant_id = p_tenant and status <> 'draft' and order_no is not null
+             and updated_at > coalesce(p_since, now() - interval '1 day')
+           order by updated_at limit least(greatest(coalesce(p_limit, 100), 1), 500)) o
+$$;
+
+-- the menu as the agent sells it in a branch: codes to map to the POS's own
+create or replace function everwake.api_menu(p_tenant uuid, p_branch_code text default null)
+returns jsonb language plpgsql as $$
+declare v_scope text := 'all'; lk jsonb;
+begin
+  if nullif(p_branch_code, '') is not null then
+    select id::text into v_scope from everwake.branches where tenant_id = p_tenant and code = p_branch_code and is_active;
+    if v_scope is null then return jsonb_build_object('ok', false, 'error', 'BRANCH_NOT_FOUND'); end if;
+  end if;
+  perform everwake.ensure_snapshot(p_tenant);
+  select lookup into lk from everwake.menu_snapshot where tenant_id = p_tenant and scope = v_scope;
+  return jsonb_build_object('ok', true, 'branch', nullif(p_branch_code, ''), 'items', coalesce((
+    select jsonb_agg(jsonb_build_object('code', e.key, 'name', e.value ->> 'name', 'name_en', e.value ->> 'name_en',
+                                        'category', e.value ->> 'category', 'price', (e.value ->> 'price')::numeric,
+                                        'unit', e.value ->> 'unit',
+                                        'available', coalesce((e.value ->> 'available')::boolean, true) and (e.value ->> 'sold_out_until') is null,
+                                        'sold_out_until', e.value ->> 'sold_out_until') order by e.key)
+      from jsonb_each(coalesce(lk -> 'items', '{}'::jsonb)) e), '[]'::jsonb));
+end $$;
+
 -- ---------------------------------------------------------------------
 -- Who may see what
 -- ---------------------------------------------------------------------
@@ -7542,22 +7594,30 @@ alter table everwake.qr_checkouts enable row level security;
 alter table everwake.integration_endpoints enable row level security;
 alter table everwake.integration_events enable row level security;
 alter table everwake.api_keys enable row level security;
+drop policy if exists member_read on everwake.qr_codes;
 create policy member_read on everwake.qr_codes for select to authenticated
   using (tenant_id = any ((select everwake.my_tenant_ids())::uuid[]));
+drop policy if exists editor_write on everwake.qr_codes;
 create policy editor_write on everwake.qr_codes for all to authenticated
   using (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]))
   with check (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]));
+drop policy if exists member_read on everwake.qr_checkouts;
 create policy member_read on everwake.qr_checkouts for select to authenticated
   using (tenant_id = any ((select everwake.my_tenant_ids())::uuid[]));
+drop policy if exists editor_read on everwake.integration_endpoints;
 create policy editor_read on everwake.integration_endpoints for select to authenticated
   using (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]));
+drop policy if exists editor_write on everwake.integration_endpoints;
 create policy editor_write on everwake.integration_endpoints for all to authenticated
   using (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]))
   with check (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]));
+drop policy if exists editor_read on everwake.integration_events;
 create policy editor_read on everwake.integration_events for select to authenticated
   using (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]));
+drop policy if exists editor_read on everwake.api_keys;
 create policy editor_read on everwake.api_keys for select to authenticated
   using (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]));
+drop policy if exists editor_revoke on everwake.api_keys;
 create policy editor_revoke on everwake.api_keys for update to authenticated
   using (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]))
   with check (tenant_id = any ((select everwake.my_editor_tenant_ids())::uuid[]));
@@ -7573,7 +7633,8 @@ grant all on everwake.qr_codes, everwake.qr_checkouts, everwake.integration_endp
 revoke execute on all functions in schema everwake from public, anon;
 grant execute on all functions in schema everwake to service_role;
 grant execute on function everwake.qr_cashier_paid(bigint), everwake.qr_checkout_cancel(bigint, text),
-  everwake.order_note_to_customer(bigint, text), everwake.api_key_create(uuid, text), everwake.item_pairs(uuid, text[])
+  everwake.order_note_to_customer(bigint, text), everwake.api_key_create(uuid, text), everwake.item_pairs(uuid, text[]),
+  everwake.integration_test(uuid)
   to authenticated;
 
 -- ================= 090_supabase.sql =================

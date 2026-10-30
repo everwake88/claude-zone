@@ -64,6 +64,7 @@ export default function OffersPage() {
       item_ids: o.scope === 'items' ? o.item_ids || [] : [], category_ids: o.scope === 'categories' ? o.category_ids || [] : [],
       branch_ids: o.branch_ids || [], free_item_id: o.kind === 'free_item' ? o.free_item_id || null : null, free_item_qty: Number(o.free_item_qty || 1),
       promo_code: (o.promo_code || '').trim().toUpperCase() || null, first_order_only: !!o.first_order_only, stackable: !!o.stackable,
+      every_nth_order: o.every_nth_order && o.every_nth_order > 1 ? Math.round(o.every_nth_order) : null,
       priority: Number(o.priority ?? 100), starts_at: o.starts_at || null, ends_at: o.ends_at || null, days_of_week: o.days_of_week || [],
       time_from: o.time_from || null, time_to: o.time_to || null, is_active: o.is_active !== false
     };
@@ -99,6 +100,7 @@ export default function OffersPage() {
                     <Badge tone="gold">{t(KIND[o.kind])}</Badge>
                     {o.promo_code && <Badge tone="navy">{t('code {code}', { code: o.promo_code })}</Badge>}
                     {o.first_order_only && <Badge>{t('first order')}</Badge>}
+                    {o.every_nth_order && <Badge tone="gold">{t('every {n}th order', { n: o.every_nth_order })}</Badge>}
                     {o.stackable && <Badge>{t('stacks with others')}</Badge>}
                     {o.days_of_week.length > 0 && <Badge>{o.days_of_week.map(d => t(DAYS[d])).join(' ')}</Badge>}
                     {o.time_from && <Badge>{o.time_from.slice(0, 5)}–{o.time_to?.slice(0, 5)}</Badge>}
@@ -159,6 +161,9 @@ export default function OffersPage() {
             )}
             <Field label={t('Minimum order ({currency})', { currency: tenant.currency })}><Input type="number" value={edit.min_subtotal ?? ''} onChange={e => set('min_subtotal', e.target.value === '' ? null : Number(e.target.value))} /></Field>
             {edit.kind === 'percent_off' && <Field label={t('Maximum discount ({currency})', { currency: tenant.currency })}><Input type="number" value={edit.max_discount ?? ''} onChange={e => set('max_discount', e.target.value === '' ? null : Number(e.target.value))} /></Field>}
+            <Field label={t('Loyalty: every how many orders? (optional)')} hint={t('10 = the customer’s 10th, 20th, 30th… order gets it, on WhatsApp and the QR menu. The agent tells them how close they are.')}>
+              <Input type="number" min={2} value={edit.every_nth_order ?? ''} onChange={e => set('every_nth_order', e.target.value === '' ? null : Number(e.target.value))} placeholder="10" />
+            </Field>
             <Field label={t('Promo code (optional)')} hint={t('Only customers who send this code get it; the agent never reveals it.')}><Input dir="ltr" value={edit.promo_code || ''} onChange={e => set('promo_code', e.target.value.toUpperCase())} placeholder="RAMADAN20" /></Field>
             <Field label={t('Starts')}><Input type="datetime-local" value={localInput(edit.starts_at)} onChange={e => set('starts_at', e.target.value ? new Date(e.target.value).toISOString() : null)} /></Field>
             <Field label={t('Ends')}><Input type="datetime-local" value={localInput(edit.ends_at)} onChange={e => set('ends_at', e.target.value ? new Date(e.target.value).toISOString() : null)} /></Field>

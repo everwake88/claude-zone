@@ -55,7 +55,9 @@ You need:
 | `MENU_AI_MODEL` | Optional; defaults to `gpt-5.6-luna`, the model the agent uses. It must read PDFs and photos |
 | `N8N_BASE_URL` | Your n8n's public address, e.g. `https://n8n.example.com` |
 | `N8N_OUTBOX_SECRET` | A long random string; the same value goes into n8n (step 3). n8n also sends it when it asks the dashboard for a payment link |
-| `NEXT_PUBLIC_SITE_URL` | Optional: the dashboard's public address for the links sent to drivers (sign-in, "your orders") and customers (payment links). Without it, the address the page was opened on is used |
+| `NEXT_PUBLIC_SITE_URL` | Optional: the dashboard's public address for the links sent to drivers (sign-in, "your orders") and customers (payment links, the QR codes). Without it, the address the page was opened on is used. Set it before printing QR cards: the address is in the code |
+| `KITCHEN_TRANSCRIBE_MODEL` | Optional; the kitchen screen's "hold and speak" button. Defaults to `gpt-transcribe` (uses `OPENAI_API_KEY`) |
+| `KITCHEN_AI_MODEL` | Optional; reads what the kitchen said ("123 ready", "the kofta is finished"). Defaults to `MENU_AI_MODEL` |
 
 ### Hosting: Vercel
 
@@ -263,6 +265,67 @@ Keeping the keys safe:
   GitHub; `SUPABASE_SERVICE_ROLE_KEY` marked *Sensitive* in Vercel; few people
   on those teams. If a key may have leaked, make a new one in Paymob's dashboard
   and paste it in Settings → Payments — the old one stops working.
+
+## Ordering in the branch (QR codes) and the kitchen screen
+
+**Settings → QR ordering in the branch**: a QR code for each branch's counter
+(take away) and one per table (dine-in: `1-12, VIP` adds them all at once).
+Each prints as an A6 card with the logo; "Print all cards" opens one card per
+page. Set `NEXT_PUBLIC_SITE_URL` first — the address is in the code.
+
+The customer's side (no app, no sign-in):
+1. They scan and see that branch's menu: its prices, what is sold out, the
+   offers, "often ordered with it" suggestions, Arabic / English.
+2. The cart is priced by the server (`/api/q/<code>/checkout`, the same
+   arithmetic and offers as the agent's cart): items, discounts, VAT, total.
+3. **Card** (needs Paymob, Settings → Online payments): Paymob's checkout, and
+   back to the waiting page. The order reaches the kitchen when Paymob confirms.
+   **Cash**: a ticket number to show at the counter. Nothing reaches the
+   kitchen until the cashier takes the money and taps **Paid**. Unpaid tickets
+   expire after 30 minutes.
+4. The waiting page shows the order number, a countdown (the branch's prep time
+   plus 2 minutes per order already in the kitchen) and the kitchen's notes.
+   When it is ready the phone rings, vibrates and flashes. A web page cannot
+   wake a locked phone, so it also offers "message me on WhatsApp": one tap
+   sends a pre-filled message with the order's code; the customer is linked
+   (to their history and loyalty) and "ready" arrives on WhatsApp too.
+
+**Kitchen** (in the sidebar, best on a tablet): one branch, four columns.
+"At the counter" (cash tickets waiting for the cashier's Paid), New,
+Preparing, Ready — WhatsApp and QR orders together, a ring for each new one,
+a red ring on late ones. **Hold and speak** in Arabic: "طلب 123 جاهز",
+"قول لصاحب طلب 123 إن الكفتة هتتأخر ٥ دقايق", "الكفتة خلصت لحد بكرة". It
+shows what it understood and does it after 3 seconds unless someone taps
+cancel. **Ready screen** opens a full-screen board for a TV: the numbers being
+prepared and the numbers ready, with a chime.
+
+**Loyalty**: an offer with "every how many orders" (Offers) applies on the
+customer's 10th, 20th… order, on WhatsApp and QR alike. The agent and the
+waiting page say how close they are.
+
+## Connecting the restaurant's own system (POS, ERP, CRM)
+
+A restaurant that already runs a cashier system keeps it: Everwake sends every
+order there and that system can update Everwake back, so nobody types an order
+twice. **Settings → Your POS and systems**:
+
+- **Webhooks out.** Add the system's address. Every order (`order.created`,
+  `order.updated` for a status or payment change) and every stock switch
+  (`item.availability`) is POSTed there as JSON, signed:
+  `X-Everwake-Signature: sha256=<HMAC-SHA256 of the raw body with the signing secret>`,
+  plus `X-Everwake-Event` and `X-Everwake-Delivery` (the same id on retries).
+  The outbox workflow sends them within a minute; a failure retries after 1, 2,
+  4… minutes, 7 tries. "Send a test" shows the result on the page.
+- **API in.** "Make a key" (shown once) and the system calls with
+  `Authorization: Bearer ew_…`:
+  - `POST /api/v1/stock` `{"item_code","available","branch_code?","until?"}` (or `{"items":[…]}`)
+  - `POST /api/v1/orders/<order_no>/status` `{"status","note?"}` — the customer is told as from the board
+  - `GET /api/v1/orders?since=<until>` — for a system that cannot receive webhooks
+  - `GET /api/v1/menu?branch=<code>` — the item codes, to map once to the POS's own items
+- Odoo: an automation rule can call the API when a product or POS order changes;
+  receiving the orders needs a small module or n8n / Make in between. Foodics,
+  Loyverse and other cloud POS: n8n, Make or Zapier joins their API to these
+  webhooks. The page has the same notes for the restaurant's developer.
 
 ## Growth and reports
 

@@ -49,6 +49,8 @@ export interface Settings {
   reservation_days_ahead?: number;
   allowed_links?: string[];
   templates?: Record<string, string>;
+  // ordering from a QR code in the branch (016): how those customers may pay
+  qr_ordering?: { cash?: boolean; card?: boolean };
 }
 
 export interface Window { open: string; close: string }
@@ -125,6 +127,7 @@ export interface Offer {
   scope: 'order' | 'items' | 'categories'; value: number; max_discount: number | null; min_subtotal: number | null;
   item_ids: string[]; category_ids: string[]; branch_ids: string[]; free_item_id: string | null; free_item_qty: number;
   promo_code: string | null; first_order_only: boolean; stackable: boolean; priority: number;
+  every_nth_order: number | null;   // loyalty (016): only on the customer's 10th, 20th… order
   starts_at: string | null; ends_at: string | null; days_of_week: number[]; time_from: string | null; time_to: string | null;
   is_active: boolean;
 }
@@ -194,7 +197,20 @@ export interface Order {
   driver_id: string | null; driver_assigned_at: string | null;
   delivery_km_left: number | null; delivery_eta_min: number | null; delivery_track_at: string | null;
   payment_status: PaymentStatus; paid_at: string | null; paid_amount: number | null;
+  source?: string; qr_token?: string | null; table_label?: string | null; ready_by?: string | null; checkout_id?: number | null;
 }
+// ordering in the branch from a QR code (016)
+export interface QrCode { id: string; tenant_id: string; branch_id: string; code: string; table_label: string | null; is_active: boolean; scans: number; created_at: string }
+export interface QrCheckout {
+  id: number; tenant_id: string; branch_id: string; token: string; ticket: number; table_label: string | null;
+  cart: { items: CartLine[] }; total: number; payment_method: 'card' | 'cash'; status: 'awaiting_payment' | 'paid' | 'cancelled' | 'expired';
+  customer: { full_name?: string; phone?: string }; notes: string | null; created_at: string; expires_at: string; order_id: number | null;
+}
+export interface IntegrationEndpoint {
+  id: string; tenant_id: string; label: string | null; url: string; secret: string; events: string[]; is_active: boolean;
+  last_ok_at: string | null; last_error: string | null; created_at: string;
+}
+export interface ApiKey { id: string; label: string | null; key_hint: string; created_at: string; last_used_at: string | null; revoked_at: string | null }
 // paying online (Paymob): the order's state, and each link made for it
 export type PaymentStatus = 'none' | 'pending' | 'paid' | 'expired' | 'refunded';
 export interface Payment {

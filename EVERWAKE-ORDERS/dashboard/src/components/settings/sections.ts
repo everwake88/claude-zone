@@ -1,4 +1,4 @@
-import { BookOpenText, Bot, ClipboardList, CreditCard, FileBarChart, MessagesSquare, Palette, Smartphone, UsersRound } from 'lucide-react';
+import { BookOpenText, Bot, ClipboardList, CreditCard, FileBarChart, MessagesSquare, Palette, PlugZap, QrCode, Smartphone, UsersRound } from 'lucide-react';
 
 // Every settings area: its tab name, and in one plain line what it changes.
 export const SETTINGS_SECTIONS = [
@@ -10,6 +10,10 @@ export const SETTINGS_SECTIONS = [
     about: 'Payment methods, what the agent asks before placing an order, ordering outside opening hours, test numbers and new-order tickets.' },
   { key: 'payments', label: 'Online payments', icon: CreditCard,
     about: 'Connect Paymob so customers can pay by card or mobile wallet through a link.' },
+  { key: 'qr', label: 'QR ordering in the branch', icon: QrCode,
+    about: 'A QR code for the counter and each table: customers see the menu, order and pay from their phone, and the kitchen gets it.' },
+  { key: 'integrations', label: 'Your POS and systems', icon: PlugZap,
+    about: 'Send every order to your POS, ERP or CRM (Odoo, Foodics…), and let it update stock and order status here.' },
   { key: 'messages', label: 'Automatic messages', icon: MessagesSquare,
     about: 'The WhatsApp messages sent when an order moves on the board, and while the agent is switched off.' },
   { key: 'whatsapp', label: 'WhatsApp number', icon: Smartphone,

@@ -12,7 +12,7 @@ const parseJson = (v, d) => {
 };
 // a Postgres node returns { r: <jsonb> }; a missing row returns {}
 const row = (j) => obj(parseJson(obj(j).r, {}));
-// an Egyptian number as people write it: 201554354929 → 01554354929
+// an Egyptian number as people write it: 201001234567 → 01001234567
 const localPhone = (p) => str(p).replace(/^\+?20(1\d{9})$/, '0$1');
 // a villa or a house has no floor or apartment to ask for
 const HOUSE_RE = /فيلا|فيلّا|ڤيلا|villa|بيت مستقل|دوبلكس|duplex|تاون ?هاوس|توين ?هاوس|town ?house|twin ?house/i;

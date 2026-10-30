@@ -126,6 +126,41 @@ pause. The agent's own replies are not included.
 - A failed send retries three times, then shows as failed in the inbox with the reason.
 - "We're back" messages are spaced 3 seconds apart, so WhatsApp never sees a burst.
 
+## Ordering from a QR code
+
+The customer's pages (`/q/<code>`, `/q/t/<token>`) need no sign-in; the dashboard
+server calls the database with the service role:
+- `qr_menu` — the branch's menu from its snapshot, the offers, the ways to pay
+  (`settings.qr_ordering`), what is ordered together (`item_pairs`, last 90 days).
+- `qr_pricing_context` → `priceCart` (`dashboard/src/lib/qr-pricing.ts`, a port of
+  the engine's cart arithmetic and `shared/offers.js`: keep them in step) →
+  `qr_checkout_create`. The browser only says which dishes, how many and which
+  choices; every price comes from the snapshot.
+- A `qr_checkouts` row waits for its money. Card: Paymob's callback
+  (`payment_callback`, a payment with a `checkout_id`). Cash: `qr_cashier_paid`
+  from the kitchen screen. Either way `qr_checkout_paid` makes the order
+  (`source = 'qr'`, `delivery_method` pickup or dine_in, `ready_by` from the
+  branch's prep time and load). Unpaid ones expire in housekeeping.
+- The waiting page polls `qr_status` (the 64-character token is the key). Its
+  WhatsApp button sends "Q-<10 characters>"; intake links that chat to the
+  checkout (`qr_link_whatsapp`), so "ready" is sent there too. QR orders with
+  no WhatsApp get no messages (`queue_customer_message` skips `qr-…` ids).
+
+## The restaurant's own system
+
+- Triggers on `orders` (deferred, so the order's lines exist) and on
+  `menu_items` / `menu_item_branches` queue `integration_events` for each active
+  `integration_endpoints` row. Both run as the owner: a deferred trigger fires at
+  commit, as whoever is signed in.
+- The outbox workflow claims them (`integration_claim`), signs the body with
+  n8n's Crypto node (HMAC-SHA256, the endpoint's secret), POSTs it and records
+  the result (`integration_result`: sent, or retried after 1, 2, 4… minutes,
+  failed after 7).
+- `/api/v1/*` takes `Authorization: Bearer ew_…`; `api_key_tenant` checks the
+  hash (`api_keys` never stores the key) and names the restaurant. The calls go
+  through the same functions as the board (`set_order_status`,
+  `set_item_availability`), so the customer hears it the same way.
+
 ## Security
 
 | Caller | What it can do |
@@ -156,6 +191,8 @@ Sensitive actions go through `SECURITY DEFINER` functions that check the role fi
 | Talk | `conversations` (the engine's state, takeover, attention), `messages`, `outbox`, `inbound_buffer`, `conversation_locks` |
 | Orders | `orders` (one draft per customer, then placed), `order_items`, `order_events` |
 | Bookings | `reservations` (one draft per customer, then requested → confirmed / declined → arrived / did not come) |
+| In the branch | `qr_codes` (counter or table), `qr_checkouts` (a priced cart waiting for its money; `ticket` per branch per day); `orders.source = 'qr'`, `table_label`, `ready_by` |
+| Their systems | `integration_endpoints` (address, events, signing secret), `integration_events` (each delivery and its tries), `api_keys` (hash and last 4 only) |
 | Paying | `payment_accounts` (each restaurant's Paymob keys; the two secrets encrypted in Supabase Vault, only their ids here), `payments` (each link: pending → paid / expired / replaced / refunded); `orders.payment_status` |
 | Switch | `agent_pauses`, `pause_contacts` |
 | Engine | `menu_snapshot`, `agent_events`, `audit_log` |

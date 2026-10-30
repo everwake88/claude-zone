@@ -1,6 +1,6 @@
 'use client';
 import {
-  BarChart3, Bike, BookOpen, CalendarDays, ChefHat, ChevronDown, LayoutDashboard, LogOut, Map, Megaphone, MessageCircle, Percent, Settings,
+  BarChart3, Bike, BookOpen, CalendarDays, ChefHat, ChevronDown, Flame, LayoutDashboard, LogOut, Map, Megaphone, MessageCircle, Percent, Settings,
   ShoppingBag, Store, Users, Menu as MenuIcon
 } from 'lucide-react';
 import Link from 'next/link';
@@ -19,6 +19,7 @@ const NAV: { group: string | null; items: { href: string; label: string; icon: t
   { group: null, items: [{ href: '', label: 'Overview', icon: LayoutDashboard }] },
   { group: 'Every day', items: [
     { href: '/orders', label: 'Orders', icon: ShoppingBag, badge: 'orders' },
+    { href: '/kitchen', label: 'Kitchen', icon: Flame },
     { href: '/inbox', label: 'Inbox', icon: MessageCircle, badge: 'inbox' },
     { href: '/reservations', label: 'Table bookings', icon: CalendarDays, badge: 'bookings' },
     { href: '/customers', label: 'Customers', icon: Users }] },
