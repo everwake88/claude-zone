@@ -24,16 +24,15 @@ updates in about a minute.
 ```js
 contact: {
   email: "everwake88@gmail.com",
-  whatsapp: "+201144017735",     // the number the green button opens
+  whatsapp: "+201505099818",     // the number the green button opens
   phones: [
-    "+201144017735",
-    "+201554354929"
+    "+201505099818"
   ],
   location: ""                   // optional, e.g. "Cairo, Egypt"
 },
 ```
 
-- Numbers in **international format, no spaces**: Egypt `01144017735` → `+201144017735`.
+- Numbers in **international format, no spaces**: Egypt `01505099818` → `+201505099818`.
   The site formats them nicely for visitors itself.
 - Add another phone: copy a line inside `phones`, change the number. Every line
   except the last ends with a comma.

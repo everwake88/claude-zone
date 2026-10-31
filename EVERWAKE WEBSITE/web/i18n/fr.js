@@ -508,6 +508,7 @@ EW_I18N.register("fr", {
   "Why an AI sales agent should never state a price it did not calculate, and how splitting persuasion from arithmetic makes agents both safer and better at selling.": "Pourquoi un agent de vente IA ne devrait jamais annoncer un prix qu'il n'a pas calculé, et comment séparer la persuasion du calcul rend les agents à la fois plus sûrs et meilleurs vendeurs.",
 
   /* ---- Scripts — messages shown after an action ---- */
+  "WhatsApp & phone": "WhatsApp et téléphone",
   "<strong>The selling half</strong> of the conversation — reading the buyer, recommending, handling the objection.": "<strong>La partie commerciale</strong> de la conversation : cerner l'acheteur, recommander, répondre à l'objection.",
   "<strong>The operational half</strong> — the half that ends in a priced, validated order your team can act on without rekeying anything.": "<strong>La partie opérationnelle</strong> : celle qui aboutit à une commande chiffrée et vérifiée, que votre équipe peut traiter sans rien ressaisir.",
   "Close menu": "Fermer le menu",

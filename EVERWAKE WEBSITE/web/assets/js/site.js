@@ -147,7 +147,10 @@
     document.querySelectorAll('[data-ew="contact-direct"]').forEach(function (host) {
       var rows = [];
       if (filled(contact.email)) rows.push(["email", "Email", contact.email, "mailto:" + contact.email]);
-      if (filled(contact.whatsapp)) rows.push(["whatsapp", "WhatsApp", prettyPhone(contact.whatsapp), waHref(contact.whatsapp)]);
+      if (filled(contact.whatsapp)) {
+        var alsoPhone = phones().some(function (p) { return digits(p) === digits(contact.whatsapp); });
+        rows.push(["whatsapp", alsoPhone ? "WhatsApp & phone" : "WhatsApp", prettyPhone(contact.whatsapp), waHref(contact.whatsapp)]);
+      }
       /* The WhatsApp number already has its own row; list only the others. */
       phones().forEach(function (p) {
         if (digits(p) !== digits(contact.whatsapp || "")) rows.push(["phone", "Phone", prettyPhone(p), telHref(p)]);

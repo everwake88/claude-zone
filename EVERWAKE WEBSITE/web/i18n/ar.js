@@ -508,6 +508,7 @@ EW_I18N.register("ar", {
   "Why an AI sales agent should never state a price it did not calculate, and how splitting persuasion from arithmetic makes agents both safer and better at selling.": "لماذا يجب ألا يذكر وكيل المبيعات بالذكاء الاصطناعي سعرًا لم يحسبه، وكيف يجعل الفصل بين الإقناع والحساب الوكلاء أكثر أمانًا وأفضل في البيع.",
 
   /* ---- Scripts — messages shown after an action ---- */
+  "WhatsApp & phone": "واتساب والهاتف",
   "<strong>The selling half</strong> of the conversation — reading the buyer, recommending, handling the objection.": "<strong>نصف البيع</strong> في المحادثة: فهم المشتري، والتوصية، والرد على الاعتراض.",
   "<strong>The operational half</strong> — the half that ends in a priced, validated order your team can act on without rekeying anything.": "<strong>النصف التشغيلي</strong>: النصف الذي ينتهي بطلب مسعَّر ومُتحقَّق منه، يستطيع فريقك تنفيذه دون إعادة إدخال أي شيء.",
   "Close menu": "إغلاق القائمة",

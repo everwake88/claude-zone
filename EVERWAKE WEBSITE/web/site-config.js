@@ -29,18 +29,17 @@ window.EVERWAKE = {
   /* -----------------------------------------------------------------------
      2. CONTACT DETAILS
      Phone numbers in full international format: + then country code,
-     no spaces. Egypt 01144017735 becomes "+201144017735".
+     no spaces. Egypt 01505099818 becomes "+201505099818".
      ----------------------------------------------------------------------- */
   contact: {
     email: "everwake88@gmail.com",
 
     // The number the WhatsApp button opens — your AI agent's line.
-    whatsapp: "+201144017735",
+    whatsapp: "+201505099818",
 
     // Every number shown on the website. Add or remove lines freely.
     phones: [
-      "+201144017735",
-      "+201554354929"
+      "+201505099818"
     ],
 
     // Optional city line on the contact page. Example: "Cairo, Egypt"
