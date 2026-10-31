@@ -3,6 +3,7 @@ import { PiggyBank } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useTenant } from '@/components/tenant';
+import { CountUp } from '@/components/ui';
 import { day, money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
@@ -30,7 +31,7 @@ export function SavingsHero() {
         <div className="flex size-14 items-center justify-center rounded-2xl bg-gold text-on-gold"><PiggyBank className="size-7" /></div>
         <div className="min-w-0 flex-1">
           <p className="text-sm text-on-navy-muted">{t('WhatsApp saved you this month')}</p>
-          <p className="text-4xl font-bold tracking-tight">{money(s.month, sym)}</p>
+          <p className="board text-[44px]"><CountUp value={Number(s.month) || 0} format={v => money(v, sym)} ms={1100} /></p>
           <p className="mt-1 text-xs text-on-navy-muted">
             {t('{n} orders · {p}% commission a delivery app would have taken', { n: s.orders_month, p: s.commission_percent })}{' '}
             <Link href={`${base}/settings/ordering`} className="underline">{t('change')}</Link>

@@ -39,7 +39,42 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; lette
 /* table headers start where the reading starts (left in English, right in Arabic) */
 th { text-align: start; }
 
-.label-caps { font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-muted); }
+/* a small label above a value: sentence case, quiet */
+.label-caps { font-size: 0.8125rem; font-weight: 500; color: var(--color-muted); }
+
+/* scrollbars: thin and in the page's own ink, never the system's grey slab */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--color-ink) 22%, transparent) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--color-ink) 18%, transparent); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in oklab, var(--color-ink) 32%, transparent); }
+::-webkit-scrollbar-button { display: none; }
+/* a row of choices that scrolls sideways shows no bar at all; its edges fade instead */
+.rail { scrollbar-width: none; -webkit-mask: linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 18px), transparent); mask: linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 18px), transparent); }
+.rail::-webkit-scrollbar { display: none; }
+
+/* the dashboard's motion: only to show what changed */
+@keyframes ew-page { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ew-drawer { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes ew-drawer-rtl { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes ew-pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes ew-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ew-toast { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes ew-shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@keyframes ew-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+/* backwards, not both: once it has played it leaves no transform behind, which would trap the
+   drawers, dialogs and full screens inside the page instead of covering the whole window */
+.ew-page { animation: ew-page .32s cubic-bezier(.2, .8, .2, 1) backwards; }
+.ew-drawer { animation: ew-drawer .3s cubic-bezier(.2, .9, .25, 1); }
+[dir="rtl"] .ew-drawer { animation-name: ew-drawer-rtl; }
+.ew-pop { animation: ew-pop .22s cubic-bezier(.2, .9, .25, 1); }
+.ew-fade { animation: ew-fade .2s ease-out; }
+.ew-toast { animation: ew-toast .28s cubic-bezier(.2, .9, .25, 1); }
+.ew-skeleton { background: linear-gradient(90deg, var(--color-paper-sunk) 0%, color-mix(in oklab, var(--color-paper-sunk) 40%, #fff) 50%, var(--color-paper-sunk) 100%) 0 0 / 200% 100%;
+               animation: ew-shimmer 1.4s linear infinite; }
+.ew-timer { transform-origin: left; animation: ew-timer linear forwards; }
+[dir="rtl"] .ew-timer { transform-origin: right; }
+@media (prefers-reduced-motion: reduce) { .ew-page, .ew-drawer, .ew-pop, .ew-fade, .ew-toast, .ew-skeleton, .ew-timer { animation: none; } }
 
 /* the inbox thread wraps long Arabic and links cleanly */
 .bubble { white-space: pre-wrap; overflow-wrap: anywhere; }

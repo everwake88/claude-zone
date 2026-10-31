@@ -3,7 +3,7 @@ import { CheckCircle2, Circle, Rocket } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { SavingsHero } from '@/components/growth/SavingsHero';
-import { Badge, Button, Card, PageHeader, Spinner, useAction } from '@/components/ui';
+import { Badge, Button, Card, CountUp, PageHeader, Spinner, useAction } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { cx, money, timeAgo, displayName } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -133,15 +133,15 @@ export default function Overview() {
 
       {stats && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[
-            ['Orders today', String(stats.orders)],
-            ['Revenue today', money(stats.revenue, tenant.currency_symbol)],
-            ['Average order', money(stats.average_order, tenant.currency_symbol)],
-            ['Chats → orders', `${stats.conversion_percent}%`]
-          ].map(([k, v]) => (
-            <div key={k} className="rounded-xl border border-hairline bg-white p-4">
+          {([
+            ['Orders today', stats.orders, (v: number) => String(v)],
+            ['Revenue today', stats.revenue, (v: number) => money(v, tenant.currency_symbol)],
+            ['Average order', stats.average_order, (v: number) => money(v, tenant.currency_symbol)],
+            ['Chats → orders', stats.conversion_percent, (v: number) => `${v}%`]
+          ] as [string, number, (v: number) => string][]).map(([k, v, f]) => (
+            <div key={k} className="rounded-2xl border border-hairline/80 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
               <p className="label-caps">{t(k)}</p>
-              <p className="mt-1 text-xl font-semibold">{v}</p>
+              <p className="board mt-1.5 text-[30px] text-ink"><CountUp value={Number(v) || 0} format={f} /></p>
             </div>
           ))}
         </div>

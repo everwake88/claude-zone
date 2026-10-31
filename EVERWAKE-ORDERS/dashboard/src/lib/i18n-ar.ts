@@ -1457,4 +1457,6 @@ export const AR: Record<string, string> = {
   "Waiting to pay": "مستني يدفع",
   "At the counter": "عند الكاشير",
   "Your dashboard takes its colours from your logo and this colour. It is also the colour of the QR menu and the menu pictures.": "الداشبورد بياخد ألوانه من اللوجو بتاعك ومن اللون ده. وده كمان لون منيو الـQR وصور المنيو.",
+  "Orders and payment": "الطلبات والدفع",
+  "Connections": "الربط",
 };

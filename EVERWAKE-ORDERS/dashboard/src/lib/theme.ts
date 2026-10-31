@@ -109,11 +109,17 @@ export function useBrandTheme(tenantId: string, brand: Brand) {
     let gone = false;
     (async () => {
       const colors = brand.color ? [brand.color] : [];
-      if (brand.logo_url) { try { colors.push(...logoColors(await loadImage(brand.logo_url))); } catch { /* the colour alone */ } }
+      let read = !brand.logo_url;
+      if (brand.logo_url) {
+        // its own address: a copy the browser cached for the sidebar's <img> may not be readable by a canvas
+        const url = brand.logo_url.startsWith('data:') ? brand.logo_url : `${brand.logo_url}${brand.logo_url.includes('?') ? '&' : '?'}ew=theme`;
+        try { colors.push(...logoColors(await loadImage(url))); read = true; } catch { /* the saved colour alone, this time */ }
+      }
       if (gone) return;
       const tokens = brandTokens(colors);
       apply(tokens);
-      try { localStorage.setItem(key, JSON.stringify({ sig, tokens })); } catch { /* private mode */ }
+      // remembered only once the logo was really read, so a failed try is tried again next time
+      if (read) { try { localStorage.setItem(key, JSON.stringify({ sig, tokens })); } catch { /* private mode */ } }
     })();
     return () => { gone = true; };
   }, [key, brand.logo_url, brand.color]);

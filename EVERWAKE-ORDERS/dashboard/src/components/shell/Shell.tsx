@@ -8,6 +8,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { askNotificationPermission, chime, notify } from '@/lib/alerts';
 import { cx, money } from '@/lib/format';
+import { lalezar } from '@/lib/fonts';
 import { LangSwitch, useLang } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import { useBrandTheme } from '@/lib/theme';
@@ -47,6 +48,13 @@ export function Shell({ children }: { children: ReactNode }) {
   const [bookings, setBookings] = useState({ waiting: 0, on: false });
   const [mobileNav, setMobileNav] = useState(false);
   const [switcher, setSwitcher] = useState(false);
+  // the top bar is the page itself until the page scrolls under it
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 4);
+    on(); window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
   const seen = useRef<Set<number>>(new Set());
   const seenBookings = useRef<Set<number>>(new Set());
   const { t, lang } = useLang();
@@ -108,10 +116,10 @@ export function Shell({ children }: { children: ReactNode }) {
             const n = badge === 'orders' ? newOrders : badge === 'inbox' ? attention : badge === 'bookings' ? bookings.waiting : 0;
             return (
               <Link key={href} href={base + href} onClick={() => setMobileNav(false)} aria-current={active(href) ? 'page' : undefined}
-                className={cx('relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                className={cx('group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-150',
                   active(href) ? 'bg-navy-soft font-medium text-white before:absolute before:inset-y-2 before:start-0 before:w-[3px] before:rounded-full before:bg-gold'
                                : 'text-on-navy-muted hover:bg-navy-raised hover:text-white')}>
-                <Icon className={cx('size-4', active(href) && 'text-gold-bright')} aria-hidden />
+                <Icon className={cx('size-4 transition-transform duration-200', active(href) ? 'text-gold-bright' : 'group-hover:scale-110')} aria-hidden />
                 <span className="flex-1">{t(label)}</span>
                 {n > 0 && <span className={cx('rounded-full px-1.5 text-xs font-semibold', badge === 'inbox' ? 'bg-critical text-white' : 'bg-gold text-on-gold ring-new')}>{n}</span>}
               </Link>
@@ -123,14 +131,14 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen lg:ps-60">
+    <div className={cx('min-h-screen lg:ps-60', lalezar.variable)}>
       {/* sidebar */}
       <aside className={cx('fixed inset-y-0 start-0 z-40 flex w-60 flex-col overflow-y-auto bg-navy text-white transition-transform lg:translate-x-0',
         mobileNav ? 'translate-x-0' : lang === 'ar' ? 'translate-x-full' : '-translate-x-full')}>
         <div className="relative px-5 pb-4 pt-5">
           <button onClick={() => setSwitcher(s => !s)} className="flex w-full items-center gap-2 text-start">
             {brand.logo_url
-              ? <img src={brand.logo_url} alt="" className="size-9 shrink-0 rounded-full bg-white object-contain p-0.5" />
+              ? <img src={brand.logo_url} alt="" crossOrigin="anonymous" className="size-9 shrink-0 rounded-full bg-white object-contain p-0.5" />
               : <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold font-bold text-on-gold">
                   {(tenant.name_en || tenant.name_ar).slice(0, 1).toUpperCase()}
                 </span>}
@@ -165,7 +173,8 @@ export function Shell({ children }: { children: ReactNode }) {
       {mobileNav && <div className="fixed inset-0 z-30 bg-navy/40 lg:hidden" onClick={() => setMobileNav(false)} />}
 
       {/* top bar */}
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-gold-line/70 bg-gold-wash/90 px-4 backdrop-blur lg:px-6">
+      <header className={cx('sticky top-0 z-20 flex h-14 items-center gap-3 px-4 transition-[background-color,box-shadow] duration-200 lg:px-6',
+        scrolled ? 'bg-paper/85 shadow-[0_1px_0_var(--color-hairline)] backdrop-blur-md' : 'bg-paper')}>
         <button className="rounded-lg p-1.5 hover:bg-paper lg:hidden" onClick={() => setMobileNav(true)} aria-label={t('Menu')}><MenuIcon className="size-5" /></button>
         {tenant.status === 'onboarding' && <Badge tone="caution">{t('Onboarding — only test numbers reach the agent')}</Badge>}
         {tenant.status === 'suspended' && <Badge tone="critical">{t('Suspended')}</Badge>}
@@ -176,7 +185,9 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
 
       {/* the kitchen screen uses every pixel; the other pages keep a readable width */}
-      <main className={path.startsWith(base + '/kitchen') ? 'w-full' : 'mx-auto w-full max-w-[1400px] px-4 py-6 lg:px-6'}>{children}</main>
+      {/* a page arrives with one short rise; the kitchen screen uses every pixel, the others keep a readable width */}
+      <main key={path.split('/').slice(0, 4).join('/')}
+            className={cx('ew-page', path.startsWith(base + '/kitchen') ? 'w-full' : 'mx-auto w-full max-w-[1400px] px-4 pb-10 pt-2 lg:px-6')}>{children}</main>
     </div>
   );
 }

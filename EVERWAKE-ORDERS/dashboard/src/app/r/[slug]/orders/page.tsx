@@ -126,7 +126,7 @@ export default function OrdersBoard() {
               </header>
               <div className="flex flex-col gap-2">
                 {list.map(o => (
-                  <article key={o.id} className={cx('cursor-pointer rounded-xl border bg-white p-3 shadow-sm transition hover:border-gold',
+                  <article key={o.id} className={cx('ew-pop cursor-pointer rounded-xl border bg-white p-3 shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-gold hover:shadow-md active:translate-y-0',
                     o.status === 'placed' ? 'border-gold ring-new' : 'border-hairline')} onClick={() => setOpen(o)}>
                     <div className="flex items-start justify-between gap-2">
                       <div>
