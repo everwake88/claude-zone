@@ -113,7 +113,7 @@ export default function Reservations() {
       )}
 
       <Tabs value={tab} onChange={setTab} tabs={[
-        { value: 'waiting', label: <span className="flex items-center gap-1.5">{t('Waiting for you')}{groups.waiting.length > 0 && <span className="rounded-full bg-gold px-1.5 text-xs font-semibold text-navy">{groups.waiting.length}</span>}</span> },
+        { value: 'waiting', label: <span className="flex items-center gap-1.5">{t('Waiting for you')}{groups.waiting.length > 0 && <span className="rounded-full bg-gold px-1.5 text-xs font-semibold text-on-gold">{groups.waiting.length}</span>}</span> },
         { value: 'upcoming', label: t('Confirmed') },
         { value: 'past', label: t('Past') }
       ]} />

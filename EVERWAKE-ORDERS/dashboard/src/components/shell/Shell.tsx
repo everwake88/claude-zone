@@ -10,6 +10,7 @@ import { askNotificationPermission, chime, notify } from '@/lib/alerts';
 import { cx, money } from '@/lib/format';
 import { LangSwitch, useLang } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
+import { useBrandTheme } from '@/lib/theme';
 import { Badge, useToast } from '../ui';
 import { useTenant } from '../tenant';
 import { AgentSwitch } from './AgentSwitch';
@@ -49,6 +50,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const seen = useRef<Set<number>>(new Set());
   const seenBookings = useRef<Set<number>>(new Set());
   const { t, lang } = useLang();
+  // the dashboard in the restaurant's colours, from its logo
+  useBrandTheme(tenant.id, brand);
 
   // badges + the new-order alarm, on every page
   useEffect(() => {
@@ -105,11 +108,12 @@ export function Shell({ children }: { children: ReactNode }) {
             const n = badge === 'orders' ? newOrders : badge === 'inbox' ? attention : badge === 'bookings' ? bookings.waiting : 0;
             return (
               <Link key={href} href={base + href} onClick={() => setMobileNav(false)} aria-current={active(href) ? 'page' : undefined}
-                className={cx('flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                  active(href) ? 'bg-navy-soft text-white' : 'text-on-navy-muted hover:bg-navy-raised hover:text-white')}>
-                <Icon className="size-4" aria-hidden />
+                className={cx('relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                  active(href) ? 'bg-navy-soft font-medium text-white before:absolute before:inset-y-2 before:start-0 before:w-[3px] before:rounded-full before:bg-gold'
+                               : 'text-on-navy-muted hover:bg-navy-raised hover:text-white')}>
+                <Icon className={cx('size-4', active(href) && 'text-gold-bright')} aria-hidden />
                 <span className="flex-1">{t(label)}</span>
-                {n > 0 && <span className={cx('rounded-full px-1.5 text-xs font-semibold', badge === 'inbox' ? 'bg-critical text-white' : 'bg-gold text-navy ring-new')}>{n}</span>}
+                {n > 0 && <span className={cx('rounded-full px-1.5 text-xs font-semibold', badge === 'inbox' ? 'bg-critical text-white' : 'bg-gold text-on-gold ring-new')}>{n}</span>}
               </Link>
             );
           })}
@@ -127,7 +131,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <button onClick={() => setSwitcher(s => !s)} className="flex w-full items-center gap-2 text-start">
             {brand.logo_url
               ? <img src={brand.logo_url} alt="" className="size-9 shrink-0 rounded-full bg-white object-contain p-0.5" />
-              : <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold font-bold text-navy">
+              : <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold font-bold text-on-gold">
                   {(tenant.name_en || tenant.name_ar).slice(0, 1).toUpperCase()}
                 </span>}
             <span className="min-w-0 flex-1">
@@ -161,7 +165,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {mobileNav && <div className="fixed inset-0 z-30 bg-navy/40 lg:hidden" onClick={() => setMobileNav(false)} />}
 
       {/* top bar */}
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-hairline bg-white/85 px-4 backdrop-blur lg:px-6">
+      <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-gold-line/70 bg-gold-wash/90 px-4 backdrop-blur lg:px-6">
         <button className="rounded-lg p-1.5 hover:bg-paper lg:hidden" onClick={() => setMobileNav(true)} aria-label={t('Menu')}><MenuIcon className="size-5" /></button>
         {tenant.status === 'onboarding' && <Badge tone="caution">{t('Onboarding — only test numbers reach the agent')}</Badge>}
         {tenant.status === 'suspended' && <Badge tone="critical">{t('Suspended')}</Badge>}

@@ -45,7 +45,7 @@ function Board() {
   const ready = orders.filter(o => o.status === 'ready');
   const color = brand.color || '#0B222E';
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col bg-[#0E1418] text-white ${lalezar.variable}`} dir="rtl">
+    <div className={`fixed inset-0 z-50 flex flex-col bg-navy-deep text-white ${lalezar.variable}`} dir="rtl">
       <header className="flex items-center gap-4 px-8 py-5" style={{ background: color }}>
         {brand.logo_url && <img src={brand.logo_url} alt="" className="size-16 rounded-full bg-white object-cover" />}
         <div>

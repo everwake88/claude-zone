@@ -74,7 +74,7 @@ export default function BrandSettings() {
       </Card>
 
       <Card title={t('Brand colour')}>
-        <p className="mb-3 text-sm text-muted">{t('The colour of the menu pictures: the top band, the category labels and the prices.')}</p>
+        <p className="mb-3 text-sm text-muted">{t('Your dashboard takes its colours from your logo and this colour. It is also the colour of the QR menu and the menu pictures.')}</p>
         {found.length > 0 && <>
           <p className="label-caps mb-2">{t('From your logo')}</p>
           <div className="mb-4 flex flex-wrap gap-2">

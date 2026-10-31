@@ -275,7 +275,7 @@ export default function Kitchen() {
   };
 
   return (
-    <div ref={root} className={cx('bg-[#0E1418] p-4 text-white lg:p-5', lalezar.variable,
+    <div ref={root} className={cx('bg-navy-deep p-4 text-white lg:p-5', lalezar.variable,
                                   full ? 'fixed inset-0 z-50 overflow-y-auto' : 'min-h-[calc(100dvh-3.5rem)]')}>
       {/* the rail's head: which branch, the time, that it is live, and the voice button */}
       <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-3">

@@ -27,7 +27,7 @@ export function SavingsHero() {
   return (
     <section className="overflow-hidden rounded-2xl bg-navy text-white shadow-sm">
       <div className="flex flex-wrap items-center gap-6 p-5">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-gold text-navy"><PiggyBank className="size-7" /></div>
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-gold text-on-gold"><PiggyBank className="size-7" /></div>
         <div className="min-w-0 flex-1">
           <p className="text-sm text-on-navy-muted">{t('WhatsApp saved you this month')}</p>
           <p className="text-4xl font-bold tracking-tight">{money(s.month, sym)}</p>

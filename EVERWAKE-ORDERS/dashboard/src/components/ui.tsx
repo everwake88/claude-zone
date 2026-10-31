@@ -11,7 +11,7 @@ import { useT } from '@/lib/i18n';
 type Variant = 'primary' | 'gold' | 'outline' | 'ghost' | 'danger' | 'positive';
 const VARIANT: Record<Variant, string> = {
   primary: 'bg-navy text-white hover:bg-navy-soft',
-  gold: 'bg-gold text-navy hover:bg-gold-bright font-semibold',
+  gold: 'bg-gold text-on-gold hover:bg-gold-bright font-semibold',
   outline: 'border border-hairline bg-white text-ink hover:bg-paper',
   ghost: 'text-ink hover:bg-paper-sunk',
   danger: 'bg-critical text-white hover:opacity-90',
