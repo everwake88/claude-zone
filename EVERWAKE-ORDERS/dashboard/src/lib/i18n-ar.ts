@@ -1452,4 +1452,8 @@ export const AR: Record<string, string> = {
   "Oldest {m} min": "أقدم طلب من {m} دقيقة",
   "Time": "الساعة",
   "{n} in the kitchen": "{n} في المطبخ",
+  "Full screen": "ملء الشاشة",
+  "Exit full screen": "خروج من ملء الشاشة",
+  "Waiting to pay": "مستني يدفع",
+  "At the counter": "عند الكاشير",
 };

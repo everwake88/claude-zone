@@ -171,7 +171,8 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1400px] px-4 py-6 lg:px-6">{children}</main>
+      {/* the kitchen screen uses every pixel; the other pages keep a readable width */}
+      <main className={path.startsWith(base + '/kitchen') ? 'w-full' : 'mx-auto w-full max-w-[1400px] px-4 py-6 lg:px-6'}>{children}</main>
     </div>
   );
 }

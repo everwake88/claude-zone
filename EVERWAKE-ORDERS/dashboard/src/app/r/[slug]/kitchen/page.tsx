@@ -1,13 +1,13 @@
 'use client';
-import { Banknote, Bike, Check, ChefHat, Mic, MonitorPlay, QrCode as QrIcon, Send, ShoppingBag, UtensilsCrossed, X } from 'lucide-react';
+import { Banknote, Bike, Check, ChefHat, Maximize2, Mic, Minimize2, MonitorPlay, QrCode as QrIcon, Send, ShoppingBag, UtensilsCrossed, X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Modal, Spinner, Textarea, useAction, useToast } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { askNotificationPermission, chime } from '@/lib/alerts';
-import { clock, cx, money, qty, statusLabel } from '@/lib/format';
+import { cx, money, qty, statusLabel } from '@/lib/format';
 import { lalezar } from '@/lib/fonts';
-import { useT } from '@/lib/i18n';
+import { useLang } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch, Order, OrderStatus, QrCheckout } from '@/lib/types';
 
@@ -53,7 +53,9 @@ export default function Kitchen() {
   const [now, setNow] = useState(Date.now());
   const { busy, run } = useAction();
   const toast = useToast();
-  const t = useT();
+  const { t, lang } = useLang();
+  const root = useRef<HTMLDivElement>(null);
+  const [full, setFull] = useState(false);
 
   useEffect(() => {
     sb().from('branches').select('*').eq('tenant_id', tenant.id).eq('is_active', true).order('sort').then(({ data }) => {
@@ -91,6 +93,18 @@ export default function Kitchen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant.id, branch]);
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(id); }, []);
+  // full screen: the kitchen covers everything; the browser's own full screen where it has one
+  // (a phone without it still gets the cover), and Esc or the button brings the dashboard back
+  useEffect(() => {
+    const left = () => { if (!document.fullscreenElement) setFull(false); };
+    document.addEventListener('fullscreenchange', left);
+    return () => document.removeEventListener('fullscreenchange', left);
+  }, []);
+  const toggleFull = async () => {
+    if (full) { setFull(false); if (document.fullscreenElement) await document.exitFullscreen().catch(() => null); return; }
+    setFull(true);
+    await root.current?.requestFullscreen?.().catch(() => null);
+  };
   useEffect(() => {
     if (!branch) return;
     loaded.current = false; known.current = new Set();
@@ -228,12 +242,15 @@ export default function Kitchen() {
   };
 
   const inKitchen = (orders || []).filter(o => o.status !== 'ready');
+  const timeParts = new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US',
+    { timeZone: tenant.timezone, hour: 'numeric', minute: '2-digit', hour12: true }).formatToParts(new Date(now));
+  const part = (k: string) => timeParts.find(p => p.type === k)?.value || '';
   const oldest = inKitchen.reduce((m, o) => Math.max(m, Math.round((now - new Date(o.placed_at || now).getTime()) / 60000)), 0);
   const COL = {
-    counter: { color: '#F2B544', icon: Banknote, empty: t('No one waiting.') },
-    new: { color: '#F2C46D', icon: QrIcon, empty: t('No new orders') },
-    prep: { color: '#6FA8DC', icon: ChefHat, empty: t('Nothing on the fire') },
-    ready: { color: '#45C486', icon: Check, empty: t('Nothing waiting to go out') }
+    counter: { color: '#F2B544', icon: Banknote, empty: t('No one waiting.'), sub: t('Waiting to pay') },
+    new: { color: '#F2C46D', icon: QrIcon, empty: t('No new orders'), sub: '' },
+    prep: { color: '#6FA8DC', icon: ChefHat, empty: t('Nothing on the fire'), sub: '' },
+    ready: { color: '#45C486', icon: Check, empty: t('Nothing waiting to go out'), sub: '' }
   } as const;
   // a plain function, not a component: the tickets inside keep their place between renders
   const column = (k: keyof typeof COL, title: string, count: number, children: React.ReactNode) => {
@@ -241,32 +258,37 @@ export default function Kitchen() {
     return (
       <section key={k} className="flex min-h-[62vh] flex-col rounded-[22px] bg-white/[.045] p-3" style={{ boxShadow: `inset 0 3px 0 ${c.color}` }}>
         <header className="mb-3 flex items-center justify-between gap-2 px-1 pt-1">
-          <h2 className="flex items-center gap-2 text-[17px] font-semibold"><c.icon className="size-5" style={{ color: c.color }} aria-hidden /> {title}</h2>
+          <h2 className="flex min-w-0 items-center gap-2 text-[17px] font-semibold">
+            <c.icon className="size-5 shrink-0" style={{ color: c.color }} aria-hidden />
+            <span className="truncate">{title}</span>
+            {c.sub && <span className="truncate text-sm font-normal text-white/50">{c.sub}</span>}
+          </h2>
           <span key={count} className="board qr-pop text-[34px] tabular-nums" style={{ color: c.color }}>{count}</span>
         </header>
         {count === 0
           ? <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/10 py-10 text-white/35">
               <c.icon className="size-8" aria-hidden /><span className="text-sm">{c.empty}</span>
             </div>
-          : <div className="space-y-3">{children}</div>}
+          : <div className="grid items-start gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))]">{children}</div>}
       </section>
     );
   };
 
   return (
-    <div className={cx('-mx-4 -my-6 min-h-[calc(100vh-3.5rem)] bg-[#0E1418] p-4 text-white lg:-mx-6 lg:p-5', lalezar.variable)}>
+    <div ref={root} className={cx('bg-[#0E1418] p-4 text-white lg:p-5', lalezar.variable,
+                                  full ? 'fixed inset-0 z-50 overflow-y-auto' : 'min-h-[calc(100dvh-3.5rem)]')}>
       {/* the rail's head: which branch, the time, that it is live, and the voice button */}
       <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-3">
         <div className="flex items-center gap-3">
           <span className="flex size-12 items-center justify-center rounded-2xl bg-white/[.07]"><ChefHat className="size-6 text-[#F2C46D]" aria-hidden /></span>
           <div>
-            <label className="relative block">
+            <label className="inline-flex items-center gap-2">
               <span className="sr-only">{t('Branch')}</span>
               <select value={branch} onChange={e => setBranch(e.target.value)}
-                className="board cursor-pointer appearance-none bg-transparent pe-7 text-[28px] text-white outline-none focus-visible:underline">
-                {branches.map(b => <option key={b.id} value={b.id} className="text-base text-ink">{b.name_en || b.name_ar}</option>)}
+                className="board cursor-pointer appearance-none bg-transparent text-[28px] text-white outline-none focus-visible:underline">
+                {branches.map(b => <option key={b.id} value={b.id} className="text-base text-ink">{(lang === 'ar' ? b.name_ar : b.name_en) || b.name_ar}</option>)}
               </select>
-              <span className="pointer-events-none absolute end-0 top-1/2 -translate-y-1/2 text-white/50" aria-hidden>▾</span>
+              {branches.length > 1 && <span className="pointer-events-none text-white/50" aria-hidden>▾</span>}
             </label>
             <p className="flex items-center gap-2 text-sm text-white/60">
               <span className="kds-live size-2 rounded-full bg-[#45C486]" aria-hidden /> {t('Live')}
@@ -275,11 +297,18 @@ export default function Kitchen() {
             </p>
           </div>
         </div>
-        <span className="board text-[40px] tabular-nums text-white/90" aria-label={t('Time')}>{clock(new Date(now).toISOString(), tenant.timezone)}</span>
+        <span className="flex items-baseline gap-1.5 text-white/90" aria-label={t('Time')}>
+          <span className="board text-[40px] tabular-nums" dir="ltr">{part('hour')}:{part('minute')}</span>
+          <span className="text-lg font-semibold text-white/60">{part('dayPeriod')}</span>
+        </span>
         <div className="flex-1" />
         <Link href={`${base}/kitchen/tv?branch=${branch}`} target="_blank"
           className="flex h-11 items-center gap-2 rounded-full bg-white/[.07] px-4 text-sm text-white/80 hover:bg-white/[.12]"><MonitorPlay className="size-4" /> {t('Ready screen for customers')}</Link>
         <Link href={`${base}/settings/qr`} className="flex h-11 items-center gap-2 rounded-full bg-white/[.07] px-4 text-sm text-white/80 hover:bg-white/[.12]"><QrIcon className="size-4" /> {t('QR codes')}</Link>
+        <button onClick={toggleFull} aria-pressed={full}
+          className="flex h-11 items-center gap-2 rounded-full bg-white/[.07] px-4 text-sm text-white/80 hover:bg-white/[.12]">
+          {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />} {full ? t('Exit full screen') : t('Full screen')}
+        </button>
         <button onPointerDown={startRec} onPointerUp={stopRec} onPointerLeave={() => recording && stopRec()} disabled={thinking}
           className={cx('flex h-16 select-none items-center gap-3 rounded-full pe-6 ps-2.5 text-lg font-bold touch-none transition-colors duration-200',
                         recording ? 'bg-[#E5484D] text-white' : thinking ? 'bg-white/15 text-white' : 'bg-[#F2C46D] text-[#1A1306] shadow-[0_10px_30px_-10px_#F2C46D]')}>
@@ -308,7 +337,7 @@ export default function Kitchen() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {column('counter', t('At the counter — waiting to pay'), counter.length, counter.map(c => (
+        {column('counter', t('At the counter'), counter.length, counter.map(c => (
             <div key={c.id} className="ticket kds-in rounded-2xl bg-[#FBFAF7] p-4 text-[#1D1C1A]">
               <div className="flex items-start justify-between gap-2">
                 <span className="board text-[48px] leading-none text-[#B7791F]">#{c.ticket}</span>
