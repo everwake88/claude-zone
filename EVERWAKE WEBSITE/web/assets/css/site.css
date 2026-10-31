@@ -564,3 +564,27 @@ html[lang="en"] .article__notice { display: none; }
 /* Article title sits below the hero scale. */
 .article__title { font-size: var(--ew-text-3xl); line-height: 1.08; letter-spacing: var(--ew-track-hero); margin-top: var(--ew-space-3); }
 .article [data-i18n-skip] { margin-top: var(--ew-space-6); }
+
+/* --- Hero proof strip: four facts under the headline -------------------- */
+.hero-proof {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  margin-top: var(--ew-space-10); border-top: 1px solid var(--ew-hairline-dark);
+}
+.hero-proof__item {
+  padding-top: var(--ew-space-6); padding-inline: var(--ew-space-6);
+  border-inline-start: 1px solid var(--ew-hairline-dark);
+}
+.hero-proof__item:first-child { border-inline-start: 0; padding-inline-start: 0; }
+.hero-proof__fig {
+  font-family: var(--ew-font-display); font-weight: 600; line-height: 1;
+  font-size: clamp(2rem, 1.4rem + 1.6vw, 2.75rem);
+  letter-spacing: var(--ew-track-hero); color: var(--ew-on-navy); margin: 0 0 var(--ew-space-4);
+}
+.hero-proof__fig::after {
+  content: ""; display: block; width: 24px; height: 2px; background: var(--ew-gold); margin-top: var(--ew-space-4);
+}
+.hero-proof__label { font-size: 15px; line-height: 1.45; color: var(--ew-on-navy-muted); margin: 0; max-width: 24ch; }
+@media (max-width: 900px) {
+  .hero-proof { grid-template-columns: 1fr 1fr; row-gap: var(--ew-space-7); }
+  .hero-proof__item { border-inline-start: 0; padding-inline: 0 var(--ew-space-4); }
+}

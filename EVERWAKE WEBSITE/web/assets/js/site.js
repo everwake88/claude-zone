@@ -197,8 +197,10 @@
       var ul = el("ul", { class: "social-row" });
       links.forEach(function (l) {
         var li = el("li");
+        /* Platform names are brands: the same in every language. */
         var a = el("a", { href: l.url, class: "social-link", "aria-label": SOCIAL_LABELS[l.key],
-                          title: SOCIAL_LABELS[l.key], target: "_blank", rel: "noopener noreferrer" });
+                          title: SOCIAL_LABELS[l.key], target: "_blank", rel: "noopener noreferrer",
+                          "data-i18n-skip": "" });
         a.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + SOCIAL_ICONS[l.key] + '"/></svg>';
         li.appendChild(a); ul.appendChild(li);
       });

@@ -69,6 +69,11 @@ EW_I18N.register("fr", {
   "Chat on WhatsApp": "Discuter sur WhatsApp",
 
   /* ---- Page — index ---- */
+  "answer coverage, tested on real customer questions": "de couverture des réponses, testée sur de vraies questions de clients",
+  "4 weeks": "4 semaines",
+  "from kick-off to a system running in production": "du lancement à un système en production",
+  "in Arabic — Gulf and Egyptian dialects — and English": "en arabe — dialectes du Golfe et égyptien — et en anglais",
+  "yours to own: workflows, data and knowledge base": "entièrement à vous : flux, données et base de connaissances",
   "Everwake — Intelligent automation, built to be owned": "Everwake — L'automatisation intelligente, conçue pour vous appartenir",
   "Everwake designs, builds and hands over AI voice agents, chat agents and automation for businesses in Qatar, the GCC and Egypt — in Arabic and English.": "Everwake conçoit, construit et livre des agents vocaux, des agents conversationnels et de l'automatisation par l'IA pour les entreprises du Qatar, du Golfe et d'Égypte, en arabe et en anglais.",
   "AI transformation & intelligent automation": "Transformation par l'IA et automatisation intelligente",
@@ -77,9 +82,6 @@ EW_I18N.register("fr", {
   "Everwake designs, builds and hands over the AI systems that run the repetitive parts of a business — sales conversations, phone calls, order operations, follow-up and product knowledge — on the channels your customers already use.": "Everwake conçoit, construit et livre les systèmes d'IA qui prennent en charge les tâches répétitives d'une entreprise — conversations commerciales, appels, gestion des commandes, relances et connaissance produit — sur les canaux que vos clients utilisent déjà.",
   "Book a free demo": "Réserver une démo gratuite",
   "Explore our services": "Découvrir nos services",
-  "Practice": "Domaine",
-  "What we deliver": "Ce que nous livrons",
-  "Voice and chat agents · AI automation · Custom AI · Websites & CRMs": "Agents vocaux et conversationnels · Automatisation par l'IA · IA sur mesure · Sites web et CRM",
   "Markets": "Marchés",
   "Languages": "Langues",
   "Arabic, including Gulf and Egyptian dialects · English": "Arabe, y compris les dialectes du Golfe et égyptien · Anglais",
@@ -114,8 +116,7 @@ EW_I18N.register("fr", {
   "We report against the week-one baseline. Targets come from your numbers, and the report says what moved and what did not.": "Nous rendons compte par rapport à la mesure de la première semaine. Les objectifs viennent de vos chiffres, et le rapport dit ce qui a progressé et ce qui n'a pas bougé.",
   "04 — Proof of delivery": "04 — Preuve de livraison",
   "In production, and measured.": "En production, et mesuré.",
-  "IQ Homes Qatar sells AI robots, smart home technology and beauty devices — a category where customers must be educated before they can be sold to, mostly over WhatsApp and mostly outside office hours. We built the Qatari-Arabic agent that does it.": "IQ Homes Qatar vend des robots IA, des technologies pour la maison connectée et des appareils de beauté : une catégorie où il faut informer le client avant de pouvoir lui vendre, surtout sur WhatsApp et surtout en dehors des heures de bureau. Nous avons construit l'agent en arabe qatari qui s'en charge.",
-  "answer coverage across the tested question bank": "de couverture des réponses sur la banque de questions testée",
+  "IQ Homes Qatar sells AI robots, smart home technology and beauty devices — a category where customers must be educated before they can be sold to, mostly over WhatsApp and mostly outside office hours. We built the Qatari-Arabic agent that does it — and in the latest round of testing it answered 99% of real customer questions correctly.": "IQ Homes Qatar vend des robots IA, des technologies pour la maison connectée et des appareils de beauté : une catégorie où il faut informer le client avant de pouvoir lui vendre, surtout sur WhatsApp et surtout en dehors des heures de bureau. Nous avons construit l'agent en arabe qatari qui s'en charge et, lors de la dernière série de tests, il a répondu correctement à 99 % des vraies questions de clients.",
   "real customer questions used as the test set": "vraies questions de clients utilisées comme jeu de test",
   "products with governed specifications and policy rules": "produits avec spécifications et règles encadrées",
   "channels live — WhatsApp and Instagram, one brain": "canaux actifs — WhatsApp et Instagram — avec un seul cerveau",
@@ -431,7 +432,7 @@ EW_I18N.register("fr", {
   "October 2026 · 3 min read": "Octobre 2026 · 3 min de lecture",
   "Baseline first: measure before you build": "La mesure d'abord : mesurer avant de construire",
   "If you cannot measure it in week one, you cannot claim it in month three. Why every project we run starts with the client's own numbers.": "Si vous ne pouvez pas le mesurer la première semaine, vous ne pourrez pas le revendiquer au troisième mois. Pourquoi chaque projet commence par les chiffres du client lui-même.",
-  "What 96% answer coverage actually means": "Ce que signifie vraiment 96 % de couverture des réponses",
+  "What 99% answer coverage actually means": "Ce que signifie vraiment 99 % de couverture des réponses",
   "How we test an agent against 1,180 real customer questions, and why a single number beats a good demo.": "Comment nous testons un agent sur 1 180 vraies questions de clients, et pourquoi un seul chiffre vaut mieux qu'une belle démo.",
 
   /* ---- Page — about ---- */
@@ -493,7 +494,7 @@ EW_I18N.register("fr", {
   "Straight answers about time, cost and ownership.": "Des réponses directes sur les délais, les coûts et la propriété.",
 
   /* ---- Page — blog/answer-coverage ---- */
-  "What 96% answer coverage actually means — Everwake": "Ce que signifie vraiment 96 % de couverture des réponses — Everwake",
+  "What 99% answer coverage actually means — Everwake": "Ce que signifie vraiment 99 % de couverture des réponses — Everwake",
   "How Everwake tested a Qatari-Arabic sales agent against 1,180 real customer questions, and why a measured coverage number beats a good demo.": "Comment Everwake a testé un agent de vente en arabe qatari sur 1 180 vraies questions de clients, et pourquoi un chiffre de couverture mesuré vaut mieux qu'une belle démo.",
   "All articles": "Tous les articles",
   "This article is currently available in English only.": "Cet article est pour l'instant disponible en anglais uniquement.",

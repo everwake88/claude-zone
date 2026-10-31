@@ -69,6 +69,11 @@ EW_I18N.register("ar", {
   "Chat on WhatsApp": "تحدث معنا عبر واتساب",
 
   /* ---- Page — index ---- */
+  "answer coverage, tested on real customer questions": "نسبة الإجابة الصحيحة، مختبرة على أسئلة عملاء حقيقية",
+  "4 weeks": "4 أسابيع",
+  "from kick-off to a system running in production": "من الانطلاق إلى نظام يعمل فعليًا",
+  "in Arabic — Gulf and Egyptian dialects — and English": "بالعربية بلهجاتها الخليجية والمصرية، وبالإنجليزية",
+  "yours to own: workflows, data and knowledge base": "ملكك بالكامل: مسارات العمل والبيانات وقاعدة المعرفة",
   "Everwake — Intelligent automation, built to be owned": "Everwake — أتمتة ذكية، مبنية لتمتلكها",
   "Everwake designs, builds and hands over AI voice agents, chat agents and automation for businesses in Qatar, the GCC and Egypt — in Arabic and English.": "تصمم Everwake وتبني وتسلّم وكلاء صوتيين ووكلاء محادثة وحلول أتمتة بالذكاء الاصطناعي للشركات في قطر ودول الخليج ومصر، بالعربية والإنجليزية.",
   "AI transformation & intelligent automation": "التحول بالذكاء الاصطناعي والأتمتة الذكية",
@@ -77,9 +82,6 @@ EW_I18N.register("ar", {
   "Everwake designs, builds and hands over the AI systems that run the repetitive parts of a business — sales conversations, phone calls, order operations, follow-up and product knowledge — on the channels your customers already use.": "تصمم Everwake وتبني وتسلّم أنظمة الذكاء الاصطناعي التي تدير الأعمال المتكررة في شركتك: محادثات البيع، والمكالمات الهاتفية، وعمليات الطلبات، والمتابعة، ومعرفة المنتجات، على القنوات التي يستخدمها عملاؤك بالفعل.",
   "Book a free demo": "احجز عرضًا تجريبيًا مجانيًا",
   "Explore our services": "استكشف خدماتنا",
-  "Practice": "مجال العمل",
-  "What we deliver": "ما نقدمه",
-  "Voice and chat agents · AI automation · Custom AI · Websites & CRMs": "وكلاء صوت ومحادثة · أتمتة بالذكاء الاصطناعي · ذكاء اصطناعي مخصص · مواقع وأنظمة إدارة العملاء",
   "Markets": "الأسواق",
   "Languages": "اللغات",
   "Arabic, including Gulf and Egyptian dialects · English": "العربية بلهجاتها الخليجية والمصرية · الإنجليزية",
@@ -114,8 +116,7 @@ EW_I18N.register("ar", {
   "We report against the week-one baseline. Targets come from your numbers, and the report says what moved and what did not.": "نقدّم تقاريرنا مقارنةً بقياس الأسبوع الأول. الأهداف مأخوذة من أرقامك، والتقرير يوضح ما تحسّن وما لم يتحسن.",
   "04 — Proof of delivery": "04 — دليل التنفيذ",
   "In production, and measured.": "يعمل فعليًا، ومقاس بالأرقام.",
-  "IQ Homes Qatar sells AI robots, smart home technology and beauty devices — a category where customers must be educated before they can be sold to, mostly over WhatsApp and mostly outside office hours. We built the Qatari-Arabic agent that does it.": "تبيع IQ Homes Qatar الروبوتات الذكية وتقنيات المنزل الذكي وأجهزة التجميل، وهي فئة يحتاج فيها العميل إلى التعريف قبل الشراء، وغالبًا عبر واتساب وخارج ساعات العمل. نحن من بنى الوكيل الذي يتولى ذلك باللهجة القطرية.",
-  "answer coverage across the tested question bank": "نسبة الإجابة عبر بنك الأسئلة المختبَر",
+  "IQ Homes Qatar sells AI robots, smart home technology and beauty devices — a category where customers must be educated before they can be sold to, mostly over WhatsApp and mostly outside office hours. We built the Qatari-Arabic agent that does it — and in the latest round of testing it answered 99% of real customer questions correctly.": "تبيع IQ Homes Qatar الروبوتات الذكية وتقنيات المنزل الذكي وأجهزة التجميل، وهي فئة يحتاج فيها العميل إلى التعريف قبل الشراء، وغالبًا عبر واتساب وخارج ساعات العمل. نحن من بنى الوكيل الذي يتولى ذلك باللهجة القطرية، وفي أحدث جولة اختبار أجاب إجابة صحيحة عن 99% من أسئلة العملاء الحقيقية.",
   "real customer questions used as the test set": "سؤال حقيقي من العملاء استُخدمت كمجموعة اختبار",
   "products with governed specifications and policy rules": "منتجًا بمواصفات وقواعد سياسات مضبوطة",
   "channels live — WhatsApp and Instagram, one brain": "قناتان تعملان: واتساب وإنستغرام، بعقل واحد",
@@ -431,7 +432,7 @@ EW_I18N.register("ar", {
   "October 2026 · 3 min read": "أكتوبر 2026 · قراءة في 3 دقائق",
   "Baseline first: measure before you build": "القياس أولًا: قِس قبل أن تبني",
   "If you cannot measure it in week one, you cannot claim it in month three. Why every project we run starts with the client's own numbers.": "إن لم تستطع قياسه في الأسبوع الأول، فلن تستطيع ادعاءه في الشهر الثالث. لماذا يبدأ كل مشروع ننفذه بأرقام العميل نفسه.",
-  "What 96% answer coverage actually means": "ماذا تعني فعلًا نسبة تغطية إجابات تبلغ 96%",
+  "What 99% answer coverage actually means": "ماذا تعني فعلًا نسبة تغطية إجابات تبلغ 99%",
   "How we test an agent against 1,180 real customer questions, and why a single number beats a good demo.": "كيف نختبر الوكيل على 1,180 سؤالًا حقيقيًا من العملاء، ولماذا يتفوق رقم واحد على عرض تجريبي جيد.",
 
   /* ---- Page — about ---- */
@@ -493,7 +494,7 @@ EW_I18N.register("ar", {
   "Straight answers about time, cost and ownership.": "إجابات مباشرة عن الوقت والتكلفة والملكية.",
 
   /* ---- Page — blog/answer-coverage ---- */
-  "What 96% answer coverage actually means — Everwake": "ماذا تعني فعلًا نسبة تغطية إجابات تبلغ 96% — Everwake",
+  "What 99% answer coverage actually means — Everwake": "ماذا تعني فعلًا نسبة تغطية إجابات تبلغ 99% — Everwake",
   "How Everwake tested a Qatari-Arabic sales agent against 1,180 real customer questions, and why a measured coverage number beats a good demo.": "كيف اختبرت Everwake وكيل مبيعات باللهجة القطرية على 1,180 سؤالًا حقيقيًا من العملاء، ولماذا يتفوق رقم تغطية مقاس على عرض تجريبي جيد.",
   "All articles": "جميع المقالات",
   "This article is currently available in English only.": "هذا المقال متاح حاليًا باللغة الإنجليزية فقط.",
