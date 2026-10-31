@@ -104,6 +104,7 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => { db.removeChannel(ch); };
   }, [tenant.id, tenant.currency_symbol, toast, t]);
 
+  const dark = path.startsWith(base + '/kitchen');
   const active = (href: string) => href === '' ? path === base : path.startsWith(base + href);
   const signOut = async () => { await sb().auth.signOut(); router.replace('/login'); };
 
@@ -173,9 +174,11 @@ export function Shell({ children }: { children: ReactNode }) {
       {mobileNav && <div className="fixed inset-0 z-30 bg-navy/40 lg:hidden" onClick={() => setMobileNav(false)} />}
 
       {/* top bar */}
+      {/* the top bar is the page under it: light on every page, the kitchen's dark on the kitchen screen */}
       <header className={cx('sticky top-0 z-20 flex h-14 items-center gap-3 px-4 transition-[background-color,box-shadow] duration-200 lg:px-6',
-        scrolled ? 'bg-paper/85 shadow-[0_1px_0_var(--color-hairline)] backdrop-blur-md' : 'bg-paper')}>
-        <button className="rounded-lg p-1.5 hover:bg-paper lg:hidden" onClick={() => setMobileNav(true)} aria-label={t('Menu')}><MenuIcon className="size-5" /></button>
+        dark ? (scrolled ? 'bg-navy-deep/90 shadow-[0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md' : 'bg-navy-deep')
+             : scrolled ? 'bg-paper/85 shadow-[0_1px_0_var(--color-hairline)] backdrop-blur-md' : 'bg-paper')}>
+        <button className={cx('rounded-lg p-1.5 lg:hidden', dark ? 'text-white hover:bg-white/10' : 'hover:bg-paper')} onClick={() => setMobileNav(true)} aria-label={t('Menu')}><MenuIcon className="size-5" /></button>
         {tenant.status === 'onboarding' && <Badge tone="caution">{t('Onboarding — only test numbers reach the agent')}</Badge>}
         {tenant.status === 'suspended' && <Badge tone="critical">{t('Suspended')}</Badge>}
         <div className="ms-auto flex items-center gap-2">
