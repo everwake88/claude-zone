@@ -53,9 +53,9 @@ window.EVERWAKE = {
      Empty lines are hidden.
      ----------------------------------------------------------------------- */
   social: {
-    linkedin:  "",   // https://www.linkedin.com/company/everwake
+    linkedin:  "https://www.linkedin.com/company/146875797/",
     instagram: "",   // https://www.instagram.com/everwake
-    facebook:  "",   // https://www.facebook.com/everwake
+    facebook:  "https://www.facebook.com/profile.php?id=61596000506201",
     x:         "",   // https://x.com/everwake
     youtube:   "",   // https://www.youtube.com/@everwake
     tiktok:    "",   // https://www.tiktok.com/@everwake

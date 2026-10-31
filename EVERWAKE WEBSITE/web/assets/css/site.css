@@ -533,6 +533,8 @@ html[lang="en"] .article__notice { display: none; }
 
 /* --- Footer -------------------------------------------------------------- */
 .site-footer { background: var(--ew-navy); color: var(--ew-on-navy); padding-block: var(--ew-space-10) var(--ew-space-6); }
+/* Room at the very bottom so the floating WhatsApp button never sits over the last line. */
+.site-footer { padding-bottom: calc(var(--ew-space-6) + 80px); }
 .footer-grid { display: grid; grid-template-columns: 1.5fr 1.2fr 0.8fr 1.1fr; gap: var(--ew-space-7); }
 @media (max-width: 960px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .footer-grid { grid-template-columns: 1fr; } }
