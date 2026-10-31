@@ -1,11 +1,12 @@
 'use client';
-import { Banknote, Check, ChefHat, Clock, Mic, MonitorPlay, QrCode as QrIcon, Send, X } from 'lucide-react';
+import { Banknote, Bike, Check, ChefHat, Mic, MonitorPlay, QrCode as QrIcon, Send, ShoppingBag, UtensilsCrossed, X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Badge, Button, Empty, Modal, Select, Spinner, Textarea, useAction, useToast } from '@/components/ui';
+import { Button, Modal, Spinner, Textarea, useAction, useToast } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { askNotificationPermission, chime } from '@/lib/alerts';
-import { cx, money, qty, statusLabel } from '@/lib/format';
+import { clock, cx, money, qty, statusLabel } from '@/lib/format';
+import { lalezar } from '@/lib/fonts';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch, Order, OrderStatus, QrCheckout } from '@/lib/types';
@@ -15,6 +16,11 @@ import type { Branch, Order, OrderStatus, QrCheckout } from '@/lib/types';
 // WhatsApp and QR alike. Hold the microphone and say it: "123 جاهز",
 // "قول لصاحب طلب 123 إن…", "الكفتة خلصت" — the screen shows what it
 // understood and does it in 3 seconds unless someone taps cancel.
+//
+// Each order is a paper ticket on a dark rail. A bar under its number fills
+// towards the promised time (green, then amber, then red when late); a new
+// one drops in and glows for a moment; the clock and the "live" dot show the
+// screen is listening.
 interface Heard {
   heard: string; action: 'start' | 'ready' | 'collected' | 'note' | 'sold_out' | 'back_in_stock' | 'unknown'; said_order: string | null;
   ambiguous?: boolean; order: { id: number; order_no: string; status: string; table: string | null; items: string[] } | null;
@@ -40,6 +46,11 @@ export default function Kitchen() {
   const rec = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const known = useRef<Set<number>>(new Set());
+  const loaded = useRef(false);
+  const arrived = useRef(new Map<number, number>());
+  const meter = useRef<{ ctx: AudioContext; raf: number } | null>(null);
+  const [level, setLevel] = useState(0);
+  const [now, setNow] = useState(Date.now());
   const { busy, run } = useAction();
   const toast = useToast();
   const t = useT();
@@ -67,15 +78,22 @@ export default function Kitchen() {
         .eq('payment_method', 'cash').gt('expires_at', new Date().toISOString()).order('created_at')
     ]);
     const list = (o.data || []) as Order[];
-    // a new order rings (not the ones already on screen when it opened)
-    if (orders !== null && list.some(x => x.status === 'placed' && !known.current.has(x.id))) chime();
+    // a new order rings and glows (not the ones already on screen when it opened)
+    const fresh = list.filter(x => !known.current.has(x.id));
+    if (loaded.current) {
+      fresh.forEach(x => arrived.current.set(x.id, Date.now()));
+      if (fresh.some(x => x.status === 'placed' || x.status === 'accepted')) chime();
+    }
+    loaded.current = true;
     known.current = new Set(list.map(x => x.id));
     setOrders(list);
     setCounter((c.data || []) as QrCheckout[]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant.id, branch]);
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(id); }, []);
   useEffect(() => {
     if (!branch) return;
+    loaded.current = false; known.current = new Set();
     load();
     const ch = sb().channel('kitchen-' + branch)
       .on('postgres_changes', { event: '*', schema: 'everwake', table: 'orders', filter: `tenant_id=eq.${tenant.id}` }, () => load())
@@ -133,10 +151,27 @@ export default function Kitchen() {
         } catch (e) { toast(e instanceof Error ? e.message : String(e), 'critical'); }
         finally { setThinking(false); }
       };
+      // the button's ring follows the voice, so the cook sees it is hearing them
+      try {
+        const ctx = new AudioContext(), an = ctx.createAnalyser();
+        an.fftSize = 512; ctx.createMediaStreamSource(stream).connect(an);
+        const buf = new Uint8Array(an.fftSize);
+        const tick = () => {
+          an.getByteTimeDomainData(buf);
+          let sum = 0; for (const v of buf) sum += (v - 128) * (v - 128);
+          setLevel(Math.min(1, Math.sqrt(sum / buf.length) / 40));
+          if (meter.current) meter.current.raf = requestAnimationFrame(tick);
+        };
+        meter.current = { ctx, raf: requestAnimationFrame(tick) };
+      } catch { /* no meter */ }
       r.start(); rec.current = r; setRecording(true);
     } catch { toast(t('Allow the microphone for this page'), 'critical'); }
   };
-  const stopRec = () => { if (rec.current && rec.current.state !== 'inactive') rec.current.stop(); setRecording(false); };
+  const stopRec = () => {
+    if (rec.current && rec.current.state !== 'inactive') rec.current.stop();
+    if (meter.current) { cancelAnimationFrame(meter.current.raf); meter.current.ctx.close().catch(() => null); meter.current = null; }
+    setLevel(0); setRecording(false);
+  };
 
   const doHeard = useCallback(async (h: Heard) => {
     setHeard(null);
@@ -192,94 +227,166 @@ export default function Kitchen() {
     }
   };
 
+  const inKitchen = (orders || []).filter(o => o.status !== 'ready');
+  const oldest = inKitchen.reduce((m, o) => Math.max(m, Math.round((now - new Date(o.placed_at || now).getTime()) / 60000)), 0);
+  const COL = {
+    counter: { color: '#F2B544', icon: Banknote, empty: t('No one waiting.') },
+    new: { color: '#F2C46D', icon: QrIcon, empty: t('No new orders') },
+    prep: { color: '#6FA8DC', icon: ChefHat, empty: t('Nothing on the fire') },
+    ready: { color: '#45C486', icon: Check, empty: t('Nothing waiting to go out') }
+  } as const;
+  // a plain function, not a component: the tickets inside keep their place between renders
+  const column = (k: keyof typeof COL, title: string, count: number, children: React.ReactNode) => {
+    const c = COL[k];
+    return (
+      <section key={k} className="flex min-h-[62vh] flex-col rounded-[22px] bg-white/[.045] p-3" style={{ boxShadow: `inset 0 3px 0 ${c.color}` }}>
+        <header className="mb-3 flex items-center justify-between gap-2 px-1 pt-1">
+          <h2 className="flex items-center gap-2 text-[17px] font-semibold"><c.icon className="size-5" style={{ color: c.color }} aria-hidden /> {title}</h2>
+          <span key={count} className="board qr-pop text-[34px] tabular-nums" style={{ color: c.color }}>{count}</span>
+        </header>
+        {count === 0
+          ? <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/10 py-10 text-white/35">
+              <c.icon className="size-8" aria-hidden /><span className="text-sm">{c.empty}</span>
+            </div>
+          : <div className="space-y-3">{children}</div>}
+      </section>
+    );
+  };
+
   return (
-    <div className="-mx-4 -my-6 min-h-[calc(100vh-3.5rem)] bg-navy-deep p-4 text-white lg:-mx-6">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <ChefHat className="size-6 text-gold-bright" />
-        <h1 className="text-xl font-bold">{t('Kitchen')}</h1>
-        <Select value={branch} onChange={e => setBranch(e.target.value)} className="h-9 w-auto bg-white text-ink">
-          {branches.map(b => <option key={b.id} value={b.id}>{b.name_en || b.name_ar}</option>)}
-        </Select>
+    <div className={cx('-mx-4 -my-6 min-h-[calc(100vh-3.5rem)] bg-[#0E1418] p-4 text-white lg:-mx-6 lg:p-5', lalezar.variable)}>
+      {/* the rail's head: which branch, the time, that it is live, and the voice button */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+        <div className="flex items-center gap-3">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-white/[.07]"><ChefHat className="size-6 text-[#F2C46D]" aria-hidden /></span>
+          <div>
+            <label className="relative block">
+              <span className="sr-only">{t('Branch')}</span>
+              <select value={branch} onChange={e => setBranch(e.target.value)}
+                className="board cursor-pointer appearance-none bg-transparent pe-7 text-[28px] text-white outline-none focus-visible:underline">
+                {branches.map(b => <option key={b.id} value={b.id} className="text-base text-ink">{b.name_en || b.name_ar}</option>)}
+              </select>
+              <span className="pointer-events-none absolute end-0 top-1/2 -translate-y-1/2 text-white/50" aria-hidden>▾</span>
+            </label>
+            <p className="flex items-center gap-2 text-sm text-white/60">
+              <span className="kds-live size-2 rounded-full bg-[#45C486]" aria-hidden /> {t('Live')}
+              {inKitchen.length > 0 && <span className="ms-2">{t('{n} in the kitchen', { n: inKitchen.length })}</span>}
+              {oldest > 0 && <span className={cx('ms-2', oldest > 25 && 'font-semibold text-[#FF8A8D]')}>{t('Oldest {m} min', { m: oldest })}</span>}
+            </p>
+          </div>
+        </div>
+        <span className="board text-[40px] tabular-nums text-white/90" aria-label={t('Time')}>{clock(new Date(now).toISOString(), tenant.timezone)}</span>
         <div className="flex-1" />
-        <Link href={`${base}/kitchen/tv?branch=${branch}`} target="_blank"><Button size="sm" variant="outline"><MonitorPlay className="size-4" /> {t('Ready screen for customers')}</Button></Link>
-        <Link href={`${base}/settings/qr`}><Button size="sm" variant="outline"><QrIcon className="size-4" /> {t('QR codes')}</Button></Link>
+        <Link href={`${base}/kitchen/tv?branch=${branch}`} target="_blank"
+          className="flex h-11 items-center gap-2 rounded-full bg-white/[.07] px-4 text-sm text-white/80 hover:bg-white/[.12]"><MonitorPlay className="size-4" /> {t('Ready screen for customers')}</Link>
+        <Link href={`${base}/settings/qr`} className="flex h-11 items-center gap-2 rounded-full bg-white/[.07] px-4 text-sm text-white/80 hover:bg-white/[.12]"><QrIcon className="size-4" /> {t('QR codes')}</Link>
         <button onPointerDown={startRec} onPointerUp={stopRec} onPointerLeave={() => recording && stopRec()} disabled={thinking}
-          className={cx('flex h-12 select-none items-center gap-2 rounded-full px-6 text-base font-bold shadow-lg touch-none',
-                        recording ? 'animate-pulse bg-critical text-white' : 'bg-gold text-navy')}>
-          <Mic className="size-5" /> {thinking ? t('Understanding…') : recording ? t('Listening — let go to send') : t('Hold and speak')}
+          className={cx('flex h-16 select-none items-center gap-3 rounded-full pe-6 ps-2.5 text-lg font-bold touch-none transition-colors duration-200',
+                        recording ? 'bg-[#E5484D] text-white' : thinking ? 'bg-white/15 text-white' : 'bg-[#F2C46D] text-[#1A1306] shadow-[0_10px_30px_-10px_#F2C46D]')}>
+          <span className="relative flex size-11 items-center justify-center rounded-full bg-black/15">
+            <span className="absolute inset-0 rounded-full bg-white/50" aria-hidden
+                  style={{ transform: `scale(${1 + level * 0.9})`, opacity: recording ? 0.55 : 0, transition: 'transform 80ms linear, opacity .2s' }} />
+            <Mic className={cx('relative size-6', thinking && 'qr-breathe')} />
+          </span>
+          {thinking ? t('Understanding…') : recording ? t('Listening — let go to send') : t('Hold and speak')}
         </button>
       </div>
 
+      {/* what it heard: does itself in 3 seconds unless cancelled */}
       {heard && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 text-ink shadow-xl">
-          <Mic className="size-5 text-gold-ink" />
+        <div className="qr-rise mb-4 flex flex-wrap items-center gap-4 rounded-[22px] bg-[#FBFAF7] p-4 text-[#1D1C1A] shadow-2xl">
+          {heard.action !== 'unknown'
+            ? <span key={left} className="board qr-pop flex size-14 items-center justify-center rounded-full bg-[#45C486] text-[32px] text-white">{left}</span>
+            : <span className="flex size-14 items-center justify-center rounded-full bg-[#ECEBE7]"><Mic className="size-6" /></span>}
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted" dir="auto">“{heard.heard}”</p>
-            <p className="text-lg font-bold" dir="auto">{heardLine(heard)}</p>
+            <p className="text-sm text-[#6E6A64]" dir="auto">“{heard.heard}”</p>
+            <p className="text-xl font-bold" dir="auto">{heardLine(heard)}</p>
           </div>
-          {heard.action !== 'unknown' && <Button variant="positive" onClick={() => doHeard(heard)}><Check className="size-4" /> {t('Do it')} ({left})</Button>}
-          <Button variant="outline" onClick={() => setHeard(null)}><X className="size-4" /> {t('Cancel')}</Button>
+          {heard.action !== 'unknown' && <Button variant="positive" className="h-12 px-5 text-base" onClick={() => doHeard(heard)}><Check className="size-5" /> {t('Do it')}</Button>}
+          <Button variant="outline" className="h-12 px-5 text-base" onClick={() => setHeard(null)}><X className="size-5" /> {t('Cancel')}</Button>
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-4">
-        <section className="space-y-3 rounded-2xl bg-white/5 p-3">
-          <h2 className="flex items-center gap-2 font-semibold text-gold-bright"><Banknote className="size-5" /> {t('At the counter — waiting to pay')}</h2>
-          {counter.length === 0 && <p className="text-sm text-on-navy-muted">{t('No one waiting.')}</p>}
-          {counter.map(c => (
-            <div key={c.id} className="rounded-xl bg-white p-3 text-ink">
-              <div className="flex items-center justify-between">
-                <span className="text-4xl font-black">#{c.ticket}</span>
-                <b className="text-lg">{money(c.total, tenant.currency_symbol)}</b>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {column('counter', t('At the counter — waiting to pay'), counter.length, counter.map(c => (
+            <div key={c.id} className="ticket kds-in rounded-2xl bg-[#FBFAF7] p-4 text-[#1D1C1A]">
+              <div className="flex items-start justify-between gap-2">
+                <span className="board text-[48px] leading-none text-[#B7791F]">#{c.ticket}</span>
+                <span className="board text-[26px]">{money(c.total, tenant.currency_symbol)}</span>
               </div>
-              <p className="text-xs text-muted">{c.table_label ? `${t('Table {n}', { n: c.table_label })} · ` : ''}{c.cart.items.length} {t('items')}{c.customer.full_name ? ` · ${c.customer.full_name}` : ''}</p>
-              <div className="mt-2 flex gap-2">
-                <Button size="sm" variant="positive" busy={busy} className="flex-1" onClick={() => paid(c)}><Check className="size-4" /> {t('Paid')}</Button>
-                <Button size="sm" variant="ghost" onClick={() => cancel(c)}><X className="size-4" /></Button>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-sm">
+                {c.table_label && <span className="rounded-full bg-[#1D1C1A] px-2.5 py-0.5 font-semibold text-white">{t('Table {n}', { n: c.table_label })}</span>}
+                <span className="rounded-full bg-[#ECEBE7] px-2.5 py-0.5">{c.cart.items.length} {t('items')}</span>
+                {c.customer.full_name && <span className="rounded-full bg-[#ECEBE7] px-2.5 py-0.5" dir="auto">{c.customer.full_name}</span>}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Button variant="positive" busy={busy} className="h-12 flex-1 text-base" onClick={() => paid(c)}><Check className="size-5" /> {t('Paid')}</Button>
+                <Button variant="ghost" className="h-12 w-12 px-0" onClick={() => cancel(c)} aria-label={t('Cancel')}><X className="size-5" /></Button>
               </div>
             </div>
-          ))}
-        </section>
-        {cols.map(col => (
-          <section key={col.key} className="space-y-3 rounded-2xl bg-white/5 p-3">
-            <h2 className="font-semibold">{col.title} <span className="text-on-navy-muted">({col.list.length})</span></h2>
-            {col.list.length === 0 && <Empty title={t('Nothing here')}><span /></Empty>}
-            {col.list.map(o => {
-              const late = o.ready_by && new Date(o.ready_by).getTime() < Date.now() && o.status !== 'ready';
-              const mins = o.ready_by ? Math.round((new Date(o.ready_by).getTime() - Date.now()) / 60000) : null;
+          )))}
+        {cols.map(col => column(col.key as 'new' | 'prep' | 'ready', col.title, col.list.length, col.list.map(o => {
+              const placed = new Date(o.placed_at || now).getTime();
+              const due = o.ready_by ? new Date(o.ready_by).getTime() : 0;
+              const isLate = !!due && due < now && o.status !== 'ready';
+              const mins = due ? Math.round((due - now) / 60000) : null;
+              const frac = due && due > placed ? Math.min(1, Math.max(0.02, (now - placed) / (due - placed))) : 0;
+              const bar = isLate ? '#E5484D' : frac > 0.7 ? '#E9A23B' : '#2E9E6A';
+              const glow = now - (arrived.current.get(o.id) || 0) < 20000;
               const next = NEXT[o.status];
+              const Service = o.table_label ? UtensilsCrossed : o.delivery_method === 'delivery' ? Bike : ShoppingBag;
               return (
-                <div key={o.id} className={cx('rounded-xl bg-white p-3 text-ink', late && 'ring-4 ring-critical')}>
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="whitespace-nowrap text-2xl font-black tracking-tight"><bdi>{o.order_no}</bdi></span>
-                    <span className="flex flex-col items-end gap-1">
-                      <Badge tone={o.source === 'qr' ? 'gold' : 'navy'}>{o.source === 'qr' ? 'QR' : 'WhatsApp'}</Badge>
-                      {mins !== null && o.status !== 'ready' && <span className={cx('flex items-center gap-1 text-xs', late ? 'font-bold text-critical' : 'text-muted')}><Clock className="size-3" /> {mins >= 0 ? `${mins}′` : `+${-mins}′`}</span>}
-                    </span>
-                  </div>
-                  <p className="text-sm font-semibold text-gold-ink">
-                    {o.table_label ? t('Table {n}', { n: o.table_label }) : o.delivery_method === 'delivery' ? t('Delivery') : t('Pickup')}
-                  </p>
-                  <ul className="mt-1 space-y-0.5 text-sm" dir="auto">
-                    {o.cart.items.map(i => (
-                      <li key={i.line_id}><b>{qty(i.quantity, i.unit)}</b> {i.display_name || i.item_name}{i.notes ? <span className="text-critical"> · {i.notes}</span> : null}</li>
-                    ))}
-                  </ul>
-                  {o.notes && <p className="mt-1 rounded bg-caution-wash px-2 py-1 text-xs text-caution" dir="auto">{o.notes}</p>}
-                  <div className="mt-2 flex gap-2">
-                    {next && <Button size="sm" variant={next.to === 'ready' ? 'positive' : 'gold'} busy={busy} className="flex-1" onClick={() => move(o, next.to)}>{t(next.label)}</Button>}
-                    {o.status === 'ready' && (
-                      <Button size="sm" variant="primary" busy={busy} className="flex-1" onClick={() => move(o, o.delivery_method === 'delivery' ? 'out_for_delivery' : 'picked_up')}>
-                        {o.delivery_method === 'delivery' ? t('Out for delivery') : o.table_label ? t('Served') : t('Collected')}
-                      </Button>
+                <div key={o.id} className={cx('kds-in rounded-2xl', isLate && 'kds-late', glow && !isLate && 'ring-new')}>
+                  <article className="torn rounded-b-2xl bg-[#FBFAF7] px-4 pb-4 pt-5 text-[#1D1C1A]">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="board whitespace-nowrap text-[34px] leading-none"><bdi>{o.order_no}</bdi></span>
+                      {o.status === 'ready'
+                        ? <Check className="size-7 text-[#2E9E6A]" strokeWidth={3} aria-label={t('Ready')} />
+                        : mins !== null && <span className={cx('board text-[28px] leading-none tabular-nums', isLate ? 'text-[#D13438]' : 'text-[#1D1C1A]')}>{mins >= 0 ? `${mins}′` : `+${-mins}′`}</span>}
+                    </div>
+                    {o.status !== 'ready' && due > 0 && (
+                      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-black/[.08]" aria-hidden>
+                        <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${frac * 100}%`, background: bar }} />
+                      </div>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => { setNoteFor(o); setNote(''); }} title={t('Tell the customer')}><Send className="size-4" /></Button>
-                  </div>
+                    <div className="mt-3 flex flex-wrap gap-1.5 text-sm">
+                      <span className={cx('flex items-center gap-1 rounded-full px-2.5 py-0.5 font-semibold', o.table_label ? 'bg-[#1D1C1A] text-white' : 'bg-[#ECEBE7]')}>
+                        <Service className="size-3.5" aria-hidden />
+                        {o.table_label ? t('Table {n}', { n: o.table_label }) : o.delivery_method === 'delivery' ? t('Delivery') : t('Pickup')}
+                      </span>
+                      <span className="rounded-full bg-[#ECEBE7] px-2.5 py-0.5 text-[#6E6A64]">{o.source === 'qr' ? 'QR' : 'WhatsApp'}</span>
+                    </div>
+                    <ul className="mt-3 space-y-2" dir="auto">
+                      {o.cart.items.map(i => (
+                        <li key={i.line_id} className="flex items-start gap-2.5">
+                          <span className="board flex h-8 min-w-10 shrink-0 items-center justify-center rounded-lg bg-[#ECEBE7] px-1.5 text-[19px]">
+                            {i.unit === 'kg' ? qty(i.quantity, i.unit) : i.quantity}
+                          </span>
+                          <span className="pt-1 leading-snug">
+                            <span className="font-semibold">{i.display_name || i.item_name}</span>
+                            {i.notes && <span className="block text-sm font-medium text-[#D13438]">{i.notes}</span>}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    {o.notes && <p className="mt-3 border-s-4 border-[#E9A23B] bg-[#FFF3CF] px-3 py-2 text-sm font-medium text-[#6B4A00]" dir="auto">{o.notes}</p>}
+                    <div className="mt-4 flex gap-2">
+                      {next && (
+                        <Button variant={next.to === 'ready' ? 'positive' : 'gold'} busy={busy} className="h-12 flex-1 text-base" onClick={() => move(o, next.to)}>
+                          {next.to === 'ready' ? <Check className="size-5" /> : <ChefHat className="size-5" />} {t(next.label)}
+                        </Button>
+                      )}
+                      {o.status === 'ready' && (
+                        <Button variant="primary" busy={busy} className="h-12 flex-1 text-base" onClick={() => move(o, o.delivery_method === 'delivery' ? 'out_for_delivery' : 'picked_up')}>
+                          {o.delivery_method === 'delivery' ? t('Out for delivery') : o.table_label ? t('Served') : t('Collected')}
+                        </Button>
+                      )}
+                      <Button variant="outline" className="h-12 w-12 px-0" onClick={() => { setNoteFor(o); setNote(''); }} title={t('Tell the customer')} aria-label={t('Tell the customer')}><Send className="size-5" /></Button>
+                    </div>
+                  </article>
                 </div>
               );
-            })}
-          </section>
-        ))}
+            })))}
       </div>
 
       <Modal open={!!noteFor} onClose={() => setNoteFor(null)} title={t('Tell the customer of {no}', { no: noteFor?.order_no || '' })}

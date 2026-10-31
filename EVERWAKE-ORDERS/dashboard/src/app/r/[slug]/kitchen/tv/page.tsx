@@ -3,6 +3,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTenant } from '@/components/tenant';
 import { chime } from '@/lib/alerts';
+import { lalezar } from '@/lib/fonts';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch, Order } from '@/lib/types';
@@ -44,27 +45,27 @@ function Board() {
   const ready = orders.filter(o => o.status === 'ready');
   const color = brand.color || '#0B222E';
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-navy-deep text-white" dir="rtl">
+    <div className={`fixed inset-0 z-50 flex flex-col bg-[#0E1418] text-white ${lalezar.variable}`} dir="rtl">
       <header className="flex items-center gap-4 px-8 py-5" style={{ background: color }}>
         {brand.logo_url && <img src={brand.logo_url} alt="" className="size-16 rounded-full bg-white object-cover" />}
         <div>
-          <p className="text-3xl font-black">{tenant.name_ar}</p>
+          <p className="board text-[44px]">{tenant.name_ar}</p>
           <p className="text-lg opacity-90">{branch?.name_ar}</p>
         </div>
       </header>
       <div className="grid flex-1 grid-cols-2 gap-6 p-8">
         <section>
-          <h2 className="mb-4 text-3xl font-bold text-on-navy-muted">قيد التحضير <span className="text-xl font-semibold opacity-70">· Preparing</span></h2>
+          <h2 className="board mb-5 text-[44px] text-white/60">قيد التحضير <span className="text-xl font-semibold opacity-70">· Preparing</span></h2>
           <div className="flex flex-wrap gap-4">
-            {preparing.map(o => <span key={o.id} className="rounded-2xl bg-white/10 px-6 py-4 text-5xl font-black"><bdi>{o.order_no}</bdi></span>)}
+            {preparing.map(o => <span key={o.id} className="board rounded-2xl bg-white/[.07] px-6 py-4 text-[56px] text-white/85"><bdi>{o.order_no}</bdi></span>)}
           </div>
         </section>
         <section>
-          <h2 className="mb-4 text-3xl font-bold text-positive">جاهز ✅ <span className="text-xl font-semibold opacity-80">· Ready</span></h2>
+          <h2 className="board mb-5 text-[44px] text-[#45C486]">جاهز <span className="text-xl font-semibold opacity-80">· Ready</span></h2>
           <div className="flex flex-wrap gap-4">
             {ready.map(o => (
-              <span key={o.id} className="animate-pulse rounded-2xl bg-positive px-6 py-4 text-6xl font-black">
-                <bdi>{o.order_no}</bdi>{o.table_label && <span className="block text-xl font-semibold">ترابيزة {o.table_label}</span>}
+              <span key={o.id} className="qr-flash kds-in rounded-2xl bg-[#1F7A52] px-7 py-5 text-[72px] [--brand:#45C486]">
+                <bdi className="board block">{o.order_no}</bdi>{o.table_label && <span className="block text-2xl font-semibold">ترابيزة {o.table_label}</span>}
               </span>
             ))}
           </div>

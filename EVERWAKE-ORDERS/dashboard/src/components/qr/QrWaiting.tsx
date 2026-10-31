@@ -1,12 +1,14 @@
 'use client';
-import { Bell, BellRing, CheckCircle2, ChefHat, Clock, CreditCard, Gift, MessageCircle, Receipt, XCircle } from 'lucide-react';
+import { Bell, BellRing, Check, ChefHat, CreditCard, Gift, MessageCircle, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { lalezar, readex } from '@/lib/fonts';
 import { kgText } from './kg';
+import { brandVars } from './QrMenu';
 
 // The customer's waiting page after ordering from a QR code. It asks the
 // server every few seconds. Cash: the ticket to show the cashier. Then the
-// order number, a countdown, the kitchen's notes — and when it's ready, a
-// sound, a vibration, a notification and a flashing screen until they tap.
+// order number, a countdown ring, the kitchen's notes — and when it's ready,
+// a sound, a vibration, a notification and a full screen until they tap.
 // A web page can't wake a locked phone, so it also offers WhatsApp: one
 // message with the order's code, and "ready" arrives there too.
 export interface QrStatus {
@@ -25,24 +27,25 @@ export interface QrStatus {
 
 const W = {
   ar: {
-    ticket: 'رقمك', payCashier: 'ادفع عند الكاشير وقوله رقمك', payCard: 'كمّل الدفع', waitingPay: 'مستنيين الدفع…',
-    expired: 'الطلب ده خلص وقته من غير دفع', cancelled: 'الطلب اتلغى', order: 'طلب رقم', placed: 'اتأكد', preparing: 'بيتجهز', ready: 'جاهز',
-    readyBig: 'طلبك جاهز ✅', readyPickup: 'اتفضل استلمه من الكاشير', readyTable: 'جاي لترابيزتك', ok: 'تمام',
-    left: 'باقي حوالي', soon: 'قرب يجهز', min: 'دقيقة', kitchen: 'من المطبخ', alert: 'نبهني بصوت لما يجهز', alertOn: 'هننبهك بصوت — سيب الصفحة مفتوحة',
-    wa: 'ابعتلي على واتساب لما يجهز', waOn: 'هنبعتلك على واتساب كمان', waText: '🔔 نبهني لما طلبي يجهز', total: 'الإجمالي',
-    loyalty: (n: number, of: number) => `طلبك رقم ${n} من ${of} للمكافأة 🎁`, payFailed: 'الدفع بالكارت مكملش — تقدر تدفع كاش عند الكاشير وتقوله رقمك',
-    done: 'استلمته', table: 'ترابيزة'
+    ticket: 'رقمك عند الكاشير', payCashier: 'ادفع للكاشير وقوله الرقم ده', payCard: 'كمّل الدفع', waitingPay: 'مستنيين الدفع',
+    validFor: 'الرقم شغال لمدة', expired: 'الطلب ده خلص وقته من غير دفع', cancelled: 'الطلب اتلغى', order: 'طلب رقم',
+    placed: 'اتأكد', preparing: 'بيتجهز', ready: 'جاهز', readyBig: 'طلبك جاهز', readyPickup: 'اتفضل استلمه من الكاشير', readyTable: 'جاي لترابيزتك دلوقتي', ok: 'تمام',
+    min: 'دقيقة', soon: 'قرب يجهز', left: 'باقي', kitchen: 'من المطبخ', alert: 'نبهني بصوت لما يجهز', alertOn: 'هنرن أول ما يجهز — سيب الصفحة مفتوحة',
+    wa: 'ابعتلي على واتساب لما يجهز', waOn: 'هيوصلك على واتساب كمان', waText: '🔔 نبهني لما طلبي يجهز', total: 'الإجمالي',
+    loyalty: (n: number, of: number) => n === of ? 'الطلب ده عليه المكافأة' : `فاضلك ${of - n} ${of - n === 1 ? 'طلب' : 'طلبات'} على المكافأة`,
+    payFailed: 'الدفع بالكارت مكملش — تقدر تدفع كاش عند الكاشير وتقوله رقمك', table: 'ترابيزة', gift: 'هدية', collected: 'بالهنا والشفا'
   },
   en: {
-    ticket: 'Your number', payCashier: 'Pay at the counter and tell them your number', payCard: 'Complete payment', waitingPay: 'Waiting for the payment…',
-    expired: 'This order expired without payment', cancelled: 'This order was cancelled', order: 'Order', placed: 'Confirmed', preparing: 'Preparing', ready: 'Ready',
-    readyBig: 'Your order is ready ✅', readyPickup: 'Please collect it at the counter', readyTable: 'On its way to your table', ok: 'OK',
-    left: 'About', soon: 'Almost ready', min: 'min', kitchen: 'From the kitchen', alert: 'Alert me with a sound when ready', alertOn: 'We will alert you — keep this page open',
-    wa: 'Message me on WhatsApp when ready', waOn: 'We will message you on WhatsApp too', waText: '🔔 Tell me when my order is ready', total: 'Total',
-    loyalty: (n: number, of: number) => `Order ${n} of ${of} towards your reward 🎁`, payFailed: 'The card payment did not go through — you can pay cash at the counter with your number',
-    done: 'Collected', table: 'Table'
+    ticket: 'Your number at the counter', payCashier: 'Pay at the counter and tell them this number', payCard: 'Complete payment', waitingPay: 'Waiting for the payment',
+    validFor: 'This number works for', expired: 'This order expired without payment', cancelled: 'This order was cancelled', order: 'Order',
+    placed: 'Confirmed', preparing: 'Preparing', ready: 'Ready', readyBig: 'Your order is ready', readyPickup: 'Collect it at the counter', readyTable: 'On its way to your table', ok: 'OK',
+    min: 'min', soon: 'Almost ready', left: 'About', kitchen: 'From the kitchen', alert: 'Ring me when it is ready', alertOn: 'We will ring — keep this page open',
+    wa: 'Message me on WhatsApp when ready', waOn: 'WhatsApp will tell you too', waText: '🔔 Tell me when my order is ready', total: 'Total',
+    loyalty: (n: number, of: number) => n === of ? 'This order earns the reward' : `${of - n} more ${of - n === 1 ? 'order' : 'orders'} to your reward`,
+    payFailed: 'The card payment did not go through — you can pay cash at the counter with your number', table: 'Table', gift: 'Free', collected: 'Enjoy your meal'
   }
 };
+const mmss = (ms: number) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 export function QrWaiting({ token, initial, payFailed }: { token: string; initial: QrStatus; payFailed: boolean }) {
   const [s, setS] = useState<QrStatus>(initial);
@@ -55,7 +58,6 @@ export function QrWaiting({ token, initial, payFailed }: { token: string; initia
   const seenNotes = useRef(initial.notes.length);
   const lang: 'ar' | 'en' = s.restaurant.language === 'en' ? 'en' : 'ar';
   const w = W[lang];
-  const color = s.restaurant.color || '#0B222E';
   const sym = s.restaurant.currency_symbol || 'ج';
 
   // every few seconds while it matters
@@ -106,127 +108,196 @@ export function QrWaiting({ token, initial, payFailed }: { token: string; initia
   useEffect(() => { if (s.notes.length > seenNotes.current) { seenNotes.current = s.notes.length; chime(); try { navigator.vibrate?.(300); } catch { /* none */ } } }, [s.notes.length, chime]);
   useEffect(() => () => { try { lock.current?.release(); } catch { /* gone */ } }, []);
 
-  const steps = ['placed', 'preparing', 'ready'];
+  const steps = ['placed', 'preparing', 'ready'] as const;
   const at = s.order ? (s.order.status === 'accepted' ? 'placed' : s.order.status === 'picked_up' ? 'ready' : s.order.status) : null;
-  const leftMin = s.order?.ready_by ? Math.ceil((new Date(s.order.ready_by).getTime() - now) / 60000) : null;
+  const atIdx = at ? steps.indexOf(at as typeof steps[number]) : -1;
+  const placed = s.order ? new Date(s.order.placed_at).getTime() : 0;
+  const due = s.order?.ready_by ? new Date(s.order.ready_by).getTime() : 0;
+  const leftMin = due ? Math.ceil((due - now) / 60000) : null;
+  const frac = ready || s.order?.status === 'picked_up' ? 1 : due && due > placed ? Math.min(0.97, Math.max(0.03, (now - placed) / (due - placed))) : 0.05;
   const waLink = s.whatsapp.number ? `https://wa.me/${s.whatsapp.number}?text=${encodeURIComponent(`${w.waText} (${s.whatsapp.code})`)}` : null;
+  const live = s.status !== 'cancelled' && s.status !== 'expired' && s.order?.status !== 'picked_up';
+  const R = 96, C = 2 * Math.PI * R;
 
   return (
-    <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen bg-paper pb-10">
+    <div dir={lang === 'ar' ? 'rtl' : 'ltr'} style={brandVars(s.restaurant.color)}
+         className={`qr-root ${lalezar.variable} ${readex.variable} min-h-screen pb-12`}>
       {ringing && !ack && (
         <button onClick={() => { setAck(true); setRinging(false); }}
-          className="fixed inset-0 z-50 flex animate-pulse flex-col items-center justify-center gap-4 p-6 text-center text-white" style={{ background: '#2E7D5B' }}>
-          <BellRing className="size-20" />
-          <p className="text-4xl font-black">{w.readyBig}</p>
-          <p className="text-2xl font-bold">{w.order} <bdi>{s.order?.order_no}</bdi></p>
-          <p className="text-lg">{s.table ? `${w.readyTable} (${w.table} ${s.table})` : w.readyPickup}</p>
-          <span className="mt-6 rounded-full bg-white px-10 py-3 text-xl font-bold text-[#2E7D5B]">{w.ok}</span>
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-[#1F7A52] p-6 text-center text-white">
+          <span className="relative mb-6 flex size-32 items-center justify-center">
+            <span className="qr-ripple absolute inset-0 rounded-full bg-white/40" />
+            <span className="qr-ripple absolute inset-0 rounded-full bg-white/30 [animation-delay:.6s]" />
+            <span className="relative flex size-32 items-center justify-center rounded-full bg-white text-[#1F7A52]"><BellRing className="qr-breathe size-16" /></span>
+          </span>
+          <p className="board text-[56px]">{w.readyBig}</p>
+          <p className="board text-[40px] opacity-90"><bdi>{s.order?.order_no}</bdi></p>
+          <p className="text-xl">{s.table ? `${w.readyTable} · ${w.table} ${s.table}` : w.readyPickup}</p>
+          <span className="mt-8 flex h-16 min-w-48 items-center justify-center rounded-full bg-white px-10 text-xl font-semibold text-[#1F7A52]">{w.ok}</span>
         </button>
       )}
 
-      <header className="flex items-center gap-3 px-4 py-4 text-white" style={{ background: color }}>
-        {s.restaurant.logo_url && <img src={s.restaurant.logo_url} alt="" className="size-11 rounded-full bg-white object-cover" />}
-        <div className="min-w-0">
-          <p className="truncate font-bold">{(lang === 'en' && s.restaurant.name_en) || s.restaurant.name_ar}</p>
-          <p className="truncate text-xs opacity-90">{(lang === 'en' && s.branch.name_en) || s.branch.name_ar}{s.table ? ` · ${w.table} ${s.table}` : ''}</p>
-        </div>
-      </header>
+      <div className="mx-auto max-w-md">
+        <header className="flex items-center gap-3 bg-[var(--brand)] px-5 pb-14 pt-5 text-[var(--brand-on)]">
+          {s.restaurant.logo_url && <img src={s.restaurant.logo_url} alt="" className="size-12 rounded-xl bg-white object-cover" />}
+          <div className="min-w-0 flex-1">
+            <p className="board truncate text-[28px]">{(lang === 'en' && s.restaurant.name_en) || s.restaurant.name_ar}</p>
+            <p className="truncate text-sm opacity-85">{(lang === 'en' && s.branch.name_en) || s.branch.name_ar}</p>
+          </div>
+          {s.table && <span className="rounded-full bg-black/15 px-3 py-1.5 text-sm font-medium">{w.table} {s.table}</span>}
+        </header>
 
-      <main className="mx-auto max-w-md space-y-4 px-4 pt-5">
-        {payFailed && s.status === 'awaiting_payment' && <p className="rounded-xl bg-caution-wash px-3 py-2 text-sm text-caution">{w.payFailed}</p>}
+        <main className="relative z-[1] -mt-10 space-y-4 px-4">
+          {payFailed && s.status === 'awaiting_payment' && <p className="rounded-2xl bg-[#FBF0DD] px-4 py-3 text-sm font-medium text-[#8A5A12]">{w.payFailed}</p>}
 
-        {/* waiting for the money */}
-        {s.status === 'awaiting_payment' && !s.order && (
-          <div className="rounded-3xl bg-white p-6 text-center shadow-sm">
-            {s.payment_method === 'cash' || payFailed ? (
-              <>
-                <Receipt className="mx-auto size-10 text-muted" />
-                <p className="mt-2 text-sm text-muted">{w.ticket}</p>
-                <p className="text-7xl font-black" style={{ color }}>{s.ticket}</p>
+          {/* waiting for the money: the ticket to show the cashier */}
+          {s.status === 'awaiting_payment' && !s.order && (
+            s.payment_method === 'cash' || payFailed ? (
+              <div className="ticket qr-rise rounded-3xl bg-white px-6 pb-6 pt-7 text-center shadow-[0_14px_36px_rgba(29,28,26,.14)]">
+                <p className="text-sm font-medium text-[#6E6A64]">{w.ticket}</p>
+                <p className="board mt-1 text-[132px] leading-none text-[var(--brand-deep)]">{s.ticket}</p>
                 <p className="mt-3 text-lg font-semibold">{w.payCashier}</p>
-                <p className="mt-1 text-muted">{w.total}: <b>{s.total}{sym}</b></p>
-              </>
+                <div className="my-5 border-t-2 border-dashed border-[#E2E1DC]" />
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[#6E6A64]">{w.total}</span>
+                  <span className="board text-[30px]">{s.total}<span className="ms-1 font-[family-name:var(--font-qr)] text-sm">{sym}</span></span>
+                </div>
+                <p className="mt-2 text-start text-sm text-[#6E6A64]">{w.validFor} <bdi suppressHydrationWarning className="font-semibold tabular-nums">{mmss(new Date(s.expires_at).getTime() - now)}</bdi></p>
+              </div>
             ) : (
-              <>
-                <CreditCard className="mx-auto size-10 text-muted" />
-                <p className="mt-2 text-lg font-semibold">{w.waitingPay}</p>
-                {s.pay_url && <a href={s.pay_url} className="mt-4 flex h-12 items-center justify-center rounded-xl font-semibold text-white" style={{ background: color }}>{w.payCard} · {s.total}{sym}</a>}
-              </>
-            )}
-          </div>
-        )}
-        {(s.status === 'expired' || s.status === 'cancelled') && !s.order && (
-          <div className="rounded-3xl bg-white p-6 text-center shadow-sm">
-            <XCircle className="mx-auto size-10 text-critical" />
-            <p className="mt-2 text-lg font-semibold">{s.status === 'expired' ? w.expired : w.cancelled}</p>
-            {s.cancel_reason && <p className="text-sm text-muted">{s.cancel_reason}</p>}
-          </div>
-        )}
-
-        {/* the order */}
-        {s.order && (
-          <div className="rounded-3xl bg-white p-6 text-center shadow-sm">
-            <p className="text-sm text-muted">{w.order}</p>
-            <p className="text-5xl font-black" style={{ color }}><bdi>{s.order.order_no}</bdi></p>
-            <div className="mt-5 flex items-center justify-between gap-2">
-              {steps.map((st, i) => {
-                const done = at ? steps.indexOf(at) >= i : false;
-                const Icon = st === 'placed' ? CheckCircle2 : st === 'preparing' ? ChefHat : Bell;
-                return (
-                  <div key={st} className="flex flex-1 flex-col items-center gap-1">
-                    <span className={`flex size-11 items-center justify-center rounded-full ${done ? 'text-white' : 'bg-paper text-muted'}`} style={done ? { background: color } : {}}>
-                      <Icon className="size-5" /></span>
-                    <span className={`text-xs ${done ? 'font-semibold' : 'text-muted'}`}>{w[st as 'placed' | 'preparing' | 'ready']}</span>
-                  </div>
-                );
-              })}
+              <div className="qr-rise rounded-3xl bg-white p-6 text-center shadow-[0_14px_36px_rgba(29,28,26,.14)]">
+                <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-[var(--brand-wash)] text-[var(--brand-deep)]"><CreditCard className="qr-breathe size-7" /></span>
+                <p className="mt-3 text-lg font-semibold">{w.waitingPay}</p>
+                {s.pay_url && (
+                  <a href={s.pay_url} className="mt-5 flex h-14 items-center justify-between rounded-[18px] bg-[var(--brand)] px-5 font-semibold text-[var(--brand-on)]">
+                    <span>{w.payCard}</span><span className="board text-2xl">{s.total}{sym}</span>
+                  </a>
+                )}
+              </div>
+            )
+          )}
+          {(s.status === 'expired' || s.status === 'cancelled') && !s.order && (
+            <div className="rounded-3xl bg-white p-6 text-center shadow-[0_14px_36px_rgba(29,28,26,.14)]">
+              <XCircle className="mx-auto size-12 text-[#B4232A]" />
+              <p className="mt-3 text-lg font-semibold">{s.status === 'expired' ? w.expired : w.cancelled}</p>
+              {s.cancel_reason && <p className="mt-1 text-sm text-[#6E6A64]">{s.cancel_reason}</p>}
             </div>
-            {s.order.status !== 'ready' && s.order.status !== 'picked_up' && leftMin !== null && (
-              <p className="mt-5 flex items-center justify-center gap-2 text-lg font-semibold">
-                <Clock className="size-5" /> {leftMin > 1 ? `${w.left} ${leftMin} ${w.min}` : w.soon}
-              </p>
-            )}
-            {s.order.status === 'ready' && <p className="mt-5 text-xl font-bold text-positive">{w.readyBig}</p>}
+          )}
+
+          {/* the order: a ring that fills towards the promised time */}
+          {s.order && (
+            <div className="qr-rise rounded-3xl bg-white px-6 pb-6 pt-6 text-center shadow-[0_14px_36px_rgba(29,28,26,.14)]">
+              <p className="text-sm text-[#6E6A64]">{w.order} <bdi className="board text-[22px] text-[#1D1C1A]">{s.order.order_no}</bdi></p>
+              <div className="relative mx-auto mt-3 size-56">
+                <svg viewBox="0 0 220 220" className="size-full -rotate-90" aria-hidden>
+                  <circle cx="110" cy="110" r={R} fill="none" stroke="#ECEBE7" strokeWidth="14" />
+                  <circle suppressHydrationWarning cx="110" cy="110" r={R} fill="none" stroke={ready ? '#1F7A52' : 'var(--brand)'} strokeWidth="14" strokeLinecap="round"
+                          strokeDasharray={C} strokeDashoffset={C * (1 - frac)} style={{ transition: 'stroke-dashoffset 1s linear, stroke .4s' }} />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  {ready || s.order.status === 'picked_up' ? (
+                    <><Check className="size-14 text-[#1F7A52]" strokeWidth={3} /><span className="board mt-1 text-[30px] text-[#1F7A52]">{s.order.status === 'picked_up' ? w.collected : w.ready}</span></>
+                  ) : leftMin !== null && leftMin > 1 ? (
+                    <><span className="text-sm text-[#6E6A64]">{w.left}</span><span suppressHydrationWarning className="board text-[76px] leading-none">{leftMin}</span><span className="text-sm text-[#6E6A64]">{w.min}</span></>
+                  ) : (
+                    <span className="board px-6 text-[34px]">{w.soon}</span>
+                  )}
+                </div>
+              </div>
+              {/* the three steps, the current one breathing */}
+              <ol className="relative mt-5 flex justify-between">
+                <span className="absolute inset-x-8 top-5 h-1 rounded-full bg-[#ECEBE7]" aria-hidden />
+                <span className="absolute start-8 top-5 h-1 rounded-full bg-[var(--brand)] transition-all duration-700" aria-hidden
+                      style={{ width: `calc((100% - 4rem) * ${Math.max(0, atIdx) / 2})` }} />
+                {steps.map((st, i) => {
+                  const done = atIdx >= i, current = atIdx === i && !ready;
+                  const Icon = st === 'placed' ? Check : st === 'preparing' ? ChefHat : Bell;
+                  return (
+                    <li key={st} className="relative flex w-16 flex-col items-center gap-1.5" aria-current={atIdx === i ? 'step' : undefined}>
+                      <span className={`flex size-11 items-center justify-center rounded-full border-4 border-white
+                        ${done ? 'bg-[var(--brand)] text-[var(--brand-on)]' : 'bg-[#ECEBE7] text-[#9A968F]'} ${current ? 'qr-breathe' : ''}`}>
+                        <Icon className="size-5" />
+                      </span>
+                      <span className={`text-sm ${done ? 'font-semibold' : 'text-[#6E6A64]'}`}>{w[st]}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
+
+          {/* the kitchen talking to them */}
+          {s.notes.length > 0 && (
+            <div className="space-y-2">
+              {s.notes.map((n, i) => (
+                <div key={i} className="qr-rise flex items-end gap-2">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#1D1C1A] text-white"><ChefHat className="size-5" /></span>
+                  <div className="rounded-2xl rounded-es-md bg-white px-4 py-3 shadow-[0_1px_0_#E2E1DC]">
+                    <p className="text-xs font-medium text-[#6E6A64]">{w.kitchen}</p>
+                    <p className="mt-0.5" dir="auto">{n.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* how they hear it's ready */}
+          {live && (
+            <div className="space-y-2.5">
+              <button onClick={enableAlert} disabled={alertOn}
+                className={`flex h-14 w-full items-center justify-center gap-2 rounded-[18px] font-semibold transition-colors duration-200
+                  ${alertOn ? 'bg-[var(--brand-wash)] text-[var(--brand-deep)]' : 'qr-flash bg-[var(--brand)] text-[var(--brand-on)]'}`}>
+                {alertOn ? <BellRing className="size-5" /> : <Bell className="size-5" />} {alertOn ? w.alertOn : w.alert}
+              </button>
+              {waLink && (s.whatsapp.linked
+                ? <p className="flex items-center justify-center gap-2 text-sm font-medium text-[#1F7A52]"><MessageCircle className="size-4" /> {w.waOn}</p>
+                : <a href={waLink} className="flex h-14 w-full items-center justify-center gap-2 rounded-[18px] bg-[#25D366] font-semibold text-[#0B3B1F]">
+                    <MessageCircle className="size-5" /> {w.wa}</a>)}
+            </div>
+          )}
+
+          {/* the loyalty card: a stamp for each order */}
+          {s.loyalty && s.loyalty.every > 1 && s.loyalty.every <= 12 && (() => {
+            const n = ((Math.max(1, s.loyalty.orders) - 1) % s.loyalty.every) + 1;
+            return (
+              <div className="rounded-3xl bg-white p-5">
+                <p className="font-semibold">{s.loyalty.title_ar}</p>
+                <p className="mt-0.5 text-sm text-[#6E6A64]">{w.loyalty(n, s.loyalty.every)}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {Array.from({ length: s.loyalty.every }, (_, i) => {
+                    const last = i === s.loyalty!.every - 1, got = i < n;
+                    return (
+                      <span key={i} className={`flex size-9 items-center justify-center rounded-full border-2 ${got ? 'border-[var(--brand)] bg-[var(--brand)] text-[var(--brand-on)]' : 'border-dashed border-[#CFCDC7] text-[#9A968F]'}
+                        ${i === n - 1 ? 'qr-pop' : ''}`}>
+                        {last ? <Gift className="size-4" /> : got ? <Check className="size-4" strokeWidth={3} /> : null}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* the receipt */}
+          <div className="torn rounded-b-3xl bg-white px-5 pb-5 pt-6">
+            <ul className="space-y-2">
+              {s.items.map((i, k) => (
+                <li key={k} className="flex items-start justify-between gap-3" dir="auto">
+                  <span className="flex gap-2">
+                    <span className="board min-w-8 text-xl text-[var(--brand-deep)]">{i.unit === 'kg' ? '' : `${i.quantity}×`}</span>
+                    <span>{i.unit === 'kg' ? `${kgText(Number(i.quantity), lang)} ` : ''}{i.name}</span>
+                  </span>
+                  <span className="shrink-0 text-[#6E6A64]">{i.gift ? <span className="flex items-center gap-1 text-[#1F7A52]"><Gift className="size-4" /> {w.gift}</span> : `${i.line_total}${sym}`}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex items-baseline justify-between border-t-2 border-dashed border-[#E2E1DC] pt-3">
+              <span className="font-semibold">{w.total}</span>
+              <span className="board text-[28px]">{s.total}<span className="ms-1 font-[family-name:var(--font-qr)] text-sm">{sym}</span></span>
+            </div>
           </div>
-        )}
-
-        {s.notes.length > 0 && (
-          <div className="space-y-2 rounded-2xl bg-gold-wash p-4 ring-1 ring-gold-line">
-            <p className="text-xs font-semibold text-gold-ink">{w.kitchen}</p>
-            {s.notes.map((n, i) => <p key={i} className="text-sm" dir="auto">{n.text}</p>)}
-          </div>
-        )}
-
-        {/* how they hear it's ready */}
-        {s.status !== 'cancelled' && s.status !== 'expired' && s.order?.status !== 'picked_up' && (
-          <div className="space-y-2">
-            <button onClick={enableAlert} disabled={alertOn}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 text-sm font-semibold disabled:opacity-80" style={{ borderColor: color, color }}>
-              {alertOn ? <BellRing className="size-5" /> : <Bell className="size-5" />} {alertOn ? w.alertOn : w.alert}
-            </button>
-            {waLink && (s.whatsapp.linked
-              ? <p className="text-center text-sm text-positive">{w.waOn}</p>
-              : <a href={waLink} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] text-sm font-semibold text-white">
-                  <MessageCircle className="size-5" /> {w.wa}</a>)}
-          </div>
-        )}
-
-        {s.loyalty && s.loyalty.every > 1 && (
-          <p className="flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm shadow-sm">
-            <Gift className="size-4 text-gold" /> {w.loyalty(((s.loyalty.orders - 1) % s.loyalty.every) + 1, s.loyalty.every)}
-          </p>
-        )}
-
-        <div className="rounded-2xl bg-white p-4 text-sm shadow-sm">
-          {s.items.map((i, k) => (
-            <p key={k} className="flex justify-between gap-2 py-0.5" dir="auto">
-              <span>{i.unit === 'kg' ? kgText(Number(i.quantity), lang) : `${i.quantity}×`} {i.name}</span>
-              <span className="text-muted">{i.gift ? '🎁' : `${i.line_total}${sym}`}</span>
-            </p>
-          ))}
-          <p className="mt-2 flex justify-between border-t border-hairline pt-2 font-bold"><span>{w.total}</span><span>{s.total}{sym}</span></p>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

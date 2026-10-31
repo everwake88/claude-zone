@@ -53,3 +53,46 @@ th { text-align: start; }
 .ring-new { animation: ew-ring 1.6s ease-out infinite; }
 
 @media (prefers-reduced-motion: reduce) { .ring-new { animation: none; } }
+
+/* ---- The customer's QR menu, its waiting page, the kitchen ---------------------------
+   One idea: the order ticket. The restaurant's own colour (--brand) on porcelain,
+   menu-board lettering for names, prices and numbers. */
+.qr-root[dir] { font-family: var(--font-qr), var(--font-ar); letter-spacing: 0; background: #F1F2EF; color: #1D1C1A; }
+.board { font-family: var(--font-board), var(--font-ar); font-weight: 400; letter-spacing: 0; line-height: 1.05; }
+/* a ticket stub: a semicircle bitten out of each side */
+.ticket { -webkit-mask: radial-gradient(circle 11px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat,
+                        radial-gradient(circle 11px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat;
+                mask: radial-gradient(circle 11px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat,
+                      radial-gradient(circle 11px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat; }
+/* the torn top of a receipt */
+.torn { -webkit-mask: radial-gradient(circle 7px at 9px 0, #0000 97%, #000) 0 0 / 18px 100% repeat-x;
+                mask: radial-gradient(circle 7px at 9px 0, #0000 97%, #000) 0 0 / 18px 100% repeat-x; }
+.no-bar { scrollbar-width: none; } .no-bar::-webkit-scrollbar { display: none; }
+
+@keyframes qr-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes qr-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes qr-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes qr-bump { 0% { transform: scale(1); } 35% { transform: scale(1.06); } 100% { transform: scale(1); } }
+@keyframes qr-pop { 0% { transform: scale(.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes qr-shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes qr-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@keyframes qr-ripple { from { transform: scale(.6); opacity: .55; } to { transform: scale(2.4); opacity: 0; } }
+@keyframes qr-flash { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand, #B8913F) 60%, transparent); } 50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--brand, #B8913F) 0%, transparent); } }
+@keyframes kds-in { from { opacity: 0; transform: translateY(-16px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes kds-late { 0%, 100% { box-shadow: 0 0 0 3px #E5484D; } 50% { box-shadow: 0 0 0 6px rgba(229, 72, 77, .35); } }
+@keyframes kds-live { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.qr-sheet { animation: qr-up .32s cubic-bezier(.2, .9, .25, 1); }
+.qr-backdrop { animation: qr-fade .25s ease-out; }
+.qr-rise { animation: qr-rise .35s cubic-bezier(.2, .9, .25, 1) both; }
+.qr-bump { animation: qr-bump .35s ease-out; }
+.qr-pop { animation: qr-pop .35s cubic-bezier(.3, 1.6, .5, 1); }
+.qr-shake { animation: qr-shake .4s ease-in-out; }
+.qr-breathe { animation: qr-breathe 1.8s ease-in-out infinite; }
+.qr-ripple { animation: qr-ripple 1.8s ease-out infinite; }
+.qr-flash { animation: qr-flash 1.6s ease-out infinite; }
+.kds-in { animation: kds-in .45s cubic-bezier(.2, .9, .25, 1) both; }
+.kds-late { animation: kds-late 1.4s ease-in-out infinite; }
+.kds-live { animation: kds-live 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .qr-sheet, .qr-backdrop, .qr-rise, .qr-bump, .qr-pop, .qr-shake, .qr-breathe, .qr-ripple, .qr-flash, .kds-in, .kds-late, .kds-live { animation: none; }
+}

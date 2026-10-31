@@ -1446,4 +1446,10 @@ export const AR: Record<string, string> = {
   "Off": "مقفول",
   "Copy link": "انسخ اللينك",
   "Download the card": "نزّل الكارت",
+  "No new orders": "مفيش طلبات جديدة",
+  "Nothing on the fire": "مفيش حاجة على النار",
+  "Nothing waiting to go out": "مفيش حاجة مستنية تطلع",
+  "Oldest {m} min": "أقدم طلب من {m} دقيقة",
+  "Time": "الساعة",
+  "{n} in the kitchen": "{n} في المطبخ",
 };
