@@ -84,13 +84,19 @@ export function brandTokens(colors: string[]): Record<string, string> | null {
     '--color-gold': gold, '--color-gold-bright': toHex({ ...acc, L: Math.min(0.88, acc.L + 0.05) }), '--color-gold-ink': goldInk,
     '--color-gold-wash': toHex({ L: 0.966, C: Math.min(acc.C * 0.22, 0.028), H: acc.H }),
     '--color-gold-line': toHex({ L: 0.88, C: Math.min(acc.C * 0.45, 0.07), H: acc.H }),
-    '--color-on-gold': contrast(gold, '#FFFFFF') >= contrast(gold, ink) ? '#FFFFFF' : ink
+    '--color-on-gold': contrast(gold, '#FFFFFF') >= contrast(gold, ink) ? '#FFFFFF' : ink,
+    // four soft colours for the overview's numbers, around the logo's own hue (its neighbours either
+    // side and its opposite), pale enough to sit behind text; and a stronger one of each for their icons
+    ...Object.fromEntries([0, 48, -48, 180].flatMap((d, i) => [
+      [`--ui-tint-${i + 1}`, toHex({ L: 0.955, C: 0.036, H: (acc.H + d + 360) % 360 })],
+      [`--ui-tint-ink-${i + 1}`, toHex({ L: 0.56, C: 0.13, H: (acc.H + d + 360) % 360 })]
+    ]))
   };
 }
 
 const KEYS = ['--color-navy-deep', '--color-navy', '--color-navy-raised', '--color-navy-soft', '--color-on-navy-muted', '--color-ink', '--color-muted',
   '--color-paper', '--color-paper-sunk', '--color-hairline', '--color-gold', '--color-gold-bright', '--color-gold-ink', '--color-gold-wash',
-  '--color-gold-line', '--color-on-gold'];
+  '--color-gold-line', '--color-on-gold', ...[1, 2, 3, 4].flatMap(i => [`--ui-tint-${i}`, `--ui-tint-ink-${i}`])];
 const apply = (tokens: Record<string, string> | null) => {
   const s = document.documentElement.style;
   KEYS.forEach(k => (tokens?.[k] ? s.setProperty(k, tokens[k]) : s.removeProperty(k)));

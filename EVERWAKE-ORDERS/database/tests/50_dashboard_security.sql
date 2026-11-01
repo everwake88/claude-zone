@@ -137,6 +137,8 @@ begin
   assert (ctx ->> 'orders')::int = 1 and (ctx ->> 'revenue')::numeric = 567.2, ctx::text;
   assert (ctx ->> 'commission_saved')::numeric = 141.8, 'commission at 25%: ' || (ctx ->> 'commission_saved');
   assert ctx -> 'top_items' -> 0 ->> 'name' = 'فرخة مشوية';
+  assert ctx -> 'by_source' -> 0 ->> 'source' = 'whatsapp' and (ctx -> 'by_source' -> 0 ->> 'orders')::int = 1, ctx::text;
+  assert (select sum((x ->> 'orders')::int) from jsonb_array_elements(ctx -> 'by_method') x) = 1, 'every order has a service';
 
   -- housekeeping runs clean
   ctx := everwake.housekeeping();

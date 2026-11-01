@@ -15,7 +15,9 @@ type Sort = 'last_seen_at' | 'orders_count' | 'total_spent' | 'first_seen_at';
 export default function CustomersPage() {
   const { tenant, base } = useTenant();
   const [list, setList] = useState<Customer[] | null>(null);
+  // a link from the search (…/customers?q=…) starts with that search
   const [q, setQ] = useState('');
+  useEffect(() => { const v = new URLSearchParams(window.location.search).get('q'); if (v) setQ(v); }, []);
   const [sort, setSort] = useState<Sort>('last_seen_at');
   const [open, setOpen] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);

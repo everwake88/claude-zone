@@ -62,9 +62,7 @@ th { text-align: start; }
 @keyframes ew-toast { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes ew-shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
 @keyframes ew-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-/* backwards, not both: once it has played it leaves no transform behind, which would trap the
-   drawers, dialogs and full screens inside the page instead of covering the whole window */
-.ew-page { animation: ew-page .32s cubic-bezier(.2, .8, .2, 1) backwards; }
+
 .ew-drawer { animation: ew-drawer .3s cubic-bezier(.2, .9, .25, 1); }
 [dir="rtl"] .ew-drawer { animation-name: ew-drawer-rtl; }
 .ew-pop { animation: ew-pop .22s cubic-bezier(.2, .9, .25, 1); }
@@ -131,4 +129,96 @@ th { text-align: start; }
 .kds-live { animation: kds-live 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .qr-sheet, .qr-backdrop, .qr-rise, .qr-bump, .qr-pop, .qr-shake, .qr-breathe, .qr-ripple, .qr-flash, .kds-in, .kds-late, .kds-live { animation: none; }
+}
+
+/* ---- The dashboard's three looks ------------------------------------------------------
+   Chosen per browser (the palette button in the header): "clay" (soft, the default),
+   "glass" (frosted panels on a field of the brand's colours) and "classic" (flat and quiet).
+   Each only changes these variables; the colours themselves come from the logo (lib/theme.ts). */
+:root, [data-ui="clay"] {
+  --ui-gap: 14px;                     /* the margin round the floating sidebar and panel */
+  --ui-canvas: color-mix(in oklab, var(--color-gold-wash) 60%, var(--color-paper));
+  --ui-panel: color-mix(in oklab, #fff 72%, var(--color-paper));
+  --ui-panel-radius: 32px;
+  --ui-panel-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 40px 80px -48px color-mix(in oklab, var(--color-navy) 38%, transparent);
+  --ui-panel-blur: none;
+  --ui-side-radius: 28px;
+  --ui-side-bg: var(--color-navy);
+  --ui-card: #fff;
+  --ui-card-border: color-mix(in oklab, #fff 80%, transparent);
+  --ui-card-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 1px 2px color-mix(in oklab, var(--color-navy) 7%, transparent),
+                    0 16px 32px -20px color-mix(in oklab, var(--color-navy) 32%, transparent);
+  --ui-card-blur: none;
+  --ui-radius: 24px;
+  --ui-radius-inner: 16px;
+  --ui-btn-radius: 999px;
+  --ui-field-radius: 14px;
+  --ui-tint-strength: 1;              /* the four soft colours behind the numbers on the overview */
+}
+[data-ui="glass"] {
+  --ui-canvas: radial-gradient(1100px 760px at 6% -12%, color-mix(in oklab, var(--color-gold) 62%, transparent), transparent 68%),
+               radial-gradient(1100px 820px at 104% 108%, color-mix(in oklab, var(--color-navy-soft) 52%, transparent), transparent 66%),
+               radial-gradient(800px 600px at 62% 38%, color-mix(in oklab, var(--ui-tint-ink-4, #6b7c86) 30%, transparent), transparent 70%),
+               color-mix(in oklab, var(--color-gold-wash) 60%, var(--color-paper));
+  --ui-panel: rgba(255, 255, 255, .2);
+  --ui-panel-shadow: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 30px 70px -40px color-mix(in oklab, var(--color-navy) 40%, transparent);
+  --ui-panel-blur: blur(22px) saturate(1.3);
+  --ui-side-bg: color-mix(in oklab, var(--color-navy) 86%, transparent);
+  --ui-card: rgba(255, 255, 255, .58);
+  --ui-card-border: rgba(255, 255, 255, .85);
+  --ui-card-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 10px 30px -18px color-mix(in oklab, var(--color-navy) 30%, transparent);
+  --ui-card-blur: blur(16px) saturate(1.2);
+  --ui-radius: 22px;
+}
+[data-ui="classic"] {
+  --ui-gap: 0px;
+  --ui-canvas: var(--color-paper);
+  --ui-panel: transparent;
+  --ui-panel-radius: 0px;
+  --ui-panel-shadow: none;
+  --ui-side-radius: 0px;
+  --ui-card: #fff;
+  --ui-card-border: var(--color-hairline);
+  --ui-card-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  --ui-radius: 14px;
+  --ui-radius-inner: 10px;
+  --ui-btn-radius: 10px;
+  --ui-field-radius: 10px;
+  --ui-tint-strength: 0;
+}
+.ew-app { --font-ar: var(--font-qr), "IBM Plex Sans Arabic", "Noto Sans Arabic", Tahoma, sans-serif; font-family: var(--font-qr), var(--font-ar); background: var(--ui-canvas); background-attachment: fixed; }
+.ew-side { background: var(--ui-side-bg); border-radius: var(--ui-side-radius); inset-block: var(--ui-gap); inset-inline-start: var(--ui-gap);
+           box-shadow: 0 30px 60px -36px color-mix(in oklab, var(--color-navy-deep) 70%, transparent); backdrop-filter: var(--ui-panel-blur); }
+.ew-panel { background: var(--ui-panel); border-radius: var(--ui-panel-radius); box-shadow: var(--ui-panel-shadow); backdrop-filter: var(--ui-panel-blur);
+            -webkit-backdrop-filter: var(--ui-panel-blur); }
+.ew-card { background: var(--ui-card); border: 1px solid var(--ui-card-border); border-radius: var(--ui-radius); box-shadow: var(--ui-card-shadow);
+           backdrop-filter: var(--ui-card-blur); -webkit-backdrop-filter: var(--ui-card-blur); }
+/* a card you can open lifts a little under the pointer (never on touch, where hover sticks) */
+@media (hover: hover) and (pointer: fine) {
+  .ew-lift { transition: transform 200ms cubic-bezier(.23, 1, .32, 1), box-shadow 200ms cubic-bezier(.23, 1, .32, 1); }
+  .ew-lift:hover { transform: translateY(-3px); box-shadow: var(--ui-card-shadow), 0 18px 34px -22px color-mix(in oklab, var(--color-navy) 40%, transparent); }
+}
+/* the four soft colours on the overview's numbers: from the logo's hue, gone in "classic" */
+.ew-tint-1 { background: color-mix(in oklab, var(--ui-tint-1, var(--color-gold-wash)) calc(var(--ui-tint-strength) * 100%), var(--ui-card)); }
+.ew-tint-2 { background: color-mix(in oklab, var(--ui-tint-2, var(--color-gold-wash)) calc(var(--ui-tint-strength) * 100%), var(--ui-card)); }
+.ew-tint-3 { background: color-mix(in oklab, var(--ui-tint-3, var(--color-gold-wash)) calc(var(--ui-tint-strength) * 100%), var(--ui-card)); }
+.ew-tint-4 { background: color-mix(in oklab, var(--ui-tint-4, var(--color-gold-wash)) calc(var(--ui-tint-strength) * 100%), var(--ui-card)); }
+::selection { background: color-mix(in oklab, var(--color-gold) 35%, transparent); }
+/* a page arrives through a short blur, like the reference: the old view dissolves, the new one sharpens.
+   backwards, not both: once played it leaves no transform or filter behind, which would trap the
+   drawers, dialogs and full screens inside the page instead of covering the whole window */
+@keyframes ew-page-blur { from { opacity: 0; filter: blur(6px); transform: translateY(6px); } to { opacity: 1; filter: none; transform: none; } }
+.ew-page { animation: ew-page-blur .34s cubic-bezier(.23, 1, .32, 1) backwards; }
+@keyframes ew-draw { from { stroke-dashoffset: var(--len, 1000); } to { stroke-dashoffset: 0; } }
+@keyframes ew-grow { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes ew-grow-x { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes ew-ring-in { from { stroke-dasharray: 0 var(--len, 1000); } }
+@keyframes ew-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.ew-rise { animation: ew-rise .45s cubic-bezier(.23, 1, .32, 1) backwards; }
+@keyframes ew-pulse-dot { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-positive) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 7px transparent; } }
+.ew-live { animation: ew-pulse-dot 2s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ew-page { animation: ew-fade .2s ease-out; }
+  .ew-rise, .ew-live { animation: none; }
+  .ew-lift:hover { transform: none; }
 }

@@ -1,7 +1,7 @@
 'use client';
 import { Banknote, Bike, Check, ChefHat, Clock, Copy, CreditCard, MapPin, MessageCircle, Package, Phone, QrCode, Send, Store, UtensilsCrossed, X } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Drawer, Field, Input, Modal, PageHeader, Select, Spinner, Textarea, useAction, useToast } from '@/components/ui';
 import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
@@ -49,6 +49,17 @@ export default function OrdersBoard() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [branch, setBranch] = useState('');
   const [open, setOpen] = useState<Order | null>(null);
+  // a link from the search (…/orders?o=<id>) opens that order once the board has loaded
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || !orders) return;
+    opened.current = true;
+    const id = Number(new URLSearchParams(window.location.search).get('o'));
+    if (!id) return;
+    const hit = orders.find(x => x.id === id);
+    if (hit) setOpen(hit);
+    else sb().from('orders').select('*').eq('id', id).single().then(({ data }) => { if (data) setOpen(data as Order); });
+  }, [orders]);
   const [accepting, setAccepting] = useState<Order | null>(null);
   const [rejecting, setRejecting] = useState<{ order: Order; status: 'rejected' | 'cancelled' } | null>(null);
   const [eta, setEta] = useState('');

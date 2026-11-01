@@ -3733,8 +3733,9 @@ begin
     'discounts', (select coalesce(sum(discount_total), 0) from good),
     'delivery_share', (select coalesce(round(100.0 * count(*) filter (where delivery_method = 'delivery') / nullif(count(*), 0), 1), 0) from good),
     'conversations', (select n from conv),
+    -- of the people who wrote, how many ordered (an order from a QR code never came from a chat)
     'conversion_percent', (select case when (select n from conv) = 0 then 0
-                                       else round(100.0 * count(distinct wa_id) / (select n from conv), 1) end from good),
+                                       else round(100.0 * count(distinct wa_id) filter (where source is distinct from 'qr') / (select n from conv), 1) end from good),
     'new_customers', (select count(*) from everwake.customers where tenant_id = p_tenant and first_seen_at >= p_from and first_seen_at < p_to),
     'returning_orders', (select count(*) from good g
                           where exists (select 1 from everwake.orders x where x.customer_id = g.customer_id and x.status <> 'draft'
@@ -3744,6 +3745,13 @@ begin
     'by_day', coalesce((select jsonb_agg(jsonb_build_object('day', d, 'orders', n, 'revenue', r) order by d)
                           from (select (placed_at at time zone t.timezone)::date as d, count(*) as n, sum(total) as r
                                   from good group by 1) x), '[]'::jsonb),
+    -- where the orders came from (the WhatsApp agent, a QR code in the branch, the team) and how they were served
+    'by_source', coalesce((select jsonb_agg(jsonb_build_object('source', k, 'orders', n, 'revenue', r) order by n desc)
+                             from (select case when source = 'qr' then 'qr' when source like 'whatsapp%' then 'whatsapp' else 'team' end as k,
+                                          count(*) as n, sum(total) as r
+                                     from good group by 1) x), '[]'::jsonb),
+    'by_method', coalesce((select jsonb_agg(jsonb_build_object('method', k, 'orders', n) order by n desc)
+                             from (select coalesce(delivery_method, 'pickup') as k, count(*) as n from good group by 1) x), '[]'::jsonb),
     'by_hour', coalesce((select jsonb_agg(jsonb_build_object('hour', h, 'orders', n) order by h)
                            from (select extract(hour from placed_at at time zone t.timezone)::int as h, count(*) as n
                                    from good group by 1) x), '[]'::jsonb),

@@ -12,7 +12,7 @@ type Variant = 'primary' | 'gold' | 'outline' | 'ghost' | 'danger' | 'positive';
 const VARIANT: Record<Variant, string> = {
   primary: 'bg-navy text-white hover:bg-navy-soft',
   gold: 'bg-gold text-on-gold hover:bg-gold-bright font-semibold',
-  outline: 'border border-hairline bg-white text-ink hover:bg-paper',
+  outline: 'border border-hairline bg-white text-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-paper',
   ghost: 'text-ink hover:bg-paper-sunk',
   danger: 'bg-critical text-white hover:opacity-90',
   positive: 'bg-positive text-white hover:opacity-90'
@@ -23,9 +23,9 @@ export function Button({ variant = 'primary', size = 'md', busy, className, chil
     <button
       {...rest}
       disabled={rest.disabled || busy}
-      className={cx('inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-medium transition-[background-color,color,box-shadow,transform] duration-150',
+      className={cx('inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--ui-btn-radius)] font-medium transition-[background-color,color,box-shadow,transform] duration-150',
         'active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
-        size === 'sm' ? 'h-8 px-3 text-xs' : 'h-10 px-4 text-sm', VARIANT[variant], className)}>
+        size === 'sm' ? 'h-8 px-3.5 text-xs' : 'h-10 px-5 text-sm', VARIANT[variant], className)}>
       {busy && <Loader2 className="size-4 animate-spin" />}
       {children}
     </button>
@@ -33,7 +33,7 @@ export function Button({ variant = 'primary', size = 'md', busy, className, chil
 }
 
 // ---- Fields --------------------------------------------------------------------
-const field = 'w-full rounded-lg border border-hairline bg-white px-3 text-sm text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-muted/70 hover:border-ink/25 focus:outline-none focus:ring-4 focus:ring-gold/20 focus:border-gold disabled:bg-paper';
+const field = 'w-full rounded-[var(--ui-field-radius)] border border-hairline bg-white px-3 text-sm text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-muted/70 hover:border-ink/25 focus:outline-none focus:ring-4 focus:ring-gold/20 focus:border-gold disabled:bg-paper';
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input dir="auto" {...props} className={cx(field, 'h-10', props.className)} />;
 }
@@ -77,11 +77,11 @@ export function Checkbox({ checked, onChange, label }: { checked: boolean; onCha
 // ---- Surfaces ------------------------------------------------------------------
 export function Card({ children, className, title, action }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode }) {
   return (
-    <section className={cx('rounded-2xl border border-hairline/80 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_20px_-12px_rgba(0,0,0,0.12)]', className)}>
+    <section className={cx('ew-card', className)}>
       {(title || action) && (
         <header className="flex items-center justify-between gap-3 border-b border-hairline/70 px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
-          {action}
+          <h2 className="min-w-0 text-[15px] font-semibold text-ink">{title}</h2>
+          {action && <div className="shrink-0 whitespace-nowrap">{action}</div>}
         </header>
       )}
       <div className="p-5">{children}</div>
@@ -102,7 +102,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="board text-[34px] text-ink">{title}</h1>
+        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.02em] text-ink">{title}</h1>
         {subtitle && <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -112,7 +112,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 
 export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-hairline bg-white px-6 py-10 text-center">
+    <div className="rounded-[var(--ui-radius)] border-2 border-dashed border-hairline bg-[var(--ui-card)] px-6 py-10 text-center">
       <p className="font-medium text-ink">{title}</p>
       {children && <div className="mx-auto mt-1 max-w-md text-sm text-muted">{children}</div>}
       {action && <div className="mt-4">{action}</div>}
@@ -205,10 +205,10 @@ export function Modal({ open, onClose, title, children, footer }:
 export function Tabs<T extends string>({ value, onChange, tabs, size = 'md' }:
   { value: T; onChange: (v: T) => void; tabs: { value: T; label: ReactNode }[]; size?: 'sm' | 'md' }) {
   return (
-    <div className="inline-flex rounded-xl border border-hairline bg-white p-1" role="tablist">
+    <div className="inline-flex rounded-[var(--ui-btn-radius)] border border-hairline bg-white p-1" role="tablist">
       {tabs.map(t => (
         <button key={t.value} onClick={() => onChange(t.value)} role="tab" aria-selected={value === t.value}
-          className={cx('whitespace-nowrap rounded-lg font-medium transition-colors duration-200', size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-sm',
+          className={cx('whitespace-nowrap rounded-[var(--ui-btn-radius)] font-medium transition-colors duration-200', size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-sm',
             value === t.value ? 'bg-navy text-white shadow-sm' : 'text-muted hover:bg-paper hover:text-ink')}>
           {t.label}
         </button>
