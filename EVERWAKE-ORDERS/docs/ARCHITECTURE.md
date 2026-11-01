@@ -161,6 +161,35 @@ server calls the database with the service role:
   through the same functions as the board (`set_order_status`,
   `set_item_availability`), so the customer hears it the same way.
 
+## Reports and live boards (017)
+
+- `analytics(tenant, from, to)` is the report for a period. On top of the
+  totals it gives the week by day and hour, kitchen speed (medians: to accept,
+  to cook, on the road; a step over six hours is left out), people from writing
+  to receiving their order, new and returning customers by day, the regulars,
+  dishes against the period before (`prev_quantity`, `falling`), payment,
+  zones and cancel reasons. The dashboard calls it twice, for the period and
+  the one before it, to show every change. Owners and managers.
+- `branch_board(tenant)`: every branch now in one call (its state, today's
+  orders, the kitchen's queue, cooking time, the last 14 days). The whole team;
+  the money only for owners and managers.
+- `menu_insights(tenant, days)`: each dish's sales against the days before and
+  its last eight weeks. A line that names its dish only by code (a QR order)
+  still counts for it.
+- Indexes on orders, messages, customers and chats by restaurant and time keep
+  these quick as the history grows.
+
+## Speed
+
+- The middleware checks the session's token against the project's public
+  signing key (`getClaims`), without a call to Supabase on every click; what a
+  user may see is still decided by the database on every query.
+- The restaurant's layout loads its brand with its restaurants, so the logo and
+  colours are there on the first paint.
+- The sidebar prefetches its pages whole, `staleTimes` keeps a page's frame for
+  30 seconds, and `useCached` (`lib/use-cached.ts`) shows the data a page had
+  last time at once and refreshes it behind; a `loading.tsx` covers the rest.
+
 ## Security
 
 | Caller | What it can do |

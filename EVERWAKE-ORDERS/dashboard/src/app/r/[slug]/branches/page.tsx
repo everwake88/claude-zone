@@ -1,236 +1,191 @@
 'use client';
-import { CalendarDays, Clock, CreditCard, MapPin, Pause, Pencil, Phone, Plus, Store, UtensilsCrossed } from 'lucide-react';
+import { LayoutGrid, Map as MapIcon, MapPin, Plus } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { HoursEditor } from '@/components/branches/HoursEditor';
-import { Badge, Button, Card, Checkbox, Drawer, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Switch, Textarea, useAction } from '@/components/ui';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { BranchCard, DayStrip, STATE, useHoursLine, type BoardRow } from '@/components/branches/BranchCard';
+import { BranchEditor, PAYMENTS } from '@/components/branches/BranchEditor';
+import { RankList } from '@/components/charts';
+import { Button, Card, Empty, Modal, PageHeader, Spinner, Switch, Tabs, useAction } from '@/components/ui';
 import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
-import { clock, money, parseLatLng } from '@/lib/format';
-import { useT } from '@/lib/i18n';
+import { cx, money } from '@/lib/format';
+import { useLang } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch } from '@/lib/types';
+import { useCached } from '@/lib/use-cached';
 
-const PAYMENTS: [string, string][] = [['cash', 'Cash'], ['card', 'Card on delivery'], ['wallet', 'Mobile wallet'], ['instapay', 'InstaPay'],
-  ['online', 'Online (Paymob link)']];
+const BranchMap = dynamic(() => import('@/components/branches/BranchMap'), { ssr: false,
+  loading: () => <div className="ew-skeleton h-full min-h-[420px] rounded-[var(--ui-radius)]" /> });
 
-const STATE: Record<string, { label: string; tone: 'positive' | 'neutral' | 'caution' | 'critical' }> = {
-  open: { label: 'Open now', tone: 'positive' }, closed: { label: 'Closed now', tone: 'neutral' },
-  busy: { label: 'Paused (busy)', tone: 'caution' }, not_accepting: { label: 'Not taking orders', tone: 'critical' },
-  unknown: { label: 'No hours set', tone: 'neutral' }
-};
+type View = 'cards' | 'map';
+const VIEW_KEY = 'ew-branches-view';
 
+// The branches, live: open or not and until when, today's orders, the kitchen's queue, the last two
+// weeks, and the switches the team uses during service. As cards, or on the map with a list beside it.
 export default function BranchesPage() {
   const { tenant, base, can } = useTenant();
-  const [list, setList] = useState<Branch[] | null>(null);
-  const [states, setStates] = useState<Record<string, string>>({});
+  const { t, lang } = useLang();
+  const tz = tenant.timezone || 'Africa/Cairo', sym = tenant.currency_symbol;
   const [edit, setEdit] = useState<Partial<Branch> | null>(null);
   const [busyFor, setBusyFor] = useState<Branch | null>(null);
-  const [restPay, setRestPay] = useState<string[]>(['cash']);
+  const [view, setView] = useState<View>('cards');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const { busy, run } = useAction();
-  const t = useT();
   const payName = (m: string) => t(PAYMENTS.find(p => p[0] === m)?.[1] || m);
+  const hoursLine = useHoursLine();
 
-  const load = useCallback(async () => {
-    const { data: tr } = await sb().from('tenants').select('settings').eq('id', tenant.id).single();
-    setRestPay(((tr as { settings?: { payment_methods?: string[] } } | null)?.settings?.payment_methods) || ['cash']);
-    const { data } = await sb().from('branches').select('*').eq('tenant_id', tenant.id).order('sort');
-    const rows = (data || []) as Branch[];
-    setList(rows);
-    const st: Record<string, string> = {};
-    await Promise.all(rows.map(async b => { const { data: s } = await sb().rpc('branch_state', { p_branch: b.id }); st[b.id] = s as string; }));
-    setStates(st);
-  }, [tenant.id]);
-  useEffect(() => { load(); }, [load]);
+  // the view chosen last time on this browser
+  useEffect(() => { try { const v = localStorage.getItem(VIEW_KEY); if (v === 'map' || v === 'cards') setView(v); } catch { /* private mode */ } }, []);
+  const choose = (v: View) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ } };
 
-  const save = () => run(async () => {
-    const b = edit!;
-    if (!b.name_ar?.trim()) throw new Error(t('The branch needs an Arabic name'));
-    const code = (b.code || b.name_en || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 30);
-    if (code.length < 2) throw new Error(t('Give the branch a short English name or code (e.g. zamalek)'));
-    const row = {
-      tenant_id: tenant.id, code, name_ar: b.name_ar.trim(), name_en: b.name_en || null,
-      aliases: (typeof b.aliases === 'string' ? (b.aliases as string).split(/[,،]/) : b.aliases || []).map(s => s.trim()).filter(Boolean),
-      area_ar: b.area_ar || null, address_ar: b.address_ar || null, address_en: b.address_en || null,
-      lat: b.lat ?? null, lng: b.lng ?? null, maps_url: b.maps_url || null, phone: b.phone || null,
-      ops_whatsapp: (b.ops_whatsapp || '').replace(/\D/g, '') || null, hours: b.hours || {}, hours_text_ar: b.hours_text_ar || null,
-      accepting_orders: b.accepting_orders !== false, delivery_enabled: b.delivery_enabled !== false, pickup_enabled: b.pickup_enabled !== false,
-      delivery_fee: b.delivery_fee ?? null, min_order: b.min_order ?? null, max_delivery_km: b.max_delivery_km ?? null,
-      vat_percent: b.vat_percent ?? null, price_note_ar: b.price_note_ar || null, prep_minutes: b.prep_minutes ?? null,
-      delivery_eta_text: b.delivery_eta_text || null, serves_hint_ar: b.serves_hint_ar || null, seasonal: !!b.seasonal,
-      is_active: b.is_active !== false, sort: b.sort ?? ((list?.length || 0) + 1) * 10,
-      reservations: b.dine_in === false ? 'off' : b.reservations || 'off', reservation_note_ar: b.reservation_note_ar || null,
-      reservation_max_guests: b.reservation_max_guests ?? null,
-      dine_in: b.dine_in ?? null, payment_methods: b.payment_methods ?? null
-    };
-    if (row.reservations === 'phone' && !row.phone) throw new Error(t('Bookings by phone need the branch phone — the agent gives that number.'));
-    if (row.payment_methods && !row.payment_methods.length) throw new Error(t('Tick at least one way to pay at this branch, or use the restaurant’s.'));
-    const { error } = b.id ? await sb().from('branches').update(row).eq('id', b.id) : await sb().from('branches').insert(row);
-    if (error) throw new Error(error.message.includes('branches_tenant_id_code_key') ? t('Another branch already uses that code') : error.message);
-    setEdit(null); await load();
-  }, t('Branch saved — the agent knows on the next message'));
+  const branches = useCached(`br:${tenant.id}`, async () => {
+    const [b, tr] = await Promise.all([
+      sb().from('branches').select('*').eq('tenant_id', tenant.id).order('sort'),
+      sb().from('tenants').select('settings').eq('id', tenant.id).single()
+    ]);
+    return { list: (b.data || []) as Branch[],
+             restPay: ((tr.data as { settings?: { payment_methods?: string[] } } | null)?.settings?.payment_methods) || ['cash'] };
+  });
+  const board = useCached(`brb:${tenant.id}`, async (): Promise<BoardRow[]> => {
+    const { data, error } = await sb().rpc('branch_board', { p_tenant: tenant.id });
+    if (!error) return data as BoardRow[];
+    // before the database update: each branch's state on its own
+    const { data: ids } = await sb().from('branches').select('id').eq('tenant_id', tenant.id);
+    return Promise.all(((ids || []) as { id: string }[]).map(async b => ({ id: b.id, state: (await sb().rpc('branch_state', { p_branch: b.id })).data as string })));
+  });
+  const { refresh: refreshBoard } = board, { refresh: refreshBranches } = branches;
+  const reload = useCallback(() => Promise.all([refreshBranches(), refreshBoard()]), [refreshBranches, refreshBoard]);
+
+  // live: orders and switches as they change (a moment after, gathered), the clock every minute
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const soon = () => { if (timer) clearTimeout(timer); timer = setTimeout(() => { refreshBoard(); }, 2500); };
+    const ch = sb().channel('branches-' + tenant.id)
+      .on('postgres_changes', { event: '*', schema: 'everwake', table: 'orders', filter: `tenant_id=eq.${tenant.id}` }, soon)
+      .on('postgres_changes', { event: '*', schema: 'everwake', table: 'branches', filter: `tenant_id=eq.${tenant.id}` }, () => { refreshBranches(); soon(); })
+      .subscribe();
+    const tick = setInterval(() => setNow(Date.now()), 60000);
+    return () => { if (timer) clearTimeout(timer); clearInterval(tick); sb().removeChannel(ch); };
+  }, [tenant.id, refreshBoard, refreshBranches]);
+
+  const rows = useMemo(() => new Map((board.data || []).map(r => [r.id, r])), [board.data]);
+  const list = branches.data?.list, restPay = branches.data?.restPay || ['cash'];
 
   const accepting = (b: Branch, v: boolean) => run(async () => {
     const { error } = await sb().rpc('set_branch_accepting', { p_branch: b.id, p_accepting: v });
     if (error) throw new Error(error.message);
-    await load();
+    await reload();
   }, v ? t('{branch} is taking orders again', { branch: b.name_en || b.name_ar }) : t('{branch} stopped taking orders — the agent offers another branch', { branch: b.name_en || b.name_ar }));
   const pause = (b: Branch, minutes: number) => run(async () => {
     const { error } = await sb().rpc('set_branch_busy', { p_branch: b.id, p_minutes: minutes, p_reason: null });
     if (error) throw new Error(error.message);
-    setBusyFor(null); await load();
+    setBusyFor(null); await reload();
   }, minutes ? t('Paused for {n} minutes', { n: minutes }) : t('Taking orders again'));
 
   if (!list) return <Spinner />;
-  const set = <K extends keyof Branch>(k: K, v: Branch[K]) => setEdit(e => ({ ...e, [k]: v }));
-  const num = (v: string) => v === '' ? null : Number(v);
+  const active = list.filter(b => b.is_active);
+  const openNow = active.filter(b => rows.get(b.id)?.state === 'open').length;
+  const todayOrders = active.reduce((s, b) => s + Number(rows.get(b.id)?.today?.orders || 0), 0);
+  const todayRevenue = active.reduce((s, b) => s + Number(rows.get(b.id)?.today?.revenue || 0), 0);
+  const money0 = can.edit && active.some(b => rows.get(b.id)?.today?.revenue != null);
+  const nameOf = (b: Branch) => (lang === 'ar' ? b.name_ar : b.name_en || b.name_ar);
+  const waiting = active.reduce((s, b) => s + Number(rows.get(b.id)?.live?.waiting || 0), 0);
+  // the finding under the title: what is open, what today has brought, what is waiting
+  const sentence = !list.length ? t('Where orders are made. Opening hours, fees and the switches here decide what the agent promises.')
+    : [t('{a} of {b} open now', { a: openNow, b: active.length }),
+       rows.size && board.data?.[0]?.today ? t('{n} orders today', { n: todayOrders }) + (money0 ? ` (${money(todayRevenue, sym)})` : '') : '',
+       waiting ? t('{n} waiting to be accepted', { n: waiting }) : ''].filter(Boolean).join(' · ') + '.';
+  const pins = active.filter(b => b.lat != null && b.lng != null)
+    .map(b => ({ id: b.id, lat: Number(b.lat), lng: Number(b.lng), name: nameOf(b), state: rows.get(b.id)?.state || 'unknown', orders: rows.get(b.id)?.today ? Number(rows.get(b.id)!.today!.orders) : null }));
+  const card = (b: Branch) => (
+    <BranchCard key={b.id} b={b} row={rows.get(b.id)} tz={tz} sym={sym} now={now} base={base} canEdit={can.edit} canMoney={can.edit} busy={busy}
+      onAccepting={v => accepting(b, v)} onPause={() => setBusyFor(b)} onResume={() => pause(b, 0)} onEdit={() => setEdit({ ...b })}
+      payName={payName} restPay={restPay} />
+  );
 
   return (
-    <div>
-      <PageHeader title={t('Branches')} subtitle={t('Where orders are made. Opening hours, fees and the switches here decide what the agent promises.')}
-        actions={can.edit && <Button variant="gold" onClick={() => setEdit({ hours: { default: [{ open: '12:00', close: '00:00' }] }, accepting_orders: true, delivery_enabled: true, pickup_enabled: true, is_active: true })}><Plus className="size-4" /> {t('Add a branch')}</Button>} />
+    <div className="space-y-5 pb-4">
+      <PageHeader title={t('Branches')} subtitle={<span className="text-[15px] text-ink/75">{sentence}</span>}
+        actions={<>
+          {list.length > 0 && <Tabs value={view} onChange={choose} tabs={[
+            { value: 'cards', label: <span className="flex items-center gap-1.5"><LayoutGrid className="size-4" aria-hidden />{t('Cards')}</span> },
+            { value: 'map', label: <span className="flex items-center gap-1.5"><MapIcon className="size-4" aria-hidden />{t('Map')}</span> }]} />}
+          {can.edit && <Button variant="gold" onClick={() => setEdit({ hours: { default: [{ open: '12:00', close: '00:00' }] }, accepting_orders: true, delivery_enabled: true, pickup_enabled: true, is_active: true })}>
+            <Plus className="size-4" /> {t('Add a branch')}</Button>}
+        </>} />
       <PageGuide id="branches" steps={[
           t('Add every branch with its Google Maps link and opening hours — every order goes to a branch.'),
           t('Its delivery fee, minimum order and VAT are what the agent quotes (a delivery zone can set its own fee).'),
           t('“Taking orders” and “Too busy” are for right now: while a branch is off, the agent offers another one.'),
           t('Open a branch (the pencil) for what is different there: seating, payment methods and table bookings. Its own dishes and prices are in Menu.')
         ]} />
-      {list.length === 0 ? <Empty title={t('No branches yet')}>{t('Add at least one branch with its address and hours — every order goes to a branch.')}</Empty> : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {list.map(b => {
-            const st = STATE[states[b.id] || 'unknown'];
-            return (
-              <Card key={b.id} className={b.is_active ? '' : 'opacity-60'}>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="flex items-center gap-2 font-semibold"><Store className="size-4 text-gold" />{b.name_en || b.name_ar}</p>
-                    <p className="text-sm text-muted ar" dir="rtl">{b.name_ar} · <span className="font-mono">{b.code}</span></p>
-                  </div>
-                  <Badge tone={st.tone}>{t(st.label)}{states[b.id] === 'busy' && b.busy_until ? ' ' + t('until {date}', { date: clock(b.busy_until, tenant.timezone) }) : ''}</Badge>
-                </div>
-                <div className="mt-3 space-y-1 text-sm text-muted">
-                  {b.address_ar && <p className="flex items-start gap-1.5" dir="auto"><MapPin className="mt-0.5 size-3.5 shrink-0" />{b.address_ar}</p>}
-                  {b.phone && <p className="flex items-center gap-1.5"><Phone className="size-3.5" />{b.phone}</p>}
-                  {b.hours_text_ar && <p className="flex items-center gap-1.5" dir="auto"><Clock className="size-3.5" />{b.hours_text_ar}</p>}
-                  {b.reservations !== 'off' && (
-                    <p className="flex items-center gap-1.5"><CalendarDays className="size-3.5" />
-                      {b.reservations === 'whatsapp' ? t('Table bookings on WhatsApp') : t('Table bookings by phone only')}</p>
+
+      {list.length === 0 ? <Empty title={t('No branches yet')}>{t('Add at least one branch with its address and hours — every order goes to a branch.')}</Empty>
+        : view === 'cards' ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{list.map(card)}</div>
+          {active.length > 1 && board.data?.[0]?.today && (
+            <Card title={t('Today by branch')}>
+              <RankList format={v => String(v)} rows={active.map(b => ({ label: nameOf(b), value: Number(rows.get(b.id)?.today?.orders || 0),
+                sub: money0 && rows.get(b.id)?.today?.revenue != null ? money(Number(rows.get(b.id)!.today!.revenue), sym) : undefined }))
+                .sort((a, b) => b.value - a.value)} />
+            </Card>
+          )}
+        </>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-stretch">
+          <div className="ew-card min-h-[460px] p-1.5 lg:min-h-[620px]">
+            {pins.length ? <BranchMap pins={pins} selected={selected} onSelect={setSelected} />
+              : <div className="flex h-full min-h-[420px] items-center justify-center p-6 text-center text-sm text-muted">{t('No branch has a map pin yet. Open a branch and paste its Google Maps link.')}</div>}
+          </div>
+          <ul className="space-y-2.5 lg:max-h-[620px] lg:overflow-y-auto lg:pe-1">
+            {list.map(b => {
+              const r = rows.get(b.id), st = STATE[r?.state || 'unknown'] || STATE.unknown, on = selected === b.id;
+              return (
+                <li key={b.id} className={cx('ew-card overflow-hidden transition-shadow duration-150', on && 'ring-2 ring-ink/70', !b.is_active && 'opacity-60')}>
+                  <button type="button" onClick={() => setSelected(on ? null : b.id)} aria-expanded={on}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-start">
+                    <span className={cx('size-2.5 shrink-0 rounded-full', st.dot, r?.state === 'open' && 'ew-live')} aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold text-ink"><bdi>{nameOf(b)}</bdi></span>
+                      <span className="block truncate text-xs text-muted">{t(st.label)} · {hoursLine(b, r, tz, now)}</span>
+                    </span>
+                    {r?.today && <span className="shrink-0 text-end"><b className="block text-lg leading-none tabular-nums text-ink">{r.today.orders}</b><span className="text-[11px] text-muted">{t('today')}</span></span>}
+                    {Number(r?.live?.waiting || 0) > 0 && <span className="shrink-0 rounded-full bg-critical px-2 py-0.5 text-xs font-semibold text-white">{r!.live!.waiting}</span>}
+                    {b.lat == null && <MapPin className="size-4 shrink-0 text-muted/60" aria-label={t('No map pin')} />}
+                  </button>
+                  {on && (
+                    <div className="ew-fade space-y-3 border-t border-hairline/70 px-4 pb-4 pt-3">
+                      <DayStrip b={b} tz={tz} now={now} />
+                      {r?.live && <p className="text-sm text-ink/80">{t('{a} waiting · {b} in the kitchen · {c} ready', { a: r.live.waiting, b: r.live.cooking, c: r.live.ready })}</p>}
+                      {b.lat == null && <p className="text-xs text-muted">{t('Add its Google Maps link to put it on the map.')}</p>}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="flex items-center gap-2 text-sm">{t('Taking orders')} <Switch checked={b.accepting_orders} onChange={v => accepting(b, v)} disabled={busy} /></label>
+                        <span className="flex-1" />
+                        {r?.state === 'busy' ? <Button size="sm" variant="outline" onClick={() => pause(b, 0)}>{t('Resume now')}</Button>
+                          : <Button size="sm" variant="outline" disabled={!b.accepting_orders} onClick={() => setBusyFor(b)}>{t('Too busy')}</Button>}
+                        {can.edit && <Button size="sm" variant="ghost" onClick={() => setEdit({ ...b })}>{t('Edit')}</Button>}
+                      </div>
+                    </div>
                   )}
-                  <p>{b.delivery_enabled ? t('Delivery {fee}', { fee: b.delivery_fee != null ? money(b.delivery_fee, tenant.currency_symbol) : t('(fee by zone)') }) : t('No delivery')} · {b.pickup_enabled ? t('Pickup') : t('No pickup')}{b.vat_percent != null ? ' · ' + t('VAT {v}%', { v: b.vat_percent }) : ''}</p>
-                  {b.dine_in != null && <p className="flex items-center gap-1.5"><UtensilsCrossed className="size-3.5" />{b.dine_in ? t('Seating — customers can eat here') : t('No seating — delivery and pickup only')}</p>}
-                  {b.payment_methods && <p className="flex items-center gap-1.5"><CreditCard className="size-3.5" />{t('Takes: {list}', { list: b.payment_methods.map(payName).join('، ') })}</p>}
-                  <Link href={`${base}/menu?branch=${b.id}`} className="inline-block text-gold-ink underline">{t('This branch’s menu')}</Link>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
-                  <label className="flex items-center gap-2 text-sm">{t('Taking orders')} <Switch checked={b.accepting_orders} onChange={v => accepting(b, v)} disabled={busy} /></label>
-                  <span className="flex-1" />
-                  {states[b.id] === 'busy'
-                    ? <Button size="sm" variant="outline" onClick={() => pause(b, 0)}>{t('Resume now')}</Button>
-                    : <Button size="sm" variant="outline" onClick={() => setBusyFor(b)}><Pause className="size-3.5" /> {t('Too busy')}</Button>}
-                  {can.edit && <Button size="sm" variant="ghost" onClick={() => setEdit({ ...b, aliases: b.aliases })}><Pencil className="size-4" /></Button>}
-                </div>
-              </Card>
-            );
-          })}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
-      <p className="mt-4 text-sm text-muted">{t('Delivery areas and their fees are drawn on the map in')} <Link href={`${base}/zones`} className="text-gold-ink underline">{t('Delivery zones')}</Link>.</p>
+      <p className="text-sm text-muted">{t('Delivery areas and their fees are drawn on the map in')} <Link href={`${base}/zones`} className="text-gold-ink underline">{t('Delivery zones')}</Link>.</p>
 
-      <Modal open={!!busyFor} onClose={() => setBusyFor(null)} title={t('Pause {branch}', { branch: busyFor?.name_en || busyFor?.name_ar })}>
+      <Modal open={!!busyFor} onClose={() => setBusyFor(null)} title={t('Pause {branch}', { branch: busyFor ? nameOf(busyFor) : '' })}>
         <p className="mb-3 text-sm text-muted">{t('The agent tells customers this branch is too busy right now and offers another open branch. It starts taking orders again by itself.')}</p>
         <div className="grid grid-cols-3 gap-2">
           {[15, 30, 45, 60, 90, 120].map(m => <Button key={m} variant="outline" busy={busy} onClick={() => busyFor && pause(busyFor, m)}>{m < 60 ? t('{n} min', { n: m }) : t('{n} h', { n: m / 60 })}</Button>)}
         </div>
       </Modal>
 
-      <Drawer open={!!edit} onClose={() => setEdit(null)} wide title={edit?.id ? t('Edit {name}', { name: edit.name_en || edit.name_ar }) : t('New branch')}
-        footer={<Button variant="gold" busy={busy} onClick={save}>{t('Save')}</Button>}>
-        {edit && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('Name (Arabic)')}><Input dir="rtl" value={edit.name_ar || ''} onChange={e => set('name_ar', e.target.value)} /></Field>
-            <Field label={t('Name (English)')}><Input value={edit.name_en || ''} onChange={e => set('name_en', e.target.value)} /></Field>
-            <Field label={t('Code')} hint={t('Short, English, never changes (e.g. zamalek).')}><Input dir="ltr" value={edit.code || ''} disabled={!!edit.id} onChange={e => set('code', e.target.value)} /></Field>
-            <Field label={t('Other names customers use')} hint={t('Comma separated.')}><Input value={Array.isArray(edit.aliases) ? edit.aliases.join('، ') : (edit.aliases as unknown as string) || ''} onChange={e => set('aliases', e.target.value as unknown as string[])} /></Field>
-            <Field label={t('Address (Arabic)')} className="sm:col-span-2"><Input dir="rtl" value={edit.address_ar || ''} onChange={e => set('address_ar', e.target.value)} /></Field>
-            <Field label={t('Google Maps link or coordinates')} hint={edit.lat ? t('Pinned at {lat}, {lng}', { lat: edit.lat.toFixed(5), lng: edit.lng?.toFixed(5) }) : t("Paste the branch's Maps link — used for distances and the nearest branch.")} className="sm:col-span-2">
-              <Input dir="ltr" value={edit.maps_url || ''} onChange={e => { const ll = parseLatLng(e.target.value); setEdit(x => ({ ...x, maps_url: e.target.value, ...(ll ? { lat: ll[0], lng: ll[1] } : {}) })); }} />
-            </Field>
-            <Field label={t('Branch phone')}><Input dir="ltr" value={edit.phone || ''} onChange={e => set('phone', e.target.value)} /></Field>
-            <Field label={t('WhatsApp for new-order tickets')} hint={t("The kitchen's number; empty = the restaurant's (Settings → Ordering rules).")}><Input dir="ltr" value={edit.ops_whatsapp || ''} onChange={e => set('ops_whatsapp', e.target.value)} /></Field>
-            <div className="sm:col-span-2"><p className="mb-2 text-sm font-medium">{t('Opening hours')}</p><HoursEditor value={edit.hours || {}} onChange={h => set('hours', h)} /></div>
-            <Field label={t('Hours as the agent should say them')} hint={t('Optional — e.g.') + ' كل يوم من 12 الضهر لـ 2 بالليل'} className="sm:col-span-2"><Input dir="rtl" value={edit.hours_text_ar || ''} onChange={e => set('hours_text_ar', e.target.value)} /></Field>
-            <div className="flex flex-wrap gap-5 sm:col-span-2">
-              <Checkbox checked={edit.delivery_enabled !== false} onChange={v => set('delivery_enabled', v)} label={t('Delivers')} />
-              <Checkbox checked={edit.pickup_enabled !== false} onChange={v => set('pickup_enabled', v)} label={t('Pickup')} />
-              <Checkbox checked={!!edit.seasonal} onChange={v => set('seasonal', v)} label={t('Seasonal')} />
-              <Checkbox checked={edit.is_active === false} onChange={v => set('is_active', !v)} label={t('Closed down (hidden)')} />
-            </div>
-            <Field label={t('Delivery fee ({currency})', { currency: tenant.currency })} hint={t('Used when no delivery zone sets one.')}><Input type="number" value={edit.delivery_fee ?? ''} onChange={e => set('delivery_fee', num(e.target.value))} /></Field>
-            <Field label={t('Minimum order ({currency})', { currency: tenant.currency })}><Input type="number" value={edit.min_order ?? ''} onChange={e => set('min_order', num(e.target.value))} /></Field>
-            <Field label={t('VAT %')} hint={t('Empty = prices exclude fees the branch adds.')}><Input type="number" value={edit.vat_percent ?? ''} onChange={e => set('vat_percent', num(e.target.value))} /></Field>
-            <Field label={t('Delivers up to (km)')} hint={t('Used only before delivery zones are drawn.')}><Input type="number" value={edit.max_delivery_km ?? ''} onChange={e => set('max_delivery_km', num(e.target.value))} /></Field>
-            <Field label={t('Usual delivery time')} hint={t('e.g.') + ' 45–60 دقيقة'}><Input dir="rtl" value={edit.delivery_eta_text || ''} onChange={e => set('delivery_eta_text', e.target.value)} /></Field>
-            <Field label={t('Pickup ready in (minutes)')}><Input type="number" value={edit.prep_minutes ?? ''} onChange={e => set('prep_minutes', num(e.target.value))} /></Field>
-            <Field label={t('Areas it usually serves')} hint={t('For customers who type an area instead of sharing a pin.')} className="sm:col-span-2"><Input dir="rtl" value={edit.serves_hint_ar || ''} onChange={e => set('serves_hint_ar', e.target.value)} /></Field>
-            <Field label={t('Note about prices')} className="sm:col-span-2"><Textarea dir="rtl" rows={2} value={edit.price_note_ar || ''} onChange={e => set('price_note_ar', e.target.value)} placeholder="الأسعار من غير ضريبة 14%" /></Field>
-            <div className="space-y-3 border-t border-hairline pt-4 sm:col-span-2">
-              <p className="flex items-center gap-2 text-sm font-medium"><Store className="size-4 text-gold" /> {t('What is different at this branch')}</p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={t('Seating (dine-in)')} hint={t('No seating: the agent never offers to eat in here, takes no table bookings, and leaves out dine-in only dishes.')}>
-                  <Select value={edit.dine_in == null ? '' : edit.dine_in ? 'yes' : 'no'}
-                    onChange={e => setEdit(x => ({ ...x, dine_in: e.target.value === '' ? null : e.target.value === 'yes',
-                                                   ...(e.target.value === 'no' ? { reservations: 'off' as const } : {}) }))}>
-                    <option value="">{t('Not said — the agent does not promise either')}</option>
-                    <option value="yes">{t('Yes — customers can eat here')}</option>
-                    <option value="no">{t('No — delivery and pickup only')}</option>
-                  </Select>
-                </Field>
-                <Field label={t('Payment methods')} hint={t('The agent offers only these to customers of this branch.')}>
-                  <Select value={edit.payment_methods ? 'own' : 'same'}
-                    onChange={e => set('payment_methods', e.target.value === 'own' ? [...restPay] : null)}>
-                    <option value="same">{t('The restaurant’s ({list})', { list: restPay.map(payName).join('، ') })}</option>
-                    <option value="own">{t('Its own')}</option>
-                  </Select>
-                </Field>
-              </div>
-              {edit.payment_methods && (
-                <div className="flex flex-wrap gap-5">
-                  {PAYMENTS.filter(([k]) => k !== 'online' || restPay.includes('online')).map(([k, label]) => (
-                    <Checkbox key={k} checked={edit.payment_methods!.includes(k)} label={t(label)}
-                      onChange={v => set('payment_methods', v ? [...edit.payment_methods!.filter(x => x !== k), k] : edit.payment_methods!.filter(x => x !== k))} />
-                  ))}
-                </div>
-              )}
-              {edit.payment_methods && !restPay.includes('online') && <p className="text-xs text-muted">{t('Online payment links can be ticked here once Paymob is on (Settings → Online payments).')}</p>}
-              <p className="text-xs text-muted">{t('Its own dishes, prices and choices: Menu, with this branch chosen at the top.')}</p>
-            </div>
-            <div className="space-y-3 border-t border-hairline pt-4 sm:col-span-2">
-              <p className="flex items-center gap-2 text-sm font-medium"><CalendarDays className="size-4 text-gold" /> {t('Table bookings (dine-in)')}</p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={t('How this branch takes bookings')} hint={edit.dine_in === false ? t('No seating at this branch, so no table bookings.') : undefined}>
-                  <Select value={edit.reservations || 'off'} disabled={edit.dine_in === false} onChange={e => set('reservations', e.target.value as Branch['reservations'])}>
-                    <option value="off">{t('No table bookings')}</option>
-                    <option value="whatsapp">{t('On WhatsApp — the agent takes them')}</option>
-                    <option value="phone">{t('By phone only — the agent gives the branch phone')}</option>
-                  </Select>
-                </Field>
-                {edit.reservations === 'whatsapp' && (
-                  <Field label={t('Largest group the agent books')} hint={t('Bigger groups are passed to the team. Empty = the restaurant’s default (20).')}>
-                    <Input type="number" min={1} value={edit.reservation_max_guests ?? ''} onChange={e => set('reservation_max_guests', num(e.target.value))} />
-                  </Field>
-                )}
-                {edit.reservations && edit.reservations !== 'off' && (
-                  <Field label={t('What the agent should tell customers about booking here')} hint={t('Optional, in Arabic.')} className="sm:col-span-2">
-                    <Input dir="rtl" value={edit.reservation_note_ar || ''} onChange={e => set('reservation_note_ar', e.target.value)}
-                      placeholder={edit.reservations === 'phone' ? 'الحجز في الفرع ده بالتليفون بس' : 'الترابيزات اللي على البحر محدودة'} />
-                  </Field>
-                )}
-              </div>
-              {edit.reservations === 'whatsapp' && <p className="text-xs text-muted">{t('The agent collects the day, time, number of people, name and any occasion, shows a summary, and after the customer says yes sends the request to this branch’s WhatsApp for new-order tickets and to Table bookings here. The customer is told it is confirmed only when your team presses Confirm.')}</p>}
-            </div>
-          </div>
-        )}
-      </Drawer>
+      <BranchEditor edit={edit} setEdit={setEdit} list={list} restPay={restPay} onSaved={reload} />
     </div>
   );
 }

@@ -1,14 +1,17 @@
 'use client';
-import { ArrowDownRight, ArrowUpRight, Banknote, CheckCircle2, ChefHat, Clock, MessageCircle, Receipt, Rocket, ShoppingBag, Sparkles, TrendingUp, Users } from 'lucide-react';
+import { Banknote, CheckCircle2, ChefHat, Clock, MessageCircle, Receipt, Rocket, ShoppingBag, Sparkles, TrendingUp, Users } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AreaChart, Columns, RankList, Ring, Sparkline, SplitBar } from '@/components/charts';
-import { Badge, Button, Card, CountUp, Spinner, Tabs, useAction } from '@/components/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { AreaChart, Columns, RankList, Ring, SplitBar } from '@/components/charts';
+import { Kpi } from '@/components/insights/Kpi';
+import { Badge, Button, Card, Spinner, Tabs, useAction } from '@/components/ui';
 import { useTenant } from '@/components/tenant';
 import { cx, money, timeAgo, displayName } from '@/lib/format';
 import { useLang } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Checklist, Conversation, Order } from '@/lib/types';
+import { useCached } from '@/lib/use-cached';
+import { dayKey, zonedMidnight } from '@/lib/zoned';
 
 // the checklist comes from the database in English; its details carry counts
 const DETAILS: [RegExp, string][] = [
@@ -47,18 +50,12 @@ interface Report {
   new_customers: number; returning_orders: number; commission_saved: number; commission_percent: number;
   by_day: Day[]; by_hour: { hour: number; orders: number }[]; top_items: { name: string; quantity: number; revenue: number }[];
   by_source?: { source: string; orders: number; revenue: number }[]; by_method?: { method: string; orders: number }[];
+  funnel?: { wrote: number; ordered: number };
 }
+// of the people who wrote, the share who ordered (from the funnel when the database has it: never over 100%)
+const rate = (r: Report) => r.funnel ? (r.funnel.wrote ? Math.round((Number(r.funnel.ordered) / Number(r.funnel.wrote)) * 1000) / 10 : 0)
+  : Math.min(100, Number(r.conversion_percent));
 interface Live { waiting: number; cooking: number; ready: number; last: { order_no: string; placed_at: string; total: number } | null }
-
-// midnight in the restaurant's own time zone, `daysAgo` days back, as an instant
-function zonedMidnight(tz: string, daysAgo = 0) {
-  const now = new Date();
-  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(now).map(x => [x.type, x.value]));
-  const offset = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - now.getTime();
-  return new Date(Date.UTC(+p.year, +p.month - 1, +p.day - daysAgo) - offset);
-}
-const dayKey = (d: Date, tz: string) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 
 // The overview: what is happening in the restaurant right now, how today compares, and the last two
 // weeks drawn — revenue, where orders come from, the busy hours, the dishes that sell. Owners and
@@ -68,19 +65,15 @@ export default function Overview() {
   const { t, lang } = useLang();
   const tz = tenant.timezone || 'Africa/Cairo';
   const sym = tenant.currency_symbol;
-  const [list, setList] = useState<Checklist | null>(null);
-  const [today, setToday] = useState<Report | null>(null);
-  const [span, setSpan] = useState<Report | null>(null);
-  const [live, setLive] = useState<Live | null>(null);
-  const [waiting, setWaiting] = useState<Order[]>([]);
-  const [attention, setAttention] = useState<Conversation[]>([]);
   const [metric, setMetric] = useState<'revenue' | 'orders'>('revenue');
   const [now, setNow] = useState(() => Date.now());
   const { busy, run } = useAction();
   const locale = lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB';
   const m = (v: number) => money(v, sym);
 
-  const loadLive = useCallback(async () => {
+  // each part kept between visits (useCached): coming back shows the last numbers at once, then fresh ones
+  const checklist = useCached(`ov-list:${tenant.id}`, async () => (await sb().rpc('onboarding_checklist', { p_tenant: tenant.id })).data as Checklist);
+  const service = useCached(`ov-live:${tenant.id}`, async () => {
     const db = sb();
     const [o, a, k, last] = await Promise.all([
       db.from('orders').select('*').eq('tenant_id', tenant.id).eq('status', 'placed').order('placed_at').limit(6),
@@ -92,33 +85,33 @@ export default function Overview() {
         .order('placed_at', { ascending: false }).limit(1)
     ]);
     const st = ((k.data || []) as { status: string }[]).map(x => x.status);
-    setWaiting((o.data || []) as Order[]);
-    setAttention((a.data || []) as Conversation[]);
-    setLive({ waiting: st.filter(x => x === 'placed').length, cooking: st.filter(x => x === 'accepted' || x === 'preparing').length,
-              ready: st.filter(x => x === 'ready').length, last: (last.data?.[0] as Live['last']) || null });
-  }, [tenant.id, tz]);
-
-  const loadReports = useCallback(async () => {
-    if (!can.edit) return;
+    const live: Live = { waiting: st.filter(x => x === 'placed').length, cooking: st.filter(x => x === 'accepted' || x === 'preparing').length,
+                         ready: st.filter(x => x === 'ready').length, last: (last.data?.[0] as Live['last']) || null };
+    return { waiting: (o.data || []) as Order[], attention: (a.data || []) as Conversation[], live };
+  });
+  const reports = useCached(can.edit ? `ov-reports:${tenant.id}` : null, async () => {
     const to = new Date(Date.now() + 60000).toISOString();
     const [d, w] = await Promise.all([
       sb().rpc('analytics', { p_tenant: tenant.id, p_from: zonedMidnight(tz).toISOString(), p_to: to }),
       sb().rpc('analytics', { p_tenant: tenant.id, p_from: zonedMidnight(tz, 13).toISOString(), p_to: to })
     ]);
-    setToday(d.data as Report); setSpan(w.data as Report);
-  }, [tenant.id, tz, can.edit]);
+    return { today: d.data as Report, span: w.data as Report };
+  });
+  const list = checklist.data || null;
+  const today = reports.data?.today || null, span = reports.data?.span || null;
+  const live = service.data?.live || null;
+  const waiting = service.data?.waiting || [], attention = service.data?.attention || [];
+  const { refresh: refreshLive } = service, { refresh: refreshReports } = reports;
 
   useEffect(() => {
-    sb().rpc('onboarding_checklist', { p_tenant: tenant.id }).then(({ data }) => setList(data as Checklist));
-    loadLive(); loadReports();
     // the service moves on its own: new orders, the kitchen, a chat that needs someone
     const ch = sb().channel('overview-' + tenant.id)
-      .on('postgres_changes', { event: '*', schema: 'everwake', table: 'orders', filter: `tenant_id=eq.${tenant.id}` }, () => { loadLive(); })
-      .on('postgres_changes', { event: '*', schema: 'everwake', table: 'conversations', filter: `tenant_id=eq.${tenant.id}` }, () => { loadLive(); })
+      .on('postgres_changes', { event: '*', schema: 'everwake', table: 'orders', filter: `tenant_id=eq.${tenant.id}` }, () => { refreshLive(); })
+      .on('postgres_changes', { event: '*', schema: 'everwake', table: 'conversations', filter: `tenant_id=eq.${tenant.id}` }, () => { refreshLive(); })
       .subscribe();
-    const tick = setInterval(() => { setNow(Date.now()); loadReports(); }, 120000);
+    const tick = setInterval(() => { setNow(Date.now()); refreshReports(); }, 120000);
     return () => { sb().removeChannel(ch); clearInterval(tick); };
-  }, [tenant.id, loadLive, loadReports]);
+  }, [tenant.id, refreshLive, refreshReports]);
 
   // the last fourteen days, every day present (a day with no orders is a zero, not a gap)
   const days = useMemo(() => {
@@ -156,17 +149,18 @@ export default function Overview() {
   const lastWeekday = lastWeek ? new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: tz }).format(lastWeek.date) : '';
   const delta = (cur: number, prev: number) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
   const avg = (d: { orders: number; revenue: number }) => (d.orders ? d.revenue / d.orders : 0);
+  const against = t('against last {day}', { day: lastWeekday }), none = t('No orders last {day} to compare', { day: lastWeekday });
   const kpis = today && span && lastWeek ? [
-    { key: 'orders', label: t('Orders today'), value: today.orders, fmt: (v: number) => String(v), icon: ShoppingBag,
-      d: delta(today.orders, lastWeek.orders), spark: days.map(x => x.orders) },
-    { key: 'revenue', label: t('Revenue today'), value: Number(today.revenue), fmt: m, icon: Banknote,
-      d: delta(Number(today.revenue), lastWeek.revenue), spark: days.map(x => x.revenue) },
-    { key: 'avg', label: t('Average order'), value: Number(today.average_order), fmt: m, icon: Receipt,
-      d: delta(Number(today.average_order), avg(lastWeek)), spark: days.map(avg) },
-    { key: 'conv', label: t('Chats that ordered'), value: Number(today.conversion_percent), fmt: (v: number) => `${v}%`, icon: MessageCircle,
-      d: today.conversations && Number(today.conversion_percent) <= 100 && Number(span.conversion_percent) <= 100
-        ? Math.round(Number(today.conversion_percent) - Number(span.conversion_percent)) : null, pts: true,
-      sub: t('{n} chats today', { n: today.conversations }) }
+    { key: 'orders', label: t('Orders today'), value: today.orders, fmt: (v: number) => String(v), icon: ShoppingBag, spark: days.map(x => x.orders),
+      change: { value: delta(today.orders, lastWeek.orders), baseline: against } },
+    { key: 'revenue', label: t('Revenue today'), value: Number(today.revenue), fmt: m, icon: Banknote, spark: days.map(x => x.revenue),
+      change: { value: delta(Number(today.revenue), lastWeek.revenue), baseline: against } },
+    { key: 'avg', label: t('Average order'), value: Number(today.average_order), fmt: m, icon: Receipt, spark: days.map(avg),
+      change: { value: delta(Number(today.average_order), avg(lastWeek)), baseline: against } },
+    { key: 'conv', label: t('Chats that ordered'), value: rate(today), fmt: (v: number) => `${v}%`, icon: MessageCircle,
+      change: { value: (today.funnel?.wrote ?? today.conversations) && rate(span) ? Math.round(rate(today) - rate(span)) : null, unit: 'pts' as const,
+                baseline: t('against your two-week average') },
+      fallback: t('{n} chats today', { n: today.funnel?.wrote ?? today.conversations }) }
   ] : [];
 
   // hours: today's orders against a usual day of the last two weeks
@@ -272,25 +266,8 @@ export default function Overview() {
       {kpis.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {kpis.map((k, i) => (
-            <div key={k.key} className={cx('ew-card ew-lift ew-rise p-5', `ew-tint-${i + 1}`)} style={{ animationDelay: `${i * 60}ms` }}>
-              <div className="flex items-start justify-between gap-3">
-                <span className="flex size-10 items-center justify-center rounded-[14px] text-white shadow-[0_8px_16px_-10px_rgba(0,0,0,0.5)]"
-                  style={{ background: `var(--ui-tint-ink-${i + 1}, var(--color-gold-ink))` }}><k.icon className="size-5" aria-hidden /></span>
-                {k.spark && <Sparkline values={k.spark} color={`var(--ui-tint-ink-${i + 1}, var(--color-gold-ink))`} />}
-              </div>
-              <p className="mt-4 text-sm text-ink/70">{k.label}</p>
-              <p className="mt-0.5 text-[28px] font-bold leading-tight tracking-[-0.02em] text-ink"><CountUp value={k.value} format={k.fmt} /></p>
-              <p className="mt-1 flex items-center gap-1 text-xs text-ink/70">
-                {k.d === null ? (k.sub || t('No orders last {day} to compare', { day: lastWeekday }))
-                  : <>
-                      <span className={cx('flex items-center gap-0.5 font-semibold', k.d >= 0 ? 'text-positive' : 'text-critical')}>
-                        {k.d >= 0 ? <ArrowUpRight className="size-3.5" aria-hidden /> : <ArrowDownRight className="size-3.5" aria-hidden />}
-                        {k.d >= 0 ? '+' : ''}{k.d}{k.pts ? ' ' + t('pts') : '%'}
-                      </span>
-                      {k.pts ? t('against your two-week average') : t('against last {day}', { day: lastWeekday })}
-                    </>}
-              </p>
-            </div>
+            <Kpi key={k.key} label={k.label} value={k.value} format={k.fmt} icon={k.icon} tint={i + 1} spark={k.spark} delay={i * 60}
+              change={k.change} fallback={k.fallback || none} />
           ))}
         </div>
       )}

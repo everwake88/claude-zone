@@ -1,31 +1,28 @@
 'use client';
-import { Camera, Copy, FileImage, MapPin, Pencil, Plus, Search, Sparkles, Star } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Camera, CircleDollarSign, Copy, FileImage, ImageOff, LayoutGrid, List, MapPin, Moon, Pencil, Plus, Search, Sparkles, Star, Utensils } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ItemEditor } from '@/components/menu/ItemEditor';
 import { BranchPriceModal, CopyBranchModal } from '@/components/menu/BranchMenuTools';
 import { StockButton } from '@/components/menu/StockButton';
-import { Badge, Button, Checkbox, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Switch, Textarea, useAction } from '@/components/ui';
+import { DishCard, type Sales } from '@/components/menu/DishCard';
+import { Badge, Button, Checkbox, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Switch, Tabs, Textarea, useAction } from '@/components/ui';
 import { PageGuide } from '@/components/guide';
 import { useTenant } from '@/components/tenant';
 import { cx, money } from '@/lib/format';
-import { useT } from '@/lib/i18n';
+import { useLang } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch, Category, Item, ItemBranch, OptionBranch } from '@/lib/types';
+import { useCached } from '@/lib/use-cached';
 
 type Show = 'all' | 'here' | 'not_here' | 'own_price';
+type Health = 'all' | 'nophoto' | 'out' | 'stale' | 'noprice';
+const VIEW_KEY = 'ew-menu-view';
 
 export default function MenuPage() {
   const { tenant, base, can } = useTenant();
   const params = useSearchParams();
-  const [cats, setCats] = useState<Category[] | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [overrides, setOverrides] = useState<ItemBranch[]>([]);
-  const [optOverrides, setOptOverrides] = useState<OptionBranch[]>([]);
-  const [photos, setPhotos] = useState<Record<string, string>>({});
-  const [choiceCount, setChoiceCount] = useState<Record<string, number>>({});
   const [cat, setCat] = useState<string>('all');
   const [scope, setScope] = useState<string>(params.get('branch') || 'all');
   const [show, setShow] = useState<Show>('all');
@@ -36,10 +33,15 @@ export default function MenuPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [priceFor, setPriceFor] = useState<Item[] | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
+  const [view, setView] = useState<'cards' | 'list'>('cards');
+  const [health, setHealth] = useState<Health>('all');
   const { busy, run } = useAction();
-  const t = useT();
+  const { t, lang } = useLang();
+  useEffect(() => { try { const v = localStorage.getItem(VIEW_KEY); if (v === 'cards' || v === 'list') setView(v); } catch { /* private mode */ } }, []);
+  const choose = (v: 'cards' | 'list') => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ } };
 
-  const load = useCallback(async () => {
+  // the menu, kept between visits: coming back shows it at once, then the fresh copy
+  const menu = useCached(`menu:${tenant.id}`, async () => {
     const db = sb();
     const [c, i, b, o, m, g, ob] = await Promise.all([
       db.from('menu_categories').select('*').eq('tenant_id', tenant.id).order('sort'),
@@ -50,19 +52,24 @@ export default function MenuPage() {
       db.from('menu_option_groups').select('item_id').eq('tenant_id', tenant.id),
       db.from('menu_option_branches').select('*').eq('tenant_id', tenant.id)
     ]);
-    setCats((c.data || []) as Category[]);
-    setItems((i.data || []) as Item[]);
-    setBranches((b.data || []) as Branch[]);
-    setOverrides((o.data || []) as ItemBranch[]);
-    setOptOverrides((ob.data || []) as OptionBranch[]);
     const ph: Record<string, string> = {};
     for (const x of (m.data || []) as { item_id: string; url: string }[]) if (!ph[x.item_id]) ph[x.item_id] = x.url;
-    setPhotos(ph);
     const cc: Record<string, number> = {};
     for (const x of (g.data || []) as { item_id: string }[]) cc[x.item_id] = (cc[x.item_id] || 0) + 1;
-    setChoiceCount(cc);
-  }, [tenant.id]);
-  useEffect(() => { load(); }, [load]);
+    return { cats: (c.data || []) as Category[], items: (i.data || []) as Item[], branches: (b.data || []) as Branch[],
+             overrides: (o.data || []) as ItemBranch[], optOverrides: (ob.data || []) as OptionBranch[], photos: ph, choiceCount: cc };
+  });
+  // each dish's sales, last 30 days against the 30 before (owners and managers; nothing before the database update)
+  const insights = useCached(can.edit ? `menuins:${tenant.id}` : null, async () => {
+    const { data, error } = await sb().rpc('menu_insights', { p_tenant: tenant.id, p_days: 30 });
+    return error ? null : ((data as { items: Record<string, Sales> }).items || {});
+  });
+  const load = menu.refresh;
+  const cats = menu.data?.cats ?? null, items = menu.data?.items ?? [], branches = menu.data?.branches ?? [];
+  const overrides = menu.data?.overrides ?? [], optOverrides = menu.data?.optOverrides ?? [];
+  const photos = menu.data?.photos ?? {}, choiceCount = menu.data?.choiceCount ?? {};
+  const sales = insights.data ?? null;
+
 
   // one branch's view of the menu (a branch from the link that no longer exists → all branches)
   const branch = scope === 'all' ? null : branches.find(b => b.id === scope) || null;
@@ -77,6 +84,11 @@ export default function MenuPage() {
     && (i.orderable || b.dine_in !== false);
   const ownPrice = (i: Item, branchId: string) => ov.get(`${i.id}:${branchId}`)?.price ?? null;
   const ownChoices = (i: Item, branchId: string) => optOverrides.filter(x => x.item_id === i.id && x.branch_id === branchId).length;
+  // out of stock now: everywhere, or at the branch whose menu is shown (on the whole menu: at any branch)
+  const gone = (a: boolean, until: string | null | undefined) => !a || (!!until && new Date(until) > new Date());
+  const isOut = (i: Item) => gone(i.is_available, i.sold_out_until)
+    || (branch ? (() => { const o = ov.get(`${i.id}:${branch.id}`); return !!o && gone(o.is_available, o.sold_out_until); })()
+               : overrides.some(o => o.item_id === i.id && gone(o.is_available, o.sold_out_until)));
 
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -84,9 +96,11 @@ export default function MenuPage() {
       .filter(i => cat === 'all' || (cat === 'none' ? !i.category_id : i.category_id === cat))
       .filter(i => !s || [i.code, i.name_ar, i.name_en, ...(i.aliases || [])].some(v => (v || '').toLowerCase().includes(s)))
       .filter(i => !branch || show === 'all' || (show === 'here' ? onMenuAt(i, branch) : show === 'not_here' ? !onMenuAt(i, branch)
-        : ownPrice(i, branch.id) != null || ownChoices(i, branch.id) > 0));
+        : ownPrice(i, branch.id) != null || ownChoices(i, branch.id) > 0))
+      .filter(i => health === 'all' || (health === 'nophoto' ? !photos[i.id] : health === 'out' ? isOut(i) : health === 'noprice' ? i.price == null
+        : !(Number(sales?.[i.id]?.sold || 0) > 0)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, cat, q, showArchived, branch, show, ov, optOverrides, catById]);
+  }, [items, cat, q, showArchived, branch, show, ov, optOverrides, catById, health, photos, sales]);
 
   const saveCategory = () => run(async () => {
     if (!catEdit?.name_ar?.trim()) throw new Error(t('The category needs an Arabic name'));
@@ -161,33 +175,61 @@ export default function MenuPage() {
         <Empty title={t('No dishes yet')} action={can.edit && <Link href={`${base}/menu/import`}><Button variant="gold"><Sparkles className="size-4" /> {t('Import your menu from a PDF, photos or a link')}</Button></Link>}>
           {t('Upload the menu you already have — the AI reads it into dishes, prices and choices, and you review everything before it goes live.')}
         </Empty>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-          <aside className="space-y-1">
-            {[{ id: 'all', name_ar: t('All dishes') } as Category, ...cats, ...(items.some(i => !i.category_id) ? [{ id: 'none', name_ar: t('No category') } as Category] : [])].map(c => {
-              const n = items.filter(i => i.is_active && (c.id === 'all' || (c.id === 'none' ? !i.category_id : i.category_id === c.id))
-                                       && (!branch || onMenuAt(i, branch))).length;
-              const notHere = branch && c.id !== 'all' && c.id !== 'none' && !servedAt(c, branch.id);
-              const some = !branch && c.branch_ids;
-              return (
-                <div key={c.id} className={cx('group flex items-center rounded-lg', cat === c.id ? 'bg-navy text-white' : 'hover:bg-paper-sunk')}>
-                  <button onClick={() => setCat(c.id)} className="flex flex-1 items-center justify-between px-3 py-2 text-start text-sm">
-                    <span dir="auto" className={cx((c.is_active === false || notHere) && 'line-through opacity-60')}>{c.name_ar}
-                      {some && <MapPin className="ms-1 inline size-3 opacity-70" aria-label={t('Some branches only')} />}</span>
-                    <span className="text-xs opacity-70">{notHere ? t('not here') : n}</span>
-                  </button>
-                  {can.edit && c.id !== 'all' && c.id !== 'none' && (
-                    <button onClick={() => setCatEdit(c)} className="px-2 opacity-0 group-hover:opacity-100" aria-label={t('Edit category')}><Pencil className="size-3.5" /></button>
-                  )}
-                </div>
-              );
-            })}
-            {can.edit && <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => setCatEdit({})}><Plus className="size-4" /> {t('Category')}</Button>}
-          </aside>
+      ) : (() => {
+        const live = items.filter(i => i.is_active && (!branch || onMenuAt(i, branch)));
+        const counts = {
+          nophoto: live.filter(i => !photos[i.id]).length, out: live.filter(isOut).length, noprice: live.filter(i => i.price == null).length,
+          stale: sales ? live.filter(i => !(Number(sales[i.id]?.sold || 0) > 0)).length : 0
+        };
+        const best = new Set(Object.entries(sales || {}).filter(([, v]) => Number(v.sold) > 0).sort((a, b) => Number(b[1].sold) - Number(a[1].sold)).slice(0, 5).map(([k]) => k));
+        const chips: { key: Health; label: string; n: number; icon: typeof Camera; tone?: string }[] = [
+          { key: 'nophoto', label: t('without a photo'), n: counts.nophoto, icon: ImageOff },
+          { key: 'out', label: t('sold out now'), n: counts.out, icon: Moon, tone: 'critical' },
+          { key: 'stale', label: t('not ordered in 30 days'), n: counts.stale, icon: Utensils },
+          { key: 'noprice', label: t('without a price'), n: counts.noprice, icon: CircleDollarSign }
+        ];
+        const catName = (c: Category) => (lang === 'en' && c.name_en ? c.name_en : c.name_ar);
+        return (
+          <div className="space-y-4">
+            {/* the menu's health: each a filter, pressed again to show everything */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setHealth('all')} aria-pressed={health === 'all'}
+                className={cx('rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors duration-150', health === 'all' ? 'bg-navy text-white' : 'ew-card !rounded-full text-ink hover:text-gold-ink')}>
+                {t('{n} dishes', { n: live.length })}
+              </button>
+              {chips.filter(c => c.n > 0).map(c => (
+                <button key={c.key} type="button" onClick={() => setHealth(health === c.key ? 'all' : c.key)} aria-pressed={health === c.key}
+                  className={cx('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors duration-150 active:scale-[.98]',
+                    health === c.key ? 'bg-navy text-white' : c.tone === 'critical' ? 'bg-critical-wash text-critical hover:brightness-95' : 'bg-paper-sunk text-ink/80 hover:text-ink')}>
+                  <c.icon className="size-3.5" aria-hidden /><b className="tabular-nums">{c.n}</b> {c.label}
+                </button>
+              ))}
+            </div>
 
-          <section>
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-              <div className="relative max-w-xs flex-1">
+            {/* the categories, as a row of chips; the chosen one can be edited */}
+            <div className="rail -mx-1 flex gap-2 overflow-x-auto px-1 py-0.5">
+              {[{ id: 'all', name_ar: t('All dishes') } as Category, ...cats, ...(items.some(i => !i.category_id) ? [{ id: 'none', name_ar: t('No category') } as Category] : [])].map(c => {
+                const n = items.filter(i => i.is_active && (c.id === 'all' || (c.id === 'none' ? !i.category_id : i.category_id === c.id)) && (!branch || onMenuAt(i, branch))).length;
+                const notHere = branch && c.id !== 'all' && c.id !== 'none' && !servedAt(c, branch.id);
+                const real = c.id !== 'all' && c.id !== 'none', on = cat === c.id;
+                return (
+                  <span key={c.id} className={cx('flex shrink-0 items-center rounded-full transition-colors duration-150', on ? 'bg-navy text-white' : 'ew-card !rounded-full text-ink')}>
+                    <button type="button" onClick={() => setCat(c.id)} aria-pressed={on} className="flex items-center gap-2 py-1.5 ps-3.5 pe-3.5 text-sm font-medium">
+                      <span dir="auto" className={cx((c.is_active === false || notHere) && 'line-through opacity-60')}>{real ? catName(c) : c.name_ar}</span>
+                      {!branch && c.branch_ids && <MapPin className="size-3 opacity-70" aria-label={t('Some branches only')} />}
+                      <span className={cx('text-xs tabular-nums', on ? 'text-white/70' : 'text-muted')}>{notHere ? t('not here') : n}</span>
+                    </button>
+                    {on && real && can.edit && (
+                      <button type="button" onClick={() => setCatEdit(c)} aria-label={t('Edit category')} className="-ms-1.5 me-1 rounded-full p-1.5 hover:bg-white/15"><Pencil className="size-3.5" /></button>
+                    )}
+                  </span>
+                );
+              })}
+              {can.edit && <button type="button" onClick={() => setCatEdit({})} className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-hairline px-3 py-1.5 text-sm text-muted hover:border-gold-line hover:text-gold-ink"><Plus className="size-3.5" /> {t('Category')}</button>}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative min-w-48 max-w-xs flex-1">
                 <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
                 <Input className="ps-9" placeholder={t('Search dishes')} value={q} onChange={e => setQ(e.target.value)} />
               </div>
@@ -202,10 +244,15 @@ export default function MenuPage() {
                 </div>
               )}
               <Checkbox checked={showArchived} onChange={setShowArchived} label={t('Show archived')} />
+              <span className="flex-1" />
+              <Tabs value={view} onChange={choose} tabs={[
+                { value: 'cards', label: <span className="flex items-center gap-1.5"><LayoutGrid className="size-4" aria-hidden />{t('Cards')}</span> },
+                { value: 'list', label: <span className="flex items-center gap-1.5"><List className="size-4" aria-hidden />{t('List')}</span> }]} />
             </div>
 
-            {branch && can.edit && picked.size > 0 && (
-              <div className="sticky top-2 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-gold/40 bg-gold-wash px-3 py-2 text-sm">
+            {branch && can.edit && view === 'cards' && <p className="text-xs text-muted">{t('To change many dishes at this branch at once, switch to List and tick them.')}</p>}
+            {branch && can.edit && view === 'list' && picked.size > 0 && (
+              <div className="ew-pop sticky top-[80px] z-10 flex flex-wrap items-center gap-2 rounded-[var(--ui-radius-inner)] border border-gold/40 bg-gold-wash px-3 py-2 text-sm">
                 <span className="font-medium">{t('{n} selected', { n: picked.size })}</span>
                 <Button size="sm" variant="outline" busy={busy} onClick={() => update([...picked], { listed: true }, t('On {branch}’s menu', { branch: bName(branch) }))}>{t('Serve here')}</Button>
                 <Button size="sm" variant="outline" busy={busy} onClick={() => update([...picked], { listed: false }, t('Off {branch}’s menu', { branch: bName(branch) }))}>{t('Not served here')}</Button>
@@ -217,15 +264,35 @@ export default function MenuPage() {
               </div>
             )}
 
-            <div className="overflow-x-auto rounded-xl border border-hairline bg-white">
+            {shown.length === 0 ? <Empty title={t('No dishes here.')}>{health !== 'all' ? t('Nothing left to fix here — well done.') : t('Try another category or search.')}</Empty>
+              : view === 'cards' ? (
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+                {shown.map((i, k) => {
+                  const o = branch ? ov.get(`${i.id}:${branch.id}`) : undefined;
+                  const outAt = branchOut(i.id);
+                  const stock = branch ? { available: (o?.is_available ?? true) && i.is_available, soldOutUntil: o?.sold_out_until || i.sold_out_until }
+                    : { available: i.is_available, soldOutUntil: i.sold_out_until };
+                  return (
+                    <DishCard key={i.id} i={i} photo={photos[i.id]} sales={sales ? sales[i.id] || { sold: 0, prev_sold: 0, revenue: 0, orders: 0, last_at: null, weeks: [] } : null}
+                      best={best.has(i.id)} stock={stock} choices={choiceCount[i.id] || 0} sym={tenant.currency_symbol} delay={k}
+                      outLabel={!branch && i.is_available && outAt.length ? t('out at {branch}', { branch: outAt.map(x => bName(branches.find(b => b.id === x.branch_id)!)).filter(Boolean).join('، ') || t('a branch') }) : undefined}
+                      branch={branch} branchPrice={branch ? ownPrice(i, branch.id) : null} served={o?.is_listed ?? true} here={!branch || onMenuAt(i, branch)}
+                      canEdit={can.edit} busy={busy} onOpen={() => setEditing(i)} onStock={load}
+                      onServed={v => branch && update([i.id], { listed: v }, v ? t('On {branch}’s menu', { branch: bName(branch) }) : t('Off {branch}’s menu', { branch: bName(branch) }))} />
+                  );
+                })}
+              </div>
+            ) : (
+            <div className="ew-card overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-paper text-start text-xs text-muted">
+                <thead className="text-start text-xs text-muted">
                   <tr>
                     {branch && can.edit && <th className="w-8 px-3 py-2"><input type="checkbox" aria-label={t('Select all')} checked={allPicked}
                       onChange={e => setPicked(e.target.checked ? new Set(shown.map(i => i.id)) : new Set())} /></th>}
                     <th className="w-14 px-3 py-2" /><th className="px-3 py-2">{t('Dish')}</th>
                     <th className="px-3 py-2">{branch ? t('Price at {branch}', { branch: bName(branch) }) : t('Price')}</th>
                     {branch && <th className="px-3 py-2">{t('Served here')}</th>}
+                    {!branch && sales && <th className="px-3 py-2 text-end">{t('Sold, 30 days')}</th>}
                     <th className="px-3 py-2">{t('Stock')}</th><th className="w-12" />
                   </tr>
                 </thead>
@@ -243,8 +310,8 @@ export default function MenuPage() {
                           {can.edit && <td className="px-3 py-2"><input type="checkbox" aria-label={t('Select {dish}', { dish: i.name_ar })} checked={picked.has(i.id)}
                             onChange={e => setPicked(p => { const n = new Set(p); if (e.target.checked) n.add(i.id); else n.delete(i.id); return n; })} /></td>}
                           <td className="px-3 py-2">
-                            {photos[i.id] ? <img src={photos[i.id]} alt="" className={cx('size-10 rounded-lg object-cover', !here && 'opacity-50')} />
-                              : <span className="flex size-10 items-center justify-center rounded-lg bg-paper-sunk text-muted"><Camera className="size-4" /></span>}
+                            {photos[i.id] ? <img src={photos[i.id]} alt="" className={cx('size-12 rounded-xl object-cover', !here && 'opacity-50')} />
+                              : <span className="flex size-12 items-center justify-center rounded-xl bg-paper-sunk text-muted"><Camera className="size-4" /></span>}
                           </td>
                           <td className="px-3 py-2">
                             <p className={cx('font-medium', !here && 'text-muted')}><span dir="auto">{i.name_ar}</span> {i.is_signature && <Star className="inline size-3.5 fill-gold text-gold" />}</p>
@@ -283,8 +350,8 @@ export default function MenuPage() {
                     return (
                       <tr key={i.id} className="hover:bg-paper/60">
                         <td className="px-3 py-2">
-                          {photos[i.id] ? <img src={photos[i.id]} alt="" className="size-10 rounded-lg object-cover" />
-                            : <span className="flex size-10 items-center justify-center rounded-lg bg-paper-sunk text-muted"><Camera className="size-4" /></span>}
+                          {photos[i.id] ? <img src={photos[i.id]} alt="" className="size-12 rounded-xl object-cover" />
+                            : <span className="flex size-12 items-center justify-center rounded-xl bg-paper-sunk text-muted"><Camera className="size-4" /></span>}
                         </td>
                         <td className="px-3 py-2">
                           <p className="font-medium"><span dir="auto">{i.name_ar}</span> {i.is_signature && <Star className="inline size-3.5 fill-gold text-gold" />}</p>
@@ -299,6 +366,16 @@ export default function MenuPage() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-2">{i.price == null ? <span className="text-muted">{t('branch confirms')}</span> : money(i.price, tenant.currency_symbol)}{i.unit === 'kg' ? ' / ' + t('kg') : ''}
                           {priced.length > 0 && <p className="text-xs text-muted">{priced.map(b => `${bName(b)} ${money(ownPrice(i, b.id), tenant.currency_symbol)}`).join(' · ')}</p>}</td>
+                        {sales && (() => {
+                          const v = sales[i.id], sold = Number(v?.sold || 0), pv = Number(v?.prev_sold || 0), tr = pv > 0 ? Math.round(((sold - pv) / pv) * 100) : null;
+                          return (
+                            <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums">
+                              {sold > 0 ? <b className="text-ink">{+sold.toFixed(2)}</b> : <span className="text-muted">0</span>}
+                              {tr !== null && tr !== 0 && <span className={cx('ms-1.5 inline-flex items-center text-xs font-semibold', tr > 0 ? 'text-positive' : 'text-critical')}>
+                                {tr > 0 ? <ArrowUpRight className="size-3.5" aria-hidden /> : <ArrowDownRight className="size-3.5" aria-hidden />}{Math.abs(tr)}%</span>}
+                            </td>
+                          );
+                        })()}
                         <td className="px-3 py-2"><StockButton itemId={i.id} available={i.is_available} soldOutUntil={i.sold_out_until} onDone={load} /></td>
                         <td className="px-3 py-2">{can.edit && <Button size="sm" variant="ghost" onClick={() => setEditing(i)} aria-label={t('Edit')}><Pencil className="size-4" /></Button>}</td>
                       </tr>
@@ -306,11 +383,11 @@ export default function MenuPage() {
                   })}
                 </tbody>
               </table>
-              {shown.length === 0 && <p className="p-6 text-center text-sm text-muted">{t('No dishes here.')}</p>}
             </div>
-          </section>
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
 
       <ItemEditor item={editing} categories={cats} branches={branches} onClose={() => setEditing(null)} onSaved={load}
         defaultCategory={cat !== 'all' && cat !== 'none' ? cat : undefined} defaultBranch={branch?.id} />

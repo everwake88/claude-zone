@@ -48,6 +48,8 @@ export default function OrdersBoard() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [branch, setBranch] = useState('');
+  // a branch chosen from a link (the branches page's queue): the board opens on it
+  useEffect(() => { const v = new URLSearchParams(window.location.search).get('branch'); if (v) setBranch(v); }, []);
   const [open, setOpen] = useState<Order | null>(null);
   // a link from the search (…/orders?o=<id>) opens that order once the board has loaded
   const opened = useRef(false);
