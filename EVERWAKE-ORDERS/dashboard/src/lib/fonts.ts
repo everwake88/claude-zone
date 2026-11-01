@@ -7,4 +7,7 @@ export const cairo = Cairo({ subsets: ['arabic', 'latin'], weight: ['400', '600'
 // shop signs and menu boards (names, prices, order numbers); Readex Pro reads
 // easily in both Arabic and English at phone sizes
 export const lalezar = Lalezar({ subsets: ['arabic', 'latin'], weight: '400', display: 'swap', variable: '--font-board' });
+// the same lettering inside the dashboard, not preloaded: only the kitchen screens use it there,
+// and every other page should not wait for it
+export const lalezarLazy = Lalezar({ subsets: ['arabic', 'latin'], weight: '400', display: 'swap', variable: '--font-board', preload: false });
 export const readex = Readex_Pro({ subsets: ['arabic', 'latin'], display: 'swap', variable: '--font-qr' });

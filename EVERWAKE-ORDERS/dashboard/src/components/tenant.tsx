@@ -1,6 +1,5 @@
 'use client';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { sb } from '@/lib/supabase/client';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { Brand, Role, TenantSummary } from '@/lib/types';
 
 interface Ctx {
@@ -14,13 +13,11 @@ interface Ctx {
 }
 const TenantCtx = createContext<Ctx | null>(null);
 
-export function TenantProvider({ tenant, tenants, children }: { tenant: TenantSummary; tenants: TenantSummary[]; children: ReactNode }) {
+// the brand (logo, colour) comes from the server with the page, so nothing pops in after it opens;
+// Settings → Brand updates it here when it is saved
+export function TenantProvider({ tenant, tenants, initialBrand, children }: { tenant: TenantSummary; tenants: TenantSummary[]; initialBrand?: Brand; children: ReactNode }) {
   const [agentEnabled, setAgentEnabled] = useState(tenant.agent_enabled);
-  const [brand, setBrand] = useState<Brand>({});
-  useEffect(() => {
-    sb().from('tenants').select('profile').eq('id', tenant.id).single()
-      .then(({ data }) => setBrand((data?.profile as { brand?: Brand } | null)?.brand || {}));
-  }, [tenant.id]);
+  const [brand, setBrand] = useState<Brand>(initialBrand || {});
   const role: Role = tenant.role;
   const value: Ctx = {
     tenant: { ...tenant, agent_enabled: agentEnabled },

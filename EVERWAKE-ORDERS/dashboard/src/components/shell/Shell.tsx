@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { askNotificationPermission, chime, notify } from '@/lib/alerts';
 import { cx, money } from '@/lib/format';
-import { lalezar, readex } from '@/lib/fonts';
+import { lalezarLazy as lalezar, readex } from '@/lib/fonts';
 import { LangSwitch, useLang } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import { useBrandTheme } from '@/lib/theme';
@@ -98,7 +98,9 @@ export function Shell({ children }: { children: ReactNode }) {
           {g.items.filter(x => x.badge !== 'bookings' || bookings.on).map(({ href, label, icon: Icon, badge }) => {
             const n = count(badge), on = active(href);
             return (
-              <Link key={href} href={base + href} aria-current={on ? 'page' : undefined}
+              // fetched whole in the background, so a click opens the page at once (React would otherwise hold
+              // a loading screen for a moment before showing it)
+              <Link key={href} href={base + href} prefetch aria-current={on ? 'page' : undefined}
                 className={cx('group relative flex items-center gap-3 rounded-[var(--ui-radius-inner)] px-3 py-2 text-sm transition-[background-color,color,box-shadow] duration-200',
                   on ? 'bg-white font-semibold text-navy shadow-[0_6px_16px_-8px_rgba(0,0,0,0.45)]' : 'text-on-navy-muted hover:bg-white/[.08] hover:text-white')}>
                 <Icon className={cx('size-[18px] shrink-0', on ? 'text-gold-ink' : 'transition-transform duration-200 group-hover:scale-110')} aria-hidden />
@@ -210,7 +212,7 @@ export function Shell({ children }: { children: ReactNode }) {
           { href: '/kitchen', label: 'Kitchen', icon: Flame }, { href: '/inbox', label: 'Inbox', icon: MessageCircle, badge: 'inbox' }].map(it => {
           const on = active(it.href), n = count(it.badge);
           return (
-            <Link key={it.href} href={base + it.href} aria-current={on ? 'page' : undefined}
+            <Link key={it.href} href={base + it.href} prefetch aria-current={on ? 'page' : undefined}
               className={cx('relative flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[11px] font-medium transition-colors duration-200',
                 on ? 'bg-navy text-white' : 'text-muted')}>
               <it.icon className="size-[18px]" aria-hidden />{t(it.label)}

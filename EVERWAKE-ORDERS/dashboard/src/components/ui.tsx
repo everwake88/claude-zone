@@ -77,7 +77,7 @@ export function Checkbox({ checked, onChange, label }: { checked: boolean; onCha
 // ---- Surfaces ------------------------------------------------------------------
 export function Card({ children, className, title, action }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode }) {
   return (
-    <section className={cx('ew-card', className)}>
+    <section className={cx('ew-card min-w-0', className)}>
       {(title || action) && (
         <header className="flex items-center justify-between gap-3 border-b border-hairline/70 px-5 py-3.5">
           <h2 className="min-w-0 text-[15px] font-semibold text-ink">{title}</h2>

@@ -3,8 +3,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './lib/env';
 import { LANG_COOKIE } from './lib/lang-cookie';
 
-// Keeps the Supabase session fresh on every request and sends anyone who
-// is not signed in to /login. Drivers' pages have their own sign-in.
+// customers' pages and the outside callers need no sign-in, so they skip the session work entirely:
+// payment pages and Paymob's notices, ordering from a QR code, the restaurant's own system (an API key)
+const OPEN = ['/login', '/auth', '/api/health', '/p/', '/api/pay/', '/q/', '/api/q/', '/api/v1/'];
+
+// Keeps the Supabase session fresh and sends anyone who is not signed in to
+// /login. Drivers' pages have their own sign-in.
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   // drivers: their own sign-in (a cookie from a WhatsApp link), Arabic unless they chose otherwise
@@ -20,6 +24,9 @@ export async function middleware(request: NextRequest) {
 
   let response = NextResponse.next({ request });
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return response;
+  const open = OPEN.some(p => path.startsWith(p));
+  // the open pages still refresh a signed-in session (the login page needs it), but only when there is one
+  if (open && !request.cookies.getAll().some(c => c.name.startsWith('sb-'))) return response;
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
@@ -31,14 +38,12 @@ export async function middleware(request: NextRequest) {
       }
     }
   });
-  const { data: { user } } = await supabase.auth.getUser();
+  // the session's token checked against the project's public signing key, here and without a call to
+  // Supabase on every click (the key is fetched once and kept); an expired session is refreshed first.
+  // What a user may see is still decided by the database, which checks the token on every query.
+  const { data } = await supabase.auth.getClaims();
 
-  // customers' payment pages and Paymob's notices need no sign-in (the link route checks its own callers)
-  const open = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/api/health')
-    || path.startsWith('/p/') || path.startsWith('/api/pay/')
-    // ordering in the branch from a QR code (customers), and the restaurant's own system (an API key)
-    || path.startsWith('/q/') || path.startsWith('/api/q/') || path.startsWith('/api/v1/');
-  if (!user && !open) {
+  if (!data?.claims && !open) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', path);

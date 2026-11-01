@@ -3,7 +3,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTenant } from '@/components/tenant';
 import { chime } from '@/lib/alerts';
-import { lalezar } from '@/lib/fonts';
+import { lalezarLazy as lalezar } from '@/lib/fonts';
 import { useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch, Order } from '@/lib/types';

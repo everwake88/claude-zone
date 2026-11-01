@@ -6,7 +6,7 @@ import { Button, Modal, Spinner, Textarea, useAction, useToast } from '@/compone
 import { useTenant } from '@/components/tenant';
 import { askNotificationPermission, chime } from '@/lib/alerts';
 import { cx, money, qty, statusLabel } from '@/lib/format';
-import { lalezar } from '@/lib/fonts';
+import { lalezarLazy as lalezar } from '@/lib/fonts';
 import { useLang } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
 import type { Branch, Order, OrderStatus, QrCheckout } from '@/lib/types';
