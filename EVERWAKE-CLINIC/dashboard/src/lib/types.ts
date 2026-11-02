@@ -32,7 +32,8 @@ export interface Alert {
   id: number; kind: string; severity: 'critical' | 'high' | 'normal' | 'low'; title: string; body: string | null;
   patient_id: number | null; contact_id: number | null; wa_id: string | null; conversation_id: number | null;
   appointment_id: number | null; doctor_id: string | null; data: Record<string, unknown>; status: string; created_at: string;
-  acknowledged_by_name?: string | null;
+  acknowledged_by_name?: string | null; acknowledged_at?: string | null;
+  who?: string | null; phone?: string | null; doctor?: string | null; appointment?: string | null;
 }
 export interface DelayNotice {
   id: number; kind: 'delay' | 'cancel_session'; doctor: string; doctor_id: string; minutes: number; reason: string | null;

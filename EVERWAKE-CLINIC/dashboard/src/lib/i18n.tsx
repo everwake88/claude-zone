@@ -30,7 +30,7 @@ export function LangSwitch({ className = '' }: { className?: string }) {
   const { lang, setLang } = useLang();
   return (
     <button type="button" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
-      className={`inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white px-3 py-1.5 text-sm font-medium text-ink hover:bg-paper ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-sheet px-3 py-1.5 text-[13px] font-medium text-ink hover:bg-raised press ${className}`}
       aria-label={lang === 'ar' ? 'Switch to English' : 'التحويل للعربية'}>
       <Languages className="size-4" />
       {lang === 'ar' ? 'English' : 'العربية'}
