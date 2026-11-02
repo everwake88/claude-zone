@@ -81,10 +81,49 @@ AFTER_WHITENING = 'ابعد عن الشاي والقهوة والكولا وال
 AFTER_IMPLANT = 'كمادات تلج من بره أول يوم، أكل طري وبارد 3 أيام، متمضغش على الزرعة، ومفيش تدخين. خد المضاد والمسكن في مواعيدهم.'
 AFTER_SCALING = 'ممكن اللثة تنزف شوية أو يكون في حساسية يومين. استعمل فرشاة ناعمة ومعجون للحساسية، وحافظ على التنضيف كل 6 شهور.'
 
+# The few questions the WhatsApp assistant asks after a booking, so the doctor starts the visit
+# knowing them. Skipped when the answer is already on file (on_file) or not for this patient (sex).
+def pq(key, ar, en, on_file=None, sex=None):
+    d = {'key': key, 'ask_ar': ar, 'ask_en': en}
+    if on_file: d['on_file'] = on_file
+    if sex: d['sex'] = sex
+    return d
+PRE_GENERAL = [
+    pq('chronic', 'عندك أي مرض مزمن زي السكر أو الضغط؟', 'Do you have a long-term condition such as diabetes or high blood pressure?', 'conditions'),
+    pq('medicines', 'بتاخد أدوية بانتظام؟ لو أيوه إيه هي؟', 'Do you take any medicines regularly? Which ones?', 'medications'),
+    pq('allergies', 'عندك حساسية من أي دوا؟', 'Are you allergic to any medicine?', 'allergies'),
+]
+PRE_VISIT = {
+    'dentistry': [
+        pq('last_dental', 'آخر مرة زرت دكتور أسنان كانت امتى؟', 'When did you last see a dentist?'),
+        pq('blood_thinners', 'بتاخد أدوية سيولة؟', 'Do you take blood thinners?', 'medications'),
+        pq('pregnancy', 'في احتمال يكون فيه حمل؟', 'Could you be pregnant?', None, 'female'),
+    ],
+    'pediatrics': [
+        pq('weight', 'وزن الطفل كام تقريبًا؟', 'Roughly how much does the child weigh?'),
+        pq('vaccines', 'التطعيمات ماشية في مواعيدها؟', 'Are the vaccinations up to date?'),
+        pq('allergies', 'عنده حساسية من أي دوا؟', 'Is the child allergic to any medicine?', 'allergies'),
+    ],
+    'obgyn': [
+        pq('lmp', 'أول يوم في آخر دورة كان امتى؟', 'When did your last period start?'),
+        pq('pregnant', 'إنتي حامل دلوقتي؟ في الشهر الكام؟', 'Are you pregnant now? How many months?'),
+        pq('medicines', 'بتاخدي أدوية بانتظام؟', 'Do you take any medicines regularly?', 'medications'),
+    ],
+    'dermatology': [
+        pq('since', 'المشكلة بدأت من امتى؟', 'When did the problem start?'),
+        pq('allergies', 'عندك حساسية من أي دوا أو كريم؟', 'Are you allergic to any medicine or cream?', 'allergies'),
+    ],
+    'physiotherapy': [
+        pq('since', 'الألم بدأ من امتى، وفي إصابة أو عملية قبل كده؟', 'When did the pain start, and was there an injury or surgery?'),
+        pq('scans', 'معاك أشعة أو رنين؟ ممكن تبعتهم هنا.', 'Do you have X-rays or an MRI? You can send them here.'),
+    ],
+}
+
 P = []
 def preset(code, ar, en, group, keywords, services, form_t, triage=(), sort=100):
     P.append({'code': code, 'name_ar': ar, 'name_en': en, 'group_name': group, 'keywords': keywords,
-              'starter_services': services, 'form_template': form_t, 'triage': list(triage), 'sort': sort})
+              'starter_services': services, 'form_template': form_t, 'triage': list(triage), 'sort': sort,
+              'pre_visit': PRE_VISIT.get(code, PRE_GENERAL)})
 
 DENTAL_FORM = {'sections': [
     sec('complaint', 'الشكوى', 'Complaint', [
@@ -305,15 +344,16 @@ out = ['-- =====================================================================
        '-- Prices are left empty on purpose: each doctor fills their own.',
        '-- =====================================================================', '']
 for p in P:
-    out.append('insert into clinic.specialty_presets (code, name_ar, name_en, group_name, keywords, starter_services, form_template, triage, is_custom, sort)')
-    out.append('values (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %d)' % (
+    out.append('insert into clinic.specialty_presets (code, name_ar, name_en, group_name, keywords, starter_services, form_template, triage, pre_visit, is_custom, sort)')
+    out.append('values (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s, %d)' % (
         q(p['code']), q(p['name_ar']), q(p['name_en']), q(p['group_name']),
         "array[" + ', '.join(q(k) for k in p['keywords']) + "]::text[]",
         q(json.dumps(p['starter_services'], ensure_ascii=False)), q(json.dumps(p['form_template'], ensure_ascii=False)),
-        q(json.dumps(p['triage'], ensure_ascii=False)), 'true' if p['code'] == 'custom' else 'false', p['sort']))
+        q(json.dumps(p['triage'], ensure_ascii=False)), q(json.dumps(p['pre_visit'], ensure_ascii=False)),
+        'true' if p['code'] == 'custom' else 'false', p['sort']))
     out.append('on conflict (code) do update set name_ar = excluded.name_ar, name_en = excluded.name_en, group_name = excluded.group_name,')
     out.append('  keywords = excluded.keywords, starter_services = excluded.starter_services, form_template = excluded.form_template,')
-    out.append('  triage = excluded.triage, is_custom = excluded.is_custom, sort = excluded.sort;')
+    out.append('  triage = excluded.triage, pre_visit = excluded.pre_visit, is_custom = excluded.is_custom, sort = excluded.sort;')
     out.append('')
 path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'migrations', '020_specialty_presets.sql')
 open(path, 'w').write('\n'.join(out))

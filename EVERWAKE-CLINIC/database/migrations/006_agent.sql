@@ -240,6 +240,13 @@ begin
                                   'display_name', co.display_name, 'full_name', co.full_name, 'language', co.language,
                                   'first_seen_at', co.first_seen_at),
     'known_patients', clinic.contact_patients(co.id),
+    -- the speciality's few questions for the next visit, not yet answered and not on file
+    'pre_visit_pending', (select jsonb_build_object('ref_no', x.ref_no, 'questions', clinic.pre_visit_pending(x.id))
+                            from clinic.appointments x
+                           where x.tenant_id = p_tenant and x.wa_id = p_wa and x.status in ('booked', 'confirmed')
+                             and x.ends_at > now() and x.starts_at < now() + interval '14 days'
+                             and jsonb_array_length(clinic.pre_visit_pending(x.id)) > 0
+                           order by x.starts_at limit 1),
     'upcoming', coalesce((select jsonb_agg(clinic.appointment_view(a, v_lang) order by a.starts_at)
                             from clinic.appointments a
                            where a.tenant_id = p_tenant and (a.wa_id = p_wa or a.contact_id = co.id)

@@ -1088,9 +1088,37 @@ begin
                            and x.status in ('booked', 'confirmed') and x.ends_at > now()), '[]'::jsonb);
 
   if v_action not in ('find_slots', 'update', 'summary', 'book', 'cancel', 'reschedule', 'confirm', 'accept_delay',
-                      'status', 'join_waitlist', 'take_offer', 'next_plan_session', 'accept_plan') then
+                      'status', 'join_waitlist', 'take_offer', 'next_plan_session', 'accept_plan', 'pre_visit') then
     return jsonb_build_object('ok', false, 'error', 'UNKNOWN_ACTION',
-      'fact', 'action is one of: find_slots, update, summary, book, cancel, reschedule, confirm, accept_delay, status, join_waitlist, take_offer, next_plan_session, accept_plan');
+      'fact', 'action is one of: find_slots, update, summary, book, cancel, reschedule, confirm, accept_delay, status, join_waitlist, take_offer, next_plan_session, accept_plan, pre_visit');
+  end if;
+
+  -- ---- pre_visit: the answers to the speciality's questions, saved on the visit for the doctor ----
+  -- details: {answers: {<question key>: "<their words>"}, ref_no?}
+  if v_action = 'pre_visit' then
+    select * into a from clinic.appointments x
+     where x.tenant_id = p_tenant and (x.wa_id = p_wa or x.contact_id = co.id)
+       and x.status in ('booked', 'confirmed') and x.ends_at > now()
+       and (nullif(v ->> 'ref_no', '') is null or x.ref_no = v ->> 'ref_no')
+     order by x.starts_at limit 1;
+    if a.id is null then return jsonb_build_object('ok', false, 'error', 'NO_UPCOMING_VISIT'); end if;
+    if jsonb_typeof(v -> 'answers') is distinct from 'object' then
+      return jsonb_build_object('ok', false, 'error', 'ANSWERS_NEEDED', 'fact', 'details.answers is an object of question key → their words');
+    end if;
+    -- kept under the question itself (in Arabic), so the doctor reads question and answer together
+    update clinic.appointments x
+       set pre_visit = x.pre_visit || coalesce((
+             select jsonb_object_agg(coalesce(q ->> 'ask_ar', k.key), k.value)
+               from jsonb_each(v -> 'answers') k
+               left join lateral (select q from jsonb_array_elements(coalesce(
+                          (select sp.pre_visit from clinic.specialty_presets sp join clinic.doctors d on d.specialty = sp.code where d.id = x.doctor_id),
+                          (select pre_visit from clinic.specialty_presets where code = 'general'))) q
+                          where q ->> 'key' = k.key limit 1) qq on true
+              where coalesce(btrim(k.value #>> '{}'), '') <> ''), '{}'::jsonb)
+     where x.id = a.id;
+    perform clinic.log_appt(a.id, 'pre_visit', v -> 'answers', 'agent');
+    return jsonb_build_object('ok', true, 'status', 'SAVED', 'still_to_ask', clinic.pre_visit_pending(a.id),
+                              'fact', 'saved for the doctor; ask what is still_to_ask only if it fits, never more than one more question now');
   end if;
 
   -- the appointment a reply is about: by ref_no, else the one a reminder / delay notice asked about, else the next one

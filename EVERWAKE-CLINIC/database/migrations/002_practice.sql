@@ -45,6 +45,7 @@ create table clinic.specialty_presets (
   starter_services jsonb not null default '[]'::jsonb,  -- [{name_ar,name_en,category,duration,price_kind,unit,sessions,session_gap_days,aliases[],aftercare_ar,resource_kind}]
   form_template    jsonb not null default '{}'::jsonb,  -- {sections:[{key,title_ar,title_en,fields:[{key,label_ar,label_en,type,unit,options[]}]}]}
   triage           jsonb not null default '[]'::jsonb,  -- [{level:'emergency'|'urgent', words:[…], why}]
+  pre_visit        jsonb not null default '[]'::jsonb,  -- [{key, ask_ar, ask_en, on_file?, sex?}] asked after booking, skipped when known
   is_custom        boolean not null default false,
   sort             int not null default 100
 );
