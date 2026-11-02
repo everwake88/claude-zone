@@ -12,7 +12,7 @@ interface Pause { id: number; started_at: string; reason: string | null; contact
 
 // The WhatsApp assistant on or off, at the foot of the sidebar.
 // Off: everyone who writes gets one warm apology and is remembered. Back on: they hear "we're back".
-export function AgentSwitch({ compact }: { compact?: boolean }) {
+export function AgentSwitch({ compact, dark }: { compact?: boolean; dark?: boolean }) {
   const { tenant, setAgentEnabled } = useTenant();
   const [pause, setPause] = useState<Pause | null>(null);
   const [open, setOpen] = useState(false);
@@ -55,15 +55,15 @@ export function AgentSwitch({ compact }: { compact?: boolean }) {
           {on ? t('On') : t('Paused')}
         </button>
       ) : (
-        <div className="flex items-center gap-3 rounded-[10px] border border-border bg-sheet px-3 py-2.5">
+        <div className={cx('flex items-center gap-3 rounded-2xl px-3.5 py-3', dark ? 'bg-navy-raised' : 'border border-border bg-sheet')}>
           <span className={cx('size-2 shrink-0 rounded-full', on ? 'c-live bg-positive [--pulse:var(--color-positive)]' : 'bg-critical')} aria-hidden />
           <button onClick={() => setOpen(true)} className="min-w-0 flex-1 text-start">
-            <span className="block text-[13px] font-medium leading-tight">{t('WhatsApp assistant')}</span>
-            <span className={cx('block truncate text-xs', on ? 'text-muted' : 'text-critical')}>
+            <span className={cx('block text-[13px] font-medium leading-tight', dark && 'text-white')}>{t('WhatsApp assistant')}</span>
+            <span className={cx('block truncate text-xs', on ? (dark ? 'text-on-navy-muted' : 'text-muted') : (dark ? 'text-[#f0a49c]' : 'text-critical'))}>
               {on ? t('Answering patients') : waiting ? t('Paused · {n} wrote meanwhile', { n: waiting }) : t('Paused')}
             </span>
           </button>
-          <Switch checked={on} onChange={() => setOpen(true)} label={t('WhatsApp assistant')} />
+          <Switch checked={on} onChange={() => setOpen(true)} label={t('WhatsApp assistant')} tone={dark ? 'gold' : 'navy'} />
         </div>
       )}
 

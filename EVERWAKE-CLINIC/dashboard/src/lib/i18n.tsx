@@ -26,11 +26,11 @@ export const useLang = () => useContext(LangCtx);
 export const useT = () => useContext(LangCtx).t;
 
 // the switch: shows the language you can switch to
-export function LangSwitch({ className = '' }: { className?: string }) {
+export function LangSwitch({ className = '', dark }: { className?: string; dark?: boolean }) {
   const { lang, setLang } = useLang();
   return (
     <button type="button" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
-      className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-sheet px-3 py-1.5 text-[13px] font-medium text-ink hover:bg-raised press ${className}`}
+      className={`press inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium ${dark ? 'text-on-navy-muted hover:bg-white/10 hover:text-white' : 'border border-border bg-sheet text-ink hover:bg-raised'} ${className}`}
       aria-label={lang === 'ar' ? 'Switch to English' : 'التحويل للعربية'}>
       <Languages className="size-4" />
       {lang === 'ar' ? 'English' : 'العربية'}
