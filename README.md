@@ -20,6 +20,11 @@ EVERWAKE-ORDERS/         WhatsApp ordering for restaurant chains — see its REA
   engine/                the n8n workflows, generated from src/ and prompts/
   dashboard/             the restaurant dashboard (Next.js + Supabase)
   docs/                  how it works, setup, signing up a restaurant, operations
+EVERWAKE-CLINIC/         the AI front desk for doctors (dentists first) — see its README
+  database/              clinics, the catalogue, patients and records, slots and queues, reminders, delays; tests
+  engine/                the n8n WhatsApp assistant: Egyptian dates and red flags in code, the doctor's commands
+  dashboard/             the clinic dashboard and the patient's page (Next.js + Supabase)
+  docs/                  setup, how it works, signing a clinic up
 brand/                   logo and colours — shared by website, proposals, deck
 docs/ROADMAP.md          what is done and what is next
 templates/ deck/ social/ upcoming phases

@@ -142,6 +142,60 @@ dashboard each restaurant runs. Everything is in `EVERWAKE-ORDERS/`.
 - **Delivery companies** (Mrsool, Roadrunner…) for restaurants without drivers, through one connection point
 - **Growth kit:** QR codes and `wa.me` links per restaurant from the dashboard
 
+## Everwake Clinic — the AI front desk for doctors
+
+`EVERWAKE-CLINIC/` is a sister product of Orders with the same three parts: database, engine and dashboard. It serves doctors of any speciality, with dentists first. It is built in three stages, and stops for review after each one.
+
+### Stage 1 — the booking core ✅ BUILT (awaiting review)
+
+| Item | Where |
+|---|---|
+| Clinics, roles (owner · manager · doctor · nurse · receptionist), records for clinical members only, an access log | `database/migrations/001, 009` |
+| The catalogue the assistant answers from: price shapes and units, per-doctor and per-place prices, offers, answers, the doctors' rules; every change previewed, applied and undoable | `002` |
+| Slots, queue numbers (الدور) or both; chairs booked with the doctor; holds; the waitlist; follow-up pricing; treatment plans | `005` |
+| Two reminders with confirm / move / cancel; "the doctor is late" with timed follow-ups; cancelled sessions; time off | `007` |
+| 29 speciality presets (dentistry the richest) | `020` |
+| The WhatsApp assistant: Egyptian dates and red flags worked out in code; voice notes, photos and PDFs; the doctor's own WhatsApp for delays and prices; 119 tests | `engine/` |
+| The dashboard, in Arabic and English, on phone and desktop | `dashboard/` |
+| The patient's own page from the reminder link | `/a/<token>` |
+| A living demo day for sales | `database/tools/showcase_clinic.sql` |
+
+The dashboard's pages:
+- Today, with the session ribbon;
+- the calendar, with drag to move;
+- patients and records;
+- the dental chart and treatment plans;
+- the inbox;
+- alerts;
+- the waitlist;
+- services and prices, with import;
+- knowledge and rules;
+- every setting.
+
+### Stage 2 — the doctor's AI — NEXT
+
+- **"Listen to the visit".** It records with consent and transcribes live. Then it fills the speciality's form, with a quoted piece of evidence for every field and a verifier pass, and the doctor reviews and signs. It also fills the dental chart and drafts the plan from what was said.
+- **The doctor's assistant, by chat and voice.**
+  - It reads records and the day.
+  - It changes prices, rules and schedules through the same functions, always with a confirm card.
+- **Pre-visit questions** after booking.
+
+### Stage 3 — payments, analytics, extras
+
+- **Paymob:** a deposit or the full fee per service, links in reminders, refunds by policy.
+- **Analytics:**
+  - the no-show rate and what reminders change;
+  - bookings by source;
+  - doctor utilisation and delays.
+- **Other extras:**
+  - a live queue page;
+  - a public booking page;
+  - recalls;
+  - feedback with a Google review link;
+  - the doctor's evening brief on WhatsApp;
+  - a PWA with push notifications;
+  - the official WhatsApp Cloud API.
+
 ---
 
 ## Working agreements
