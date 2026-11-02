@@ -10,7 +10,7 @@ import { DocDot } from '../booking/pickers';
 // time; the needle is now. When the doctor is late, a hatched band opens at the start of the
 // session and the blocks slide along by the same minutes.
 const BLOCK: Record<ApptStatus, string> = {
-  held: 'bg-sheet text-faint ring-1 ring-dashed ring-control',
+  held: 'bg-sheet text-faint border border-dashed border-control',
   booked: 'bg-sheet text-ink ring-1 ring-inset ring-control',
   confirmed: 'bg-accent-soft text-accent-ink ring-1 ring-inset ring-accent-track',
   arrived: 'bg-caution-soft text-caution ring-1 ring-inset ring-caution-line',
@@ -85,7 +85,7 @@ export function Ribbon({ rows, now, tz, onPick, lanePx = 84 }: { rows: RibbonRow
                   <DocDot color={s?.color} /><span className="truncate">{r.label}</span>
                 </p>
                 <p className="truncate ps-4 text-[11.5px] text-muted">{r.sub}</p>
-                {delay > 0 && <p className="ps-4"><span className="inline-flex rounded-full bg-caution-soft px-1.5 text-[11px] font-medium text-caution">{t('+{n} min late', { n: delay })}</span></p>}
+                {delay > 0 && <p className="ps-4"><span className="inline-flex whitespace-nowrap rounded-full bg-caution-soft px-1.5 text-[10.5px] font-medium text-caution sm:text-[11px]">{t('+{n} min late', { n: delay })}</span></p>}
               </div>
               <div className="relative h-[62px] border-b border-rule">
                 {/* hour lines */}

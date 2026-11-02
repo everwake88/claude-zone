@@ -95,7 +95,7 @@ export default function NewClinic() {
                 <Field label={t('Your name as patients know it')}><Input dir="auto" required value={doctor} onChange={e => setDoctor(e.target.value)} placeholder="د. منى عادل" /></Field>
                 <Field label={t('Patients call you')}>
                   <Segmented label="gender" value={gender} onChange={setGender}
-                    options={[{ value: 'male', label: t('دكتور') }, { value: 'female', label: t('دكتورة') }]} />
+                    options={[{ value: 'male', label: 'دكتور' }, { value: 'female', label: 'دكتورة' }]} />
                 </Field>
               </div>
             )}

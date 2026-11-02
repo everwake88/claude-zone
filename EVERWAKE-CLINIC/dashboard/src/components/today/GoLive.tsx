@@ -24,6 +24,11 @@ export function GoLive() {
     setC(data as Checklist);
   }, [tenant.id]);
   useEffect(() => { load(); }, [load]);
+  // "2 of 3 doctors have a schedule" from the database, in the dashboard's language
+  const detail = (d: string) => {
+    const m = d.match(/^(\d+) of (\d+) (doctors have a schedule|services have a price)$/);
+    return m ? t(m[3] === 'doctors have a schedule' ? '{a} of {b} doctors have a schedule' : '{a} of {b} services have a price', { a: m[1], b: m[2] }) : d;
+  };
   if (!c) return null;
   const done = c.items.filter(i => i.done).length;
   const live = async () => {
@@ -56,7 +61,7 @@ export function GoLive() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className={cx('block text-[13px] font-medium', i.done && 'text-muted line-through decoration-faint/50')}>{t(i.label)}{!i.required && <span className="ms-1 font-normal text-faint">· {t('optional')}</span>}</span>
-                {i.detail && !i.done && <span className="block text-xs text-muted">{t(i.detail)}</span>}
+                {i.detail && !i.done && <span className="block text-xs text-muted">{detail(i.detail)}</span>}
               </span>
               <ChevronRight className="mt-0.5 size-4 shrink-0 text-faint opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180" aria-hidden />
             </Link>

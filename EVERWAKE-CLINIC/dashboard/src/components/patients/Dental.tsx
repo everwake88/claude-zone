@@ -26,7 +26,7 @@ export const CONDITIONS: { key: string; label: string; cls: string }[] = [
   { key: 'bridge', label: 'Bridge', cls: 'bg-caution-soft ring-caution text-caution' },
   { key: 'implant', label: 'Implant', cls: 'bg-[#e6e9ef] ring-faint/60 text-muted' },
   { key: 'veneer', label: 'Veneer', cls: 'bg-accent-soft ring-accent/40 text-accent-ink' },
-  { key: 'missing', label: 'Missing', cls: 'bg-transparent ring-dashed ring-control text-faint' },
+  { key: 'missing', label: 'Missing', cls: 'bg-transparent ring-0 border border-dashed border-faint/70 text-faint' },
   { key: 'extraction_needed', label: 'To extract', cls: 'bg-sheet ring-critical text-critical-ink' },
   { key: 'impacted', label: 'Impacted', cls: 'bg-critical-soft ring-critical/40 text-critical-ink' },
   { key: 'fractured', label: 'Fractured', cls: 'bg-critical-soft ring-critical text-critical-ink' },

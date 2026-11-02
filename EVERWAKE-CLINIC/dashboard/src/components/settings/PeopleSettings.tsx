@@ -229,9 +229,9 @@ export function SchedulesSection() {
                   {rows.map(s => (
                     <div key={s.id} className={cx('flex flex-wrap items-center gap-2 rounded-[9px] bg-raised p-2 ring-1 ring-inset ring-border', !s.is_active && 'opacity-60')}>
                       <Select aria-label={t('Location')} value={s.location_id} onChange={e => upd(s, { location_id: e.target.value })} className="!h-8 !w-36">{locations.map(l => <option key={l.id} value={l.id}>{placeName(l, lang)}</option>)}</Select>
-                      <Input type="time" aria-label={t('From')} defaultValue={s.start_time.slice(0, 5)} onBlur={e => e.target.value !== s.start_time.slice(0, 5) && upd(s, { start_time: e.target.value })} className="!h-8 !w-28" />
+                      <Input type="time" aria-label={t('From')} defaultValue={s.start_time.slice(0, 5)} onBlur={e => e.target.value !== s.start_time.slice(0, 5) && upd(s, { start_time: e.target.value })} className="!h-8 !w-[124px]" />
                       <span className="text-muted">–</span>
-                      <Input type="time" aria-label={t('To')} defaultValue={s.end_time.slice(0, 5)} onBlur={e => e.target.value !== s.end_time.slice(0, 5) && upd(s, { end_time: e.target.value })} className="!h-8 !w-28" />
+                      <Input type="time" aria-label={t('To')} defaultValue={s.end_time.slice(0, 5)} onBlur={e => e.target.value !== s.end_time.slice(0, 5) && upd(s, { end_time: e.target.value })} className="!h-8 !w-[124px]" />
                       <Select aria-label={t('How patients are seen')} value={s.mode} onChange={e => upd(s, { mode: e.target.value as Schedule['mode'] })} className="!h-8 !w-28">
                         <option value="slots">{t('Slots')}</option><option value="queue">{t('Queue')}</option><option value="both">{t('Both')}</option>
                       </Select>
@@ -362,7 +362,7 @@ export function TeamSection() {
           ))}
           {(data?.i || []).map(i => (
             <li key={i.id} className="flex items-center gap-3 px-4 py-3 text-[13.5px] text-muted">
-              <span className="flex size-[34px] items-center justify-center rounded-full ring-1 ring-dashed ring-control"><UserPlus className="size-4" aria-hidden /></span>
+              <span className="flex size-[34px] items-center justify-center rounded-full border border-dashed border-control"><UserPlus className="size-4" aria-hidden /></span>
               <span className="min-w-0 flex-1 truncate" dir="ltr">{i.email}</span><Pill tone="caution">{t('Invited')} · {t(i.role)}</Pill>
             </li>
           ))}

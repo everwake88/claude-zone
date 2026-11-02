@@ -83,7 +83,7 @@ export function Manage({ token, view }: { token: string; view: ManageView | null
             </AnimatePresence>
             <dl className="mt-4 space-y-1.5 text-[14px]">
               <div className="flex gap-2"><dt className="w-16 shrink-0 text-muted">{t('Doctor')}</dt><dd><bdi>{a.doctor}</bdi></dd></div>
-              {a.service && <div className="flex gap-2"><dt className="w-16 shrink-0 text-muted">{t('For')}</dt><dd><bdi>{a.service}</bdi>{a.price_text ? <span className="text-muted"> · {a.price_text}</span> : null}</dd></div>}
+              {a.service && <div className="flex gap-2"><dt className="w-16 shrink-0 text-muted">{t('Service')}</dt><dd><bdi>{a.service}</bdi>{a.price_text ? <span className="text-muted"> · {a.price_text}</span> : null}</dd></div>}
               <div className="flex gap-2"><dt className="w-16 shrink-0 text-muted">{t('Booking')}</dt><dd className="tabular-nums" dir="ltr">{a.ref_no}</dd></div>
             </dl>
           </div>

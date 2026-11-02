@@ -131,7 +131,7 @@ function Frame({ children }: { children: ReactNode }) {
           {brand.logo_url
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={brand.logo_url} alt="" className="size-9 shrink-0 rounded-[9px] bg-sheet object-contain p-0.5 ring-1 ring-border" />
-            : <span className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-accent text-[15px] font-semibold text-white">{name.replace(/^(عيادات?|عيادة|clinics?)\s+/i, '').slice(0, 1)}</span>}
+            : <span className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-accent text-[15px] font-semibold text-white">{name.replace(/^(عيادات?|عيادة|مركز|clinics?|the)\s+/i, '').replace(/^ال(?=\S{2})/, '').slice(0, 1).toUpperCase()}</span>}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[14px] font-semibold leading-tight">{name}</span>
             <span className="block truncate text-xs text-muted">{t(role)}</span>

@@ -120,6 +120,20 @@ begin
           '[{"name":"HbA1c","value":"7.8","unit":"%","flag":"high"}]', now() - interval '2 days'),
          (t, p[1], 'imaging', 'أشعة بانوراما', 'whatsapp', 'أشعة بانوراما من عيادة سابقة.', null, now() - interval '5 days');
 
+  -- Sara's teeth and the plan she was quoted
+  insert into clinic.dental_chart (tenant_id, patient_id, tooth, condition, surfaces, planned, notes) values
+    (t, p[1], 16, 'root_canal', '{O}', 'طربوش زيركون', 'العصب اتشال الجلسة اللي فاتت'), (t, p[1], 26, 'caries', '{O,D}', 'حشو كومبوزيت', null),
+    (t, p[1], 36, 'filled', '{O}', null, null), (t, p[1], 46, 'crown', '{}', null, 'طربوش من 2023'), (t, p[1], 38, 'impacted', '{}', 'خلع جراحي', 'بيوجع مع الأكل'),
+    (t, p[1], 11, 'veneer', '{B}', null, null), (t, p[1], 21, 'veneer', '{B}', null, null), (t, p[1], 47, 'sensitive', '{}', null, null),
+    (t, p[1], 37, 'extraction_needed', '{}', 'خلع', null), (t, p[1], 18, 'missing', '{}', null, null);
+  insert into clinic.treatment_plans (tenant_id, patient_id, doctor_id, title, status, discount, notes, quoted_at)
+  values (t, p[1], d1, 'خطة علاج الضروس', 'quoted', 500, 'ممكن التقسيط على 3 شهور', now() - interval '2 days') returning id into v_id;
+  insert into clinic.treatment_plan_items (tenant_id, plan_id, seq, tooth, service_id, label, price, sessions, session_gap_days, done_sessions, status) values
+    (t, v_id, 1, 16, s_rct, 'حشو عصب', 1800, 2, 7, 1, 'in_progress'),
+    (t, v_id, 2, 16, (select id from clinic.services where tenant_id = t and name_ar = 'طربوش زيركون'), 'طربوش زيركون', 3500, 2, 7, 0, 'planned'),
+    (t, v_id, 3, 26, s_fill, 'حشو كومبوزيت', 700, 1, null, 0, 'planned'),
+    (t, v_id, 4, 38, (select id from clinic.services where tenant_id = t and name_ar = 'خلع ضرس عقل جراحي'), 'خلع ضرس عقل جراحي', 1500, 1, null, 0, 'planned');
+
   -- the dentist's day: 30-minute visits from the start of the session
   v_seq := (select appt_seq from clinic.tenants where id = t);
   for i in 0 .. 9 loop

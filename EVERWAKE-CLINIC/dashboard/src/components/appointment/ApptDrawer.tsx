@@ -155,7 +155,7 @@ export function ApptDrawer({ appt, onClose, onChanged }: { appt: ApptCard | null
               </dd>
               <dt className="text-muted">{t('Doctor')}</dt><dd>{docName(doc, lang)}</dd>
               <dt className="text-muted">{t('Where')}</dt><dd>{placeName(loc, lang)}{a.resource ? ` · ${a.resource}` : ''}</dd>
-              <dt className="text-muted">{t('For')}</dt><dd>{(lang === 'en' && a.service_en) || a.service || '—'}{a.price_text ? <span className="text-muted"> · {a.price_text}</span> : null}</dd>
+              <dt className="text-muted">{t('Service')}</dt><dd>{(lang === 'en' && a.service_en) || a.service || '—'}{a.price_text ? <span className="text-muted"> · {a.price_text}</span> : null}</dd>
               <dt className="text-muted">{t('Booked')}</dt><dd>{t(SOURCE[a.source] || a.source)}{a.created_at ? <span className="text-muted"> · {timeAgo(a.created_at)}</span> : null}</dd>
               {a.delay_reply && <><dt className="text-muted">{t('Delay')}</dt><dd className={a.delay_reply === 'accepted' ? 'text-positive' : 'text-caution'}>{t(DELAY_REPLY[a.delay_reply] || a.delay_reply)}</dd></>}
             </dl>

@@ -123,7 +123,7 @@ export function PatientProfile({ id }: { id: number }) {
         {tab === 'overview' && !p.clinical && <Family p={p} />}
         {tab === 'visits' && p.clinical && <VisitNotes patientId={pt.id} encounters={p.encounters || []} templates={p.templates || []} onChanged={refresh} />}
         {tab === 'dental' && p.clinical && (
-          <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div className="space-y-5">
             <DentalChart patientId={pt.id} teeth={p.dental_chart || []} onChanged={refresh} onPlanTooth={(tooth, planned) => setDraftTooth({ tooth, planned })} />
             <Plans patientId={pt.id} plans={p.plans || []} onChanged={refresh} draftTooth={draftTooth} onDraftUsed={() => setDraftTooth(null)} />
           </div>

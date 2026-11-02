@@ -1,7 +1,7 @@
 import { AR } from './i18n-ar';
 
-// The dashboard in English or Arabic. The English text is the key: t('Orders')
-// shows "الطلبات" in Arabic, and any text without a translation stays as it
+// The dashboard in English or Arabic. The English text is the key: t('Today')
+// shows "النهارده" in Arabic, and any text without a translation stays as it
 // is. {name}-style placeholders are filled from vars. The choice lives in a
 // cookie, so the server renders the right language and direction first time.
 export type Lang = 'en' | 'ar';
