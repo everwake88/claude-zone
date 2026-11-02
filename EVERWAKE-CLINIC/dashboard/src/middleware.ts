@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './lib/env';
+import { LANG_COOKIE } from './lib/lang-cookie';
 
 // Patients' pages (the link in a reminder: /a/<token>) and the health check need no sign-in,
 // so they skip the session work entirely. Everything else needs a signed-in member.
@@ -8,6 +9,13 @@ const OPEN = ['/login', '/auth', '/api/health', '/a/', '/api/a/'];
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
+  // a patient's page opens in Arabic unless they chose English
+  if (path.startsWith('/a/') && !request.cookies.get(LANG_COOKIE)) {
+    request.cookies.set(LANG_COOKIE, 'ar');
+    const res = NextResponse.next({ request });
+    res.cookies.set(LANG_COOKIE, 'ar', { path: '/', maxAge: 31536000, sameSite: 'lax' });
+    return res;
+  }
   let response = NextResponse.next({ request });
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return response;
   const open = OPEN.some(p => path.startsWith(p));

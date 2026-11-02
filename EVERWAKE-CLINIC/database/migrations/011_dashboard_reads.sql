@@ -101,3 +101,83 @@ begin
 end $$;
 
 grant execute on function clinic.waitlist_list(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- The patient's own page, from the link in every reminder (/a/<token>):
+-- see the appointment, confirm it, pick another time, or cancel. No sign-in:
+-- the token is the key. Called by the dashboard's server with the service
+-- role only (never granted to anon).
+-- ---------------------------------------------------------------------
+create or replace function clinic.manage_view(p_token text, p_lang text default 'ar')
+returns jsonb language plpgsql stable security definer set search_path = clinic, pg_temp as $$
+declare
+  a  clinic.appointments%rowtype;
+  t  clinic.tenants%rowtype;
+  l  clinic.locations%rowtype;
+  st jsonb;
+  v_lang text := case when p_lang = 'en' then 'en' else 'ar' end;
+begin
+  select * into a from clinic.appointments where manage_token = p_token and ref_no is not null;
+  if not found then return jsonb_build_object('ok', false, 'error', 'NOT_FOUND'); end if;
+  select * into t from clinic.tenants where id = a.tenant_id;
+  select * into l from clinic.locations where id = a.location_id;
+  st := clinic.merged_settings(t.settings);
+  return jsonb_build_object('ok', true,
+    'appointment', clinic.appointment_view(a, v_lang),
+    'clinic', jsonb_build_object('name', case when v_lang = 'en' then t.name_en else t.name_ar end, 'brand', clinic.merged_profile(t.profile) -> 'brand',
+                                 'phone', clinic.merged_profile(t.profile) -> 'contacts' ->> 'phone', 'timezone', t.timezone),
+    'place', jsonb_build_object('name', case when v_lang = 'en' then coalesce(l.name_en, l.name_ar) else l.name_ar end,
+                                'address', case when v_lang = 'en' then coalesce(l.address_en, l.address_ar) else l.address_ar end,
+                                'directions', l.directions_ar, 'maps_url', coalesce(l.maps_url, case when l.lat is not null then format('https://maps.google.com/?q=%s,%s', l.lat, l.lng) end),
+                                'phone', l.phone),
+    'first_name', clinic.first_name((select full_name from clinic.patients where id = a.patient_id), null),
+    'can_change', a.status in ('booked', 'confirmed') and coalesce(a.est_at, a.starts_at) > now()
+                  and (coalesce((st -> 'booking' ->> 'cancel_hours')::int, 0) = 0
+                       or coalesce(a.est_at, a.starts_at) > now() + make_interval(hours => (st -> 'booking' ->> 'cancel_hours')::int)),
+    'cancel_hours', coalesce((st -> 'booking' ->> 'cancel_hours')::int, 0));
+end $$;
+
+create or replace function clinic.manage_slots(p_token text, p_from date default null)
+returns jsonb language plpgsql stable security definer set search_path = clinic, pg_temp as $$
+declare a clinic.appointments%rowtype;
+begin
+  select * into a from clinic.appointments where manage_token = p_token and ref_no is not null and status in ('booked', 'confirmed');
+  if not found then return jsonb_build_object('slots', '[]'::jsonb); end if;
+  return clinic.available_slots(a.tenant_id, jsonb_build_object('doctor_id', a.doctor_id, 'service_id', a.service_id, 'patient_id', a.patient_id,
+           'from', p_from, 'limit', 120, 'ignore_appointment', a.id));
+end $$;
+
+-- p_action: confirm · cancel {reason} · move {starts_at | date, kind, location_id}
+create or replace function clinic.manage_action(p_token text, p_action text, p jsonb default '{}'::jsonb)
+returns jsonb language plpgsql security definer set search_path = clinic, pg_temp as $$
+declare
+  a clinic.appointments%rowtype;
+  v jsonb;
+  r jsonb;
+begin
+  select * into a from clinic.appointments where manage_token = p_token and ref_no is not null for update;
+  if not found then return jsonb_build_object('ok', false, 'error', 'NOT_FOUND'); end if;
+  v := clinic.manage_view(p_token);
+  if not (v ->> 'can_change')::boolean then return jsonb_build_object('ok', false, 'error', 'TOO_LATE_TO_CHANGE'); end if;
+  if p_action = 'confirm' then
+    update clinic.appointments set status = 'confirmed', confirmed_at = coalesce(confirmed_at, now()) where id = a.id;
+    update clinic.delay_notice_items set status = 'accepted', replied_at = coalesce(replied_at, now()) where appointment_id = a.id and status = 'sent';
+    perform clinic.log_appt(a.id, 'confirmed', jsonb_build_object('via', 'link'), 'patient');
+    return jsonb_build_object('ok', true, 'status', 'CONFIRMED');
+  elsif p_action = 'cancel' then
+    r := clinic.cancel_appointment(a.id, 'patient', coalesce(nullif(p ->> 'reason', ''), 'from the link'), false);
+    if (r ->> 'ok')::boolean then
+      perform clinic.raise_alert(jsonb_build_object('tenant_id', a.tenant_id, 'kind', 'cancelled', 'severity', 'low', 'appointment_id', a.id,
+        'title', 'مريض لغى من الرابط', 'body', clinic.appt_when(a), 'notify_doctor', false));
+    end if;
+    return r;
+  elsif p_action = 'move' then
+    r := clinic.reschedule_appointment(a.id, jsonb_build_object('starts_at', p ->> 'starts_at', 'date', p ->> 'date', 'kind', p ->> 'kind',
+           'location_id', p ->> 'location_id', 'staff', false, 'notify', false, 'by_role', 'patient'));
+    return r;
+  end if;
+  return jsonb_build_object('ok', false, 'error', 'UNKNOWN_ACTION');
+end $$;
+
+revoke all on function clinic.manage_view(text, text), clinic.manage_slots(text, date), clinic.manage_action(text, text, jsonb) from public;
+grant execute on function clinic.manage_view(text, text), clinic.manage_slots(text, date), clinic.manage_action(text, text, jsonb) to service_role;
