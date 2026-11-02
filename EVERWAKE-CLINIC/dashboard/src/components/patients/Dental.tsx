@@ -72,7 +72,7 @@ export function DentalChart({ patientId, teeth, onChanged, onPlanTooth }:
         aria-label={`${t('Tooth')} ${n}: ${t(c.label)}${x?.planned ? ' · ' + x.planned : ''}`}
         className={cx('press group relative flex flex-col items-center gap-1', lower && 'flex-col-reverse')}>
         <span className={cx('relative flex items-center justify-center ring-1 ring-inset transition-[box-shadow,background-color] duration-150',
-          molar ? 'h-9 w-[30px] rounded-[9px] sm:h-10 sm:w-9' : 'h-9 w-6 rounded-[10px] sm:h-10 sm:w-7', c.cls,
+          molar ? 'h-9 w-[30px] rounded-xl sm:h-10 sm:w-9' : 'h-9 w-6 rounded-2xl sm:h-10 sm:w-7', c.cls,
           sel === n && 'ring-2 ring-accent shadow-[0_0_0_3px_var(--color-accent-soft)]',
           x?.condition === 'missing' && 'opacity-60')}>
           {x?.surfaces?.length ? <span className="text-[8px] font-semibold leading-none tracking-tight">{x.surfaces.join('')}</span> : null}
@@ -93,8 +93,8 @@ export function DentalChart({ patientId, teeth, onChanged, onPlanTooth }:
 
   return (
     <Card title={t('Dental chart')} sub={t('FDI numbering, as you face the patient. Tap a tooth.')}
-      action={<div className="inline-flex rounded-[8px] bg-raised p-0.5 text-xs ring-1 ring-inset ring-border">
-        {[false, true].map(v => <button key={String(v)} onClick={() => { setChild(v); setSel(null); }} className={cx('press rounded-[6px] px-2.5 py-1 font-medium', child === v ? 'bg-sheet text-ink shadow-sm ring-1 ring-border' : 'text-muted')}>{v ? t('Child') : t('Adult')}</button>)}
+      action={<div className="inline-flex rounded-xl bg-raised p-0.5 text-xs ring-1 ring-inset ring-border">
+        {[false, true].map(v => <button key={String(v)} onClick={() => { setChild(v); setSel(null); }} className={cx('press rounded-lg px-2.5 py-1 font-medium', child === v ? 'bg-sheet text-ink shadow-sm ring-1 ring-border' : 'text-muted')}>{v ? t('Child') : t('Adult')}</button>)}
       </div>}>
       <div dir="ltr" className="-mx-1 overflow-x-auto px-1 pb-1">
         <div className="mx-auto w-max space-y-2 py-1">
@@ -114,7 +114,7 @@ export function DentalChart({ patientId, teeth, onChanged, onPlanTooth }:
       <AnimatePresence initial={false}>
         {sel != null && (
           <motion.div key={sel} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4, transition: { duration: 0.12 } }}
-            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }} className="mt-4 space-y-3 rounded-[10px] bg-raised p-4 ring-1 ring-inset ring-border">
+            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }} className="mt-4 space-y-3 rounded-2xl bg-raised p-4 ring-1 ring-inset ring-border">
             <div className="flex items-center justify-between">
               <h3 className="text-[14px] font-semibold">{t('Tooth {n}', { n: sel })}</h3>
               <button onClick={() => setSel(null)} className="press rounded-md p-1 text-muted hover:bg-active" aria-label={t('Close')}><X className="size-4" /></button>
@@ -122,7 +122,7 @@ export function DentalChart({ patientId, teeth, onChanged, onPlanTooth }:
             <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t('Condition')}>
               {CONDITIONS.map(c => (
                 <button key={c.key} type="button" role="radio" aria-checked={form.condition === c.key} onClick={() => setForm(f => ({ ...f, condition: c.key }))}
-                  className={cx('press inline-flex h-8 items-center gap-1.5 rounded-[7px] px-2.5 text-[12.5px]',
+                  className={cx('press inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12.5px]',
                     form.condition === c.key ? 'bg-ink text-white' : 'bg-sheet ring-1 ring-inset ring-border hover:bg-active/50')}>
                   <span className={cx('size-2.5 rounded-[3px] ring-1 ring-inset', c.cls)} />{t(c.label)}
                 </button>
@@ -133,7 +133,7 @@ export function DentalChart({ patientId, teeth, onChanged, onPlanTooth }:
               {SURFACES.map(sf => {
                 const on = form.surfaces.includes(sf);
                 return <button key={sf} type="button" aria-pressed={on} onClick={() => setForm(f => ({ ...f, surfaces: on ? f.surfaces.filter(x => x !== sf) : [...f.surfaces, sf] }))}
-                  className={cx('press size-8 rounded-[7px] text-[12.5px] font-semibold', on ? 'bg-accent text-white' : 'bg-sheet text-muted ring-1 ring-inset ring-border')}>{sf}</button>;
+                  className={cx('press size-8 rounded-full text-[12.5px] font-semibold', on ? 'bg-accent text-white' : 'bg-sheet text-muted ring-1 ring-inset ring-border')}>{sf}</button>;
               })}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -145,7 +145,7 @@ export function DentalChart({ patientId, teeth, onChanged, onPlanTooth }:
                 {map.has(sel) && <Button size="sm" variant="ghost" onClick={() => save(true)}>{t('Clear')}</Button>}
                 {onPlanTooth && form.planned && <Button size="sm" variant="outline" onClick={() => onPlanTooth(sel, form.planned)}><Plus className="size-3.5" aria-hidden />{t('Add to a treatment plan')}</Button>}
               </div>
-              <Button size="sm" variant="accent" busy={busy} onClick={() => save()}>{t('Save tooth {n}', { n: sel })}</Button>
+              <Button size="sm" busy={busy} onClick={() => save()}>{t('Save tooth {n}', { n: sel })}</Button>
             </div>
           </motion.div>
         )}
@@ -196,7 +196,7 @@ export function Plans({ patientId, plans, onChanged, draftTooth, onDraftUsed }:
             const done = p.items.reduce((s, i) => s + Math.min(i.done_sessions, i.sessions), 0);
             const st = PLAN_STATUS[p.status] || PLAN_STATUS.draft;
             return (
-              <section key={p.id} className="rounded-[10px] ring-1 ring-inset ring-border">
+              <section key={p.id} className="rounded-2xl ring-1 ring-inset ring-border">
                 <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 text-[14px] font-semibold"><bdi>{p.title}</bdi><Pill tone={st.tone}>{t(st.label)}</Pill></p>
@@ -227,7 +227,7 @@ export function Plans({ patientId, plans, onChanged, draftTooth, onDraftUsed }:
                   {['draft', 'quoted'].includes(p.status) && <Button size="sm" variant="ghost" onClick={() => setEdit(p)}>{t('Edit')}</Button>}
                   {p.status === 'quoted' && <Button size="sm" variant="outline" busy={busy} onClick={() => accept(p)}>{t('Patient agreed')}</Button>}
                   {['draft', 'quoted'].includes(p.status) && p.items.length > 0 &&
-                    <Button size="sm" variant="accent" busy={busy} onClick={() => quote(p)}><Send className="size-3.5 rtl:-scale-x-100" aria-hidden />{p.status === 'quoted' ? t('Send again') : t('Send the quote on WhatsApp')}</Button>}
+                    <Button size="sm" busy={busy} onClick={() => quote(p)}><Send className="size-3.5 rtl:-scale-x-100" aria-hidden />{p.status === 'quoted' ? t('Send again') : t('Send the quote on WhatsApp')}</Button>}
                 </footer>
               </section>
             );
@@ -292,7 +292,7 @@ function PlanEditor({ patientId, plan, open, onClose, onSaved, draftTooth }:
       footer={<>
         <span className="me-auto text-[13px] text-muted">{t('Total')} <b className="ms-1 text-[16px] font-semibold tabular-nums text-ink"><CountUp value={total} format={v => money(v, tenant.currency_symbol)} /></b></span>
         <Button variant="outline" onClick={onClose}>{t('Cancel')}</Button>
-        <Button variant="accent" busy={busy} onClick={save}>{t('Save the plan')}</Button>
+        <Button busy={busy} onClick={save}>{t('Save the plan')}</Button>
       </>}>
       <div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -307,14 +307,14 @@ function PlanEditor({ patientId, plan, open, onClose, onSaved, draftTooth }:
               {rows.map((r, i) => (
                 <motion.div key={r.id ?? `n${i}`} layout initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 8, transition: { duration: 0.15 } }}
                   transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-                  className="grid grid-cols-[64px_minmax(0,1fr)_32px] gap-2 rounded-[9px] bg-raised p-2 ring-1 ring-inset ring-border sm:grid-cols-[64px_minmax(0,1.4fr)_minmax(0,1fr)_96px_64px_32px]">
+                  className="grid grid-cols-[64px_minmax(0,1fr)_32px] gap-2 rounded-xl bg-raised p-2 ring-1 ring-inset ring-border sm:grid-cols-[64px_minmax(0,1.4fr)_minmax(0,1fr)_96px_64px_32px]">
                   <Input aria-label={t('Tooth')} placeholder={t('Tooth')} inputMode="numeric" value={r.tooth} onChange={e => setRow(i, { tooth: e.target.value.replace(/\D/g, '').slice(0, 2) })} className="text-center tabular-nums" />
                   <Select aria-label={t('Treatment')} value={r.service_id} onChange={e => pickService(i, e.target.value)}>
                     <option value="">{t('Treatment…')}</option>
                     {dental.map(s => <option key={s.id} value={s.id}>{serviceName(s, lang)}</option>)}
                   </Select>
                   <button onClick={() => setRows(rs => rs.filter((_, k) => k !== i))} disabled={r.status && r.status !== 'planned' ? true : undefined}
-                    className="press flex size-9 items-center justify-center rounded-[7px] text-muted hover:bg-active disabled:opacity-30 sm:order-last" aria-label={t('Remove')}><Trash2 className="size-4" /></button>
+                    className="press flex size-9 items-center justify-center rounded-full text-muted hover:bg-active disabled:opacity-30 sm:order-last" aria-label={t('Remove')}><Trash2 className="size-4" /></button>
                   <Input aria-label={t('Label')} placeholder={t('What, in words')} value={r.label} onChange={e => setRow(i, { label: e.target.value })} className="col-span-3 sm:col-span-1" />
                   <Input aria-label={t('Price')} placeholder={t('Price')} inputMode="numeric" value={r.price} onChange={e => setRow(i, { price: e.target.value.replace(/[^\d.]/g, '') })} className="col-span-2 tabular-nums sm:col-span-1" />
                   <Input aria-label={t('Sessions')} title={t('Sessions')} inputMode="numeric" value={r.sessions} onChange={e => setRow(i, { sessions: e.target.value.replace(/\D/g, '') })} className="text-center tabular-nums" />

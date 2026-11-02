@@ -17,10 +17,10 @@ export function SaveBar({ dirty, busy, onSave, onReset }: { dirty: boolean; busy
   const { t } = useLang();
   return (
     <div className={cx('sticky bottom-20 z-20 mt-5 flex justify-end transition-[opacity,transform] duration-200 lg:bottom-4', dirty ? 'opacity-100' : 'pointer-events-none translate-y-2 opacity-0')}>
-      <div className="flex items-center gap-2 rounded-[12px] bg-ink px-3 py-2 text-[13px] text-white shadow-[0_16px_40px_-16px_rgb(15_23_41/.6)]">
+      <div className="flex items-center gap-2 rounded-2xl bg-ink px-3 py-2 text-[13px] text-white shadow-[0_16px_40px_-16px_rgb(15_23_41/.6)]">
         <span className="px-1">{t('Unsaved changes')}</span>
-        <button onClick={onReset} className="press rounded-[7px] px-2.5 py-1 text-white/80 hover:bg-white/10">{t('Discard')}</button>
-        <Button size="sm" variant="accent" busy={busy} onClick={onSave}>{t('Save')}</Button>
+        <button onClick={onReset} className="press rounded-full px-2.5 py-1 text-white/80 hover:bg-white/10">{t('Discard')}</button>
+        <Button size="sm" busy={busy} onClick={onSave}>{t('Save')}</Button>
       </div>
     </div>
   );
@@ -112,7 +112,7 @@ export function AgentSection() {
             <Field label={t('…and in English')}><Textarea rows={2} dir="ltr" value={d.em_en} onChange={set('em_en')} /></Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('Ambulance number')}><Input dir="ltr" value={d.ambulance} onChange={set('ambulance')} /></Field>
-              <label className="flex items-center justify-between gap-3 self-end rounded-[9px] px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border">
+              <label className="flex items-center justify-between gap-3 self-end rounded-xl px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border">
                 {t('Message the doctor’s own WhatsApp')}<Switch checked={d.wa_doctor} onChange={v => setD({ ...d, wa_doctor: v })} label={t('Message the doctor’s own WhatsApp')} />
               </label>
             </div>
@@ -120,7 +120,7 @@ export function AgentSection() {
         </Card>
         <Card title={t('Everything else')}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex items-center justify-between gap-3 rounded-[9px] px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border sm:col-span-2">
+            <label className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border sm:col-span-2">
               {t('Send aftercare instructions when a visit is marked done')}<Switch checked={d.aftercare} onChange={v => setD({ ...d, aftercare: v })} label={t('Aftercare')} />
             </label>
             <Field label={t('Give a taken-over chat back after (minutes of silence)')}><Input inputMode="numeric" value={d.release} onChange={set('release')} /></Field>
@@ -164,7 +164,7 @@ export function BookingSection() {
         </Card>
         <Card title={t('Did not come')}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex items-center justify-between gap-3 rounded-[9px] px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border">
+            <label className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border">
               {t('Mark “did not come” on its own')}<Switch checked={d.no_show} onChange={v => setD({ ...d, no_show: v })} label={t('Mark “did not come” on its own')} />
             </label>
             <Field label={t('After (minutes past the time)')}><Input {...n('grace')} /></Field>
@@ -225,12 +225,12 @@ export function MessagesSection() {
       <div className="space-y-5">
         <Card title={t('Reminders')} sub={t('Each reminder lets the patient confirm, change or cancel, by a number or in their own words.')}>
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3 rounded-[9px] px-3 py-2.5 ring-1 ring-inset ring-border">
+            <div className="flex flex-wrap items-center gap-3 rounded-xl px-3 py-2.5 ring-1 ring-inset ring-border">
               <Switch checked={d.day_on} onChange={v => setD({ ...d, day_on: v })} label={t('The day before')} />
               <span className="text-[13.5px]">{t('The day before, at')}</span>
               <Input type="time" value={d.day_at} onChange={e => setD({ ...d, day_at: e.target.value })} className="!w-32" disabled={!d.day_on} />
             </div>
-            <div className="flex flex-wrap items-center gap-3 rounded-[9px] px-3 py-2.5 ring-1 ring-inset ring-border">
+            <div className="flex flex-wrap items-center gap-3 rounded-xl px-3 py-2.5 ring-1 ring-inset ring-border">
               <Switch checked={d.hours_on} onChange={v => setD({ ...d, hours_on: v })} label={t('Hours before')} />
               <Input inputMode="numeric" value={d.hours} onChange={e => setD({ ...d, hours: e.target.value.replace(/\D/g, '') })} className="!w-16" disabled={!d.hours_on} />
               <span className="text-[13.5px]">{t('hours before the visit')}</span>
@@ -289,11 +289,11 @@ export function BrandSection() {
         <Card title={t('Logo and colour')} sub={t('The dashboard takes the clinic’s colour, darkened where needed so text stays readable.')}>
           <div className="space-y-5">
             <label className="flex cursor-pointer items-center gap-4">
-              <span className="flex size-16 items-center justify-center overflow-hidden rounded-[14px] bg-raised ring-1 ring-inset ring-border">
+              <span className="flex size-16 items-center justify-center overflow-hidden rounded-[20px] bg-raised ring-1 ring-inset ring-border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {logo ? <img src={logo} alt="" className="size-full object-contain p-1" /> : <ImageUp className="size-6 text-faint" aria-hidden />}
               </span>
-              <span className="text-[13.5px]"><span className="font-medium text-accent">{uploading ? t('Uploading…') : t('Upload the logo')}</span><span className="block text-xs text-muted">{t('PNG or SVG, square works best')}</span></span>
+              <span className="text-[13.5px]"><span className="font-medium text-gold-ink">{uploading ? t('Uploading…') : t('Upload the logo')}</span><span className="block text-xs text-muted">{t('PNG or SVG, square works best')}</span></span>
               <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && upload(e.target.files[0])} />
             </label>
             <div className="flex flex-wrap items-center gap-2">
@@ -310,8 +310,8 @@ export function BrandSection() {
         </Card>
         <Card title={t('Preview')}>
           <div className="space-y-3" style={vars ? Object.fromEntries(Object.entries(vars)) as React.CSSProperties : undefined}>
-            <span className="inline-flex h-9 items-center rounded-[7px] px-3.5 text-sm font-medium text-white" style={{ background: 'var(--brand)' }}>{t('New booking')}</span>
-            <div className="rounded-[9px] px-3 py-2 text-[13px]" style={{ background: 'var(--brand-soft)', color: 'var(--brand-ink)' }}>{t('Next visit')} · 6:30 pm</div>
+            <span className="inline-flex h-9 items-center rounded-full px-3.5 text-sm font-medium text-white" style={{ background: 'var(--brand)' }}>{t('New booking')}</span>
+            <div className="rounded-xl px-3 py-2 text-[13px]" style={{ background: 'var(--brand-soft)', color: 'var(--brand-ink)' }}>{t('Next visit')} · 6:30 pm</div>
             <div className="h-2 overflow-hidden rounded-full bg-rule"><span className="block h-full w-2/3 rounded-full" style={{ background: 'var(--brand)' }} /></div>
           </div>
         </Card>

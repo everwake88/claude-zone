@@ -69,12 +69,12 @@ export function Knowledge() {
                 {data.k.map(k => (
                   <motion.li key={k.id} layout exit={{ opacity: 0, height: 0 }} className="group">
                     {edit === k.id ? <FaqForm form={form} setForm={setForm} busy={busy} lockTopic onCancel={() => setEdit(null)} onSave={() => saveFaq(k)} /> : (
-                      <div className="flex items-start gap-3 px-4 py-3">
+                      <div className="flex items-start gap-3 px-5 py-3">
                         <button disabled={!can.edit} onClick={() => { setEdit(k.id); setForm({ topic: k.topic, content_ar: k.content_ar || '' }); }} className="min-w-0 flex-1 text-start">
                           <p className="text-[13.5px] font-semibold"><bdi>{k.topic}</bdi></p>
                           <p className="mt-0.5 text-[13px] leading-relaxed text-muted"><bdi>{k.content_ar || k.content_en}</bdi></p>
                         </button>
-                        {can.edit && <button onClick={() => removeFaq(k)} className="press shrink-0 rounded-[6px] p-1.5 text-muted opacity-100 hover:bg-raised hover:text-critical sm:opacity-0 sm:group-hover:opacity-100" aria-label={t('Remove')}><Trash2 className="size-3.5" /></button>}
+                        {can.edit && <button onClick={() => removeFaq(k)} className="press shrink-0 rounded-lg p-1.5 text-muted opacity-100 hover:bg-raised hover:text-critical sm:opacity-0 sm:group-hover:opacity-100" aria-label={t('Remove')}><Trash2 className="size-3.5" /></button>}
                       </div>
                     )}
                   </motion.li>
@@ -94,16 +94,16 @@ export function Knowledge() {
                 {data.r.filter(r => r.kind !== 'note').map(r => {
                   const d = doctors.find(x => x.id === r.doctor_id);
                   return (
-                    <li key={r.id} className="group flex items-start gap-3 px-4 py-3">
+                    <li key={r.id} className="group flex items-start gap-3 px-5 py-3">
                       <div className="min-w-0 flex-1">
                         <p className="text-[13.5px] font-medium"><bdi>{r.text_ar}</bdi></p>
                         {d && <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted"><DocDot color={d.color} />{docName(d, lang)}</p>}
                       </div>
-                      {can.edit && <button onClick={() => removeRule(r)} className="press shrink-0 rounded-[6px] p-1.5 text-muted hover:bg-raised hover:text-critical sm:opacity-0 sm:group-hover:opacity-100" aria-label={t('Remove')}><Trash2 className="size-3.5" /></button>}
+                      {can.edit && <button onClick={() => removeRule(r)} className="press shrink-0 rounded-lg p-1.5 text-muted hover:bg-raised hover:text-critical sm:opacity-0 sm:group-hover:opacity-100" aria-label={t('Remove')}><Trash2 className="size-3.5" /></button>}
                     </li>
                   );
                 })}
-                {data.r.filter(r => r.kind !== 'note').length === 0 && edit !== 'rule' && <li className="px-4 py-3 text-[13px] text-muted">{t('No rules yet.')}</li>}
+                {data.r.filter(r => r.kind !== 'note').length === 0 && edit !== 'rule' && <li className="px-5 py-3 text-[13px] text-muted">{t('No rules yet.')}</li>}
               </ul>
             )}
             {edit === 'rule' && (
@@ -128,13 +128,13 @@ export function Knowledge() {
                   <div className="flex flex-wrap gap-1.5">
                     {[6, 0, 1, 2, 3, 4, 5].map(d => { const on = rule.days.includes(d); return (
                       <button key={d} type="button" aria-pressed={on} onClick={() => setRule(r => ({ ...r, days: on ? r.days.filter(x => x !== d) : [...r.days, d] }))}
-                        className={cx('press h-8 w-12 rounded-[7px] text-[12.5px]', on ? 'bg-accent text-white' : 'bg-sheet ring-1 ring-inset ring-border')}>{t(DAY_LABEL[d])}</button>); })}
+                        className={cx('press h-8 w-12 rounded-full text-[12.5px]', on ? 'bg-accent text-white' : 'bg-sheet ring-1 ring-inset ring-border')}>{t(DAY_LABEL[d])}</button>); })}
                   </div>
                 )}
                 {rule.kind === 'note' && <Field label={t('What the assistant should do')}><Textarea rows={2} value={rule.text_ar} onChange={e => setRule(r => ({ ...r, text_ar: e.target.value }))} placeholder="مع كشف الزرعة قول إن أشعة البانوراما عليها خصم 50%" /></Field>}
                 <div className="flex justify-end gap-2">
                   <Button size="sm" variant="ghost" onClick={() => setEdit(null)}>{t('Cancel')}</Button>
-                  <Button size="sm" variant="accent" type="submit" busy={busy} disabled={(rule.kind === 'note' && !rule.text_ar.trim()) || (rule.kind === 'age_doctor' && !rule.doctor)}>{t('Add the rule')}</Button>
+                  <Button size="sm" type="submit" busy={busy} disabled={(rule.kind === 'note' && !rule.text_ar.trim()) || (rule.kind === 'age_doctor' && !rule.doctor)}>{t('Add the rule')}</Button>
                 </div>
               </form>
             )}
@@ -144,12 +144,12 @@ export function Knowledge() {
             sub={t('Short instructions under its fixed safety rules: it never diagnoses or prescribes.')}>
             <ul className="divide-y divide-rule">
               {(data?.r || []).filter(r => r.kind === 'note').map(r => (
-                <li key={r.id} className="group flex items-start gap-3 px-4 py-3">
+                <li key={r.id} className="group flex items-start gap-3 px-5 py-3">
                   <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed"><bdi>{r.text_ar}</bdi></p>
-                  {can.edit && <button onClick={() => removeRule(r)} className="press shrink-0 rounded-[6px] p-1.5 text-muted hover:bg-raised hover:text-critical sm:opacity-0 sm:group-hover:opacity-100" aria-label={t('Remove')}><Trash2 className="size-3.5" /></button>}
+                  {can.edit && <button onClick={() => removeRule(r)} className="press shrink-0 rounded-lg p-1.5 text-muted hover:bg-raised hover:text-critical sm:opacity-0 sm:group-hover:opacity-100" aria-label={t('Remove')}><Trash2 className="size-3.5" /></button>}
                 </li>
               ))}
-              {data && !data.r.some(r => r.kind === 'note') && <li className="px-4 py-3 text-[13px] text-muted">{t('No notes yet.')}</li>}
+              {data && !data.r.some(r => r.kind === 'note') && <li className="px-5 py-3 text-[13px] text-muted">{t('No notes yet.')}</li>}
             </ul>
           </Card>
         </div>
@@ -162,10 +162,10 @@ function FaqForm({ form, setForm, busy, onCancel, onSave, lockTopic }:
   { form: { topic: string; content_ar: string }; setForm: (f: { topic: string; content_ar: string }) => void; busy: boolean; onCancel: () => void; onSave: () => void; lockTopic?: boolean }) {
   const { t } = useLang();
   return (
-    <form className="space-y-2.5 bg-raised/60 px-4 py-3" onSubmit={e => { e.preventDefault(); if (form.topic.trim() && form.content_ar.trim()) onSave(); }}>
+    <form className="space-y-2.5 bg-raised/60 px-5 py-3" onSubmit={e => { e.preventDefault(); if (form.topic.trim() && form.content_ar.trim()) onSave(); }}>
       <Input autoFocus={!lockTopic} disabled={lockTopic} value={form.topic} onChange={e => setForm({ ...form, topic: e.target.value })} placeholder={t('Topic, e.g. Parking')} aria-label={t('Topic')} />
       <Textarea autoFocus={lockTopic} rows={3} value={form.content_ar} onChange={e => setForm({ ...form, content_ar: e.target.value })} placeholder="في جراج قدام العيادة…" aria-label={t('The answer')} />
-      <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={onCancel}>{t('Cancel')}</Button><Button size="sm" variant="accent" type="submit" busy={busy}>{t('Save')}</Button></div>
+      <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={onCancel}>{t('Cancel')}</Button><Button size="sm" type="submit" busy={busy}>{t('Save')}</Button></div>
     </form>
   );
 }

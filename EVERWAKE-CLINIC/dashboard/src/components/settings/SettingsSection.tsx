@@ -26,7 +26,7 @@ export function SettingsSection({ section }: { section: string }) {
       <Link href={`${base}/settings`} className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" aria-hidden />{t('Settings')}</Link>
       <PageTitle title={t(s.label)} finding={t(s.sub)} />
       {allowed || s.key === 'team' ? <Body /> : (
-        <p className="flex items-center gap-2 rounded-[10px] bg-raised px-4 py-3 text-[13.5px] text-muted ring-1 ring-inset ring-border">
+        <p className="flex items-center gap-2 rounded-2xl bg-raised px-4 py-3 text-[13.5px] text-muted ring-1 ring-inset ring-border">
           <Lock className="size-4 text-faint" aria-hidden />{t('Only the clinic’s owner, managers and doctors change this.')}
         </p>
       )}

@@ -46,7 +46,7 @@ export function Inbox() {
   const pick = (id: number | null) => router.replace(id ? `?c=${id}` : '?', { scroll: false });
 
   return (
-    <div className="-mx-4 -mt-5 flex h-[calc(100dvh-56px-64px)] lg:-mx-8 lg:-mb-10 lg:h-[calc(100dvh-16px-58px)]">
+    <div className="card c-rise flex h-[calc(100dvh-200px)] min-h-[520px] overflow-hidden lg:h-[calc(100dvh-110px)]">
       {/* the chats */}
       <aside className={cx('flex w-full shrink-0 flex-col border-e border-rule md:w-[340px]', sel && 'max-md:hidden')}>
         <div className="space-y-2.5 border-b border-rule p-3">
@@ -149,20 +149,20 @@ function ChatView({ id, onBack, onChanged }: { id: number; onBack: () => void; o
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14.5px] font-semibold"><bdi>{c.name || fmtPhone(c.wa_id)}</bdi></p>
           <p className="truncate text-xs text-muted"><bdi dir="ltr">{fmtPhone(c.phone || c.wa_id)}</bdi>
-            {th.patients.length > 0 && <> · {th.patients.map((p, i) => <span key={p.id}>{i ? '، ' : ''}<Link href={`${base}/patients/${p.id}`} className="text-accent hover:underline"><bdi>{p.full_name}</bdi></Link></span>)}</>}
+            {th.patients.length > 0 && <> · {th.patients.map((p, i) => <span key={p.id}>{i ? '، ' : ''}<Link href={`${base}/patients/${p.id}`} className="text-gold-ink hover:underline"><bdi>{p.full_name}</bdi></Link></span>)}</>}
           </p>
         </div>
         {human
           ? <Button size="sm" variant="outline" busy={busy} onClick={() => call('hand_back', { p_conversation: id }, t('The assistant has the chat again.'))}><Bot className="size-4" aria-hidden />{t('Hand back')}</Button>
           : <Button size="sm" variant="outline" busy={busy} onClick={() => call('take_over', { p_conversation: id, p_reason: null }, t('You have the chat. The assistant stays quiet until you hand it back.'))}><Hand className="size-4" aria-hidden />{t('Take over')}</Button>}
-        {th.patients[0] && <Button size="sm" variant="accent" className="max-sm:hidden" onClick={() => shell.newBooking({ patientId: th.patients[0].id, patientName: th.patients[0].full_name })}><CalendarPlus className="size-4" aria-hidden />{t('Book')}</Button>}
+        {th.patients[0] && <Button size="sm" className="max-sm:hidden" onClick={() => shell.newBooking({ patientId: th.patients[0].id, patientName: th.patients[0].full_name })}><CalendarPlus className="size-4" aria-hidden />{t('Book')}</Button>}
       </header>
 
       {(c.urgency || c.needs_attention) && (
         <div className={cx('flex items-center gap-3 px-4 py-2 text-[13px]', c.urgency === 'emergency' ? 'bg-critical-soft text-critical-ink' : 'bg-caution-soft text-caution')}>
           {c.urgency === 'emergency' ? <Siren className="size-4 shrink-0" aria-hidden /> : <CircleHelp className="size-4 shrink-0" aria-hidden />}
           <span className="min-w-0 flex-1"><bdi>{c.attention_reason || (c.urgency === 'emergency' ? t('Possible emergency') : t('Needs someone from the team'))}</bdi></span>
-          <button onClick={() => call('resolve_attention', { p_conversation: id }, t('Marked as handled.'))} className="press shrink-0 rounded-[6px] px-2 py-1 text-xs font-medium ring-1 ring-inset ring-current/30 hover:bg-white/50">{t('Handled')}</button>
+          <button onClick={() => call('resolve_attention', { p_conversation: id }, t('Marked as handled.'))} className="press shrink-0 rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset ring-current/30 hover:bg-white/50">{t('Handled')}</button>
         </div>
       )}
       {th.appointments.length > 0 && (
@@ -218,12 +218,12 @@ function ChatView({ id, onBack, onChanged }: { id: number; onBack: () => void; o
           <form className="flex items-end gap-2" onSubmit={e => { e.preventDefault(); send(); }}>
             <Textarea rows={1} value={text} onChange={e => setText(e.target.value)} placeholder={t('Write to the patient…')} className="max-h-40 min-h-9 flex-1 resize-none"
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
-            <Button type="submit" variant="accent" busy={busy} disabled={!text.trim()} aria-label={t('Send')}><Send className="size-4 rtl:-scale-x-100" aria-hidden /></Button>
+            <Button type="submit" busy={busy} disabled={!text.trim()} aria-label={t('Send')}><Send className="size-4 rtl:-scale-x-100" aria-hidden /></Button>
           </form>
         ) : (
           <p className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-muted">
             <span className="inline-flex items-center gap-1.5"><Bot className="size-4 text-accent" aria-hidden />{t('The assistant is answering this patient.')}</span>
-            <button onClick={() => call('take_over', { p_conversation: id, p_reason: null })} className="font-medium text-accent hover:underline">{t('Take over to write yourself')}</button>
+            <button onClick={() => call('take_over', { p_conversation: id, p_reason: null })} className="font-medium text-gold-ink hover:underline">{t('Take over to write yourself')}</button>
           </p>
         )}
       </footer>
@@ -246,7 +246,7 @@ function QuestionCard({ q, onAnswer }: { q: Question; onAnswer: (q: Question, ki
         <form className="mt-2.5 flex gap-2" onSubmit={e => { e.preventDefault(); if (text.trim()) go('text', text.trim()); }}>
           <Input autoFocus value={text} onChange={e => setText(e.target.value)} placeholder={t('Your answer; the assistant passes it on in its own words')} className="flex-1 bg-sheet" />
           <Button size="sm" variant="ghost" onClick={() => setTyping(false)} aria-label={t('Cancel')}><X className="size-4" /></Button>
-          <Button size="sm" type="submit" variant="accent" busy={busy}>{t('Send')}</Button>
+          <Button size="sm" type="submit" busy={busy}>{t('Send')}</Button>
         </form>
       ) : (
         <div className="mt-2.5 flex flex-wrap gap-2">

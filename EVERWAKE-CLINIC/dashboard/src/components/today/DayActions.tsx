@@ -61,12 +61,12 @@ export function RunningLate({ open, onClose, doctorId }: { open: boolean; onClos
     <Dialog open={open} onClose={onClose} title={preview ? t('Who will be told') : t('Running late')}
       footer={preview ? <>
         <Button variant="outline" onClick={() => setPreview(null)}>{t('Back')}</Button>
-        <Button variant="accent" busy={busy} disabled={!preview.count} onClick={send}>
+        <Button busy={busy} disabled={!preview.count} onClick={send}>
           {onWa ? t('Tell {n} patients', { n: onWa }) : t('Move the times')}
         </Button>
       </> : <>
         <Button variant="outline" onClick={onClose}>{t('Cancel')}</Button>
-        <Button variant="accent" busy={busy} disabled={!valid} onClick={look}>{t('See who is affected')}</Button>
+        <Button busy={busy} disabled={!valid} onClick={look}>{t('See who is affected')}</Button>
       </>}>
       {!preview ? (
         <div className="space-y-4">
@@ -91,7 +91,7 @@ export function RunningLate({ open, onClose, doctorId }: { open: boolean; onClos
           <p className="mb-2 text-[13px] text-muted">{t('{n} patients · every time moves {m} min later', { n: preview.count, m: preview.minutes })}</p>
           {preview.items.map((it, i) => (
             <div key={it.appointment_id} style={{ animationDelay: `${Math.min(i, 10) * 35}ms` }}
-              className="c-rise flex items-center gap-3 rounded-[8px] px-2.5 py-2 ring-1 ring-inset ring-border">
+              className="c-rise flex items-center gap-3 rounded-xl px-2.5 py-2 ring-1 ring-inset ring-border">
               <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{it.patient || it.ref_no}{it.queue_no ? <span className="ms-1.5 text-xs font-normal text-muted">#{it.queue_no}</span> : null}</span>
               <span className="flex shrink-0 items-center gap-1.5 text-[13px] tabular-nums">
                 <s className="text-faint">{to12(it.old_time, lang)}</s>
@@ -161,7 +161,7 @@ export function BlockTime({ open, onClose, doctorId }: { open: boolean; onClose:
     <Drawer open={open} onClose={onClose} title={t('Block time')} width="max-w-[440px]"
       footer={<>
         <Button variant="outline" onClick={onClose}>{t('Cancel')}</Button>
-        <Button variant="accent" busy={busy} disabled={!doctor} onClick={save}>{t('Block it')}</Button>
+        <Button busy={busy} disabled={!doctor} onClick={save}>{t('Block it')}</Button>
       </>}>
       <div className="space-y-4">
         {doctors.filter(d => d.is_active).length > 1 && <Field label={t('Doctor')}><DoctorPick doctors={doctors} value={doctor} onChange={setDoctor} layout="block-doc" /></Field>}
@@ -177,7 +177,7 @@ export function BlockTime({ open, onClose, doctorId }: { open: boolean; onClose:
         </div>
         <Field label={t('Reason (only your team sees it)')}><Input value={reason} onChange={e => setReason(e.target.value)} placeholder={t('Conference, travel…')} /></Field>
         {inside !== null && (
-          <p className={cx('c-fade rounded-[9px] px-3 py-2.5 text-[13px]', inside ? 'bg-caution-soft text-caution' : 'bg-raised text-muted')}>
+          <p className={cx('c-fade rounded-xl px-3 py-2.5 text-[13px]', inside ? 'bg-caution-soft text-caution' : 'bg-raised text-muted')}>
             {inside ? t('{n} bookings are already inside this time. They stay until you move or cancel them.', { n: inside }) : t('No bookings inside this time.')}
           </p>
         )}

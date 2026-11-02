@@ -25,7 +25,7 @@ export function VisitNotes({ patientId, encounters, templates, onChanged, appoin
             const filled = tpl ? tpl.schema.sections.flatMap(s => s.fields.map(f => ({ s, f, v: e.data?.[s.key]?.[f.key] }))).filter(x => x.v !== undefined && x.v !== '' && x.v !== null && x.v !== false) : [];
             return (
               <li key={e.id}>
-                <button onClick={() => setOpen(e)} className="block w-full px-4 py-3 text-start hover:bg-raised">
+                <button onClick={() => setOpen(e)} className="block w-full px-5 py-3 text-start hover:bg-raised">
                   <p className="flex flex-wrap items-center gap-2 text-[13.5px]">
                     <span className="font-medium">{dateShort(e.started_at, tenant.timezone)}</span>
                     {e.doctor && <span className="text-muted"><bdi>{e.doctor}</bdi></span>}
@@ -94,7 +94,7 @@ function EncounterForm({ open, encounter, templates, patientId, appointmentId, o
               {(f.options || []).map(o => {
                 const on = list.includes(o);
                 return <button key={o} type="button" disabled={signed} aria-pressed={on} onClick={() => setV(sKey, f.key, on ? list.filter(x => x !== o) : [...list, o])}
-                  className={cx('press h-8 rounded-[7px] px-2.5 text-[12.5px]', on ? 'bg-accent text-white' : 'ring-1 ring-inset ring-border hover:bg-raised')}>{o}</button>;
+                  className={cx('press h-8 rounded-full px-2.5 text-[12.5px]', on ? 'bg-accent text-white' : 'ring-1 ring-inset ring-border hover:bg-raised')}>{o}</button>;
               })}
             </div>
           </Field>
@@ -104,7 +104,7 @@ function EncounterForm({ open, encounter, templates, patientId, appointmentId, o
         <Field key={f.key} label={label}>
           <div className="flex gap-1">{Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
             <button key={n} type="button" disabled={signed} aria-pressed={v === n} onClick={() => setV(sKey, f.key, n)}
-              className={cx('press h-8 flex-1 rounded-[6px] text-xs font-medium tabular-nums', v === n ? 'bg-accent text-white' : 'ring-1 ring-inset ring-border hover:bg-raised')}>{n}</button>))}
+              className={cx('press h-8 flex-1 rounded-lg text-xs font-medium tabular-nums', v === n ? 'bg-accent text-white' : 'ring-1 ring-inset ring-border hover:bg-raised')}>{n}</button>))}
           </div>
         </Field>
       );
@@ -122,7 +122,7 @@ function EncounterForm({ open, encounter, templates, patientId, appointmentId, o
       title={<span className="inline-flex items-center gap-2"><FileSignature className="size-4 text-accent" aria-hidden />{encounter ? (signed ? t('Signed visit note') : t('Visit note (draft)')) : t('New visit note')}</span>}
       footer={signed ? <Button variant="outline" onClick={onClose}>{t('Close')}</Button> : <>
         <Button variant="outline" busy={busy} onClick={() => save(false)}>{t('Save draft')}</Button>
-        <Button variant="accent" busy={busy} onClick={() => save(true)}>{t('Sign')}</Button>
+        <Button busy={busy} onClick={() => save(true)}>{t('Sign')}</Button>
       </>}>
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">

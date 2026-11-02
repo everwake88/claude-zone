@@ -104,7 +104,7 @@ export function Calendar() {
     <div className="space-y-4">
       <PageTitle title={t('Calendar')} finding={title}
         actions={<>
-          <div className="flex items-center rounded-[8px] ring-1 ring-inset ring-border">
+          <div className="flex items-center rounded-xl ring-1 ring-inset ring-border">
             <button onClick={() => setDate(d => addDays(d, -step))} className="press flex size-9 items-center justify-center rounded-s-[8px] text-muted hover:bg-raised" aria-label={t('Back')}><ChevronLeft className="size-4 rtl:rotate-180" /></button>
             <button onClick={() => setDate(today)} className="press h-9 px-2.5 text-[13px] font-medium">{t('Today')}</button>
             <button onClick={() => setDate(d => addDays(d, step))} className="press flex size-9 items-center justify-center rounded-e-[8px] text-muted hover:bg-raised" aria-label={t('Forward')}><ChevronRight className="size-4 rtl:rotate-180" /></button>
@@ -132,7 +132,7 @@ export function Calendar() {
                 return (
                   <div key={c.key} className="sticky top-0 z-10 border-b border-s border-rule bg-sheet px-2 py-2 text-center">
                     {d ? <p className="flex items-center justify-center gap-1.5 truncate text-[13px] font-medium"><DocDot color={d.color} />{docName(d, lang)}</p> : (
-                      <button onClick={() => { setDate(c.date); setView('day'); }} className="mx-auto block rounded-[7px] px-2 hover:bg-raised">
+                      <button onClick={() => { setDate(c.date); setView('day'); }} className="mx-auto block rounded-full px-2 hover:bg-raised">
                         <span className="block text-[11.5px] text-muted">{dayLabel(c.date, tz, { weekday: 'short' })}</span>
                         <span className={cx('mx-auto flex size-7 items-center justify-center rounded-full text-[14px] font-semibold tabular-nums', isToday && 'bg-accent text-white')}>{dayLabel(c.date, tz, { day: 'numeric' })}</span>
                       </button>
@@ -158,11 +158,11 @@ export function Calendar() {
                     {sessions.map((s, i) => (
                       <button key={i} onClick={() => shell.newBooking({ doctorId: s.doctor_id, locationId: s.location_id, date: s.date })}
                         aria-label={t('Book in this session')} title={t('Book in this session')}
-                        className="absolute rounded-[8px] bg-raised ring-1 ring-inset ring-border transition-colors hover:bg-accent-soft/60"
+                        className="absolute rounded-xl bg-raised ring-1 ring-inset ring-border transition-colors hover:bg-accent-soft/60"
                         style={{ ...lane(s.doctor_id), top: ypx(minOf(s.starts_at)), height: ypx(minOf(s.ends_at) || 1440) - ypx(minOf(s.starts_at)) }} />
                     ))}
                     {offs.map(o => (
-                      <div key={o.id} className="hatch absolute rounded-[8px] opacity-70" title={o.reason || t('Time off')}
+                      <div key={o.id} className="hatch absolute rounded-xl opacity-70" title={o.reason || t('Time off')}
                         style={{ ...lane(o.doctor_id), top: ypx(o.start_time ? Number(o.start_time.slice(0, 2)) * 60 + Number(o.start_time.slice(3, 5)) : lo), height: o.start_time && o.end_time ? ((Number(o.end_time.slice(0, 2)) * 60 + Number(o.end_time.slice(3, 5))) - (Number(o.start_time.slice(0, 2)) * 60 + Number(o.start_time.slice(3, 5)))) / 60 * HOUR_PX : ypx(hi) }} />
                     ))}
                     {c.date === today && nowMin >= lo && nowMin <= hi && (
@@ -180,7 +180,7 @@ export function Calendar() {
                           whileDrag={{ scale: 1.03, zIndex: 40, boxShadow: '0 12px 28px -12px rgb(15 23 41 / .45)' }}
                           onDragEnd={(_, info) => startDrop(a, c, info.offset.y, Math.round((lang === 'ar' ? -info.offset.x : info.offset.x) / colW))}
                           title={`${a.patient || ''} · ${clock(a.est_at || a.starts_at, tz)} · ${(lang === 'en' && a.service_en) || a.service || ''}`}
-                          className={cx('group absolute z-10 flex flex-col justify-center overflow-hidden rounded-[7px] border-s-[3px] px-1.5 text-start text-[11.5px] leading-tight',
+                          className={cx('group absolute z-10 flex flex-col justify-center overflow-hidden rounded-full border-s-[3px] px-1.5 text-start text-[11.5px] leading-tight',
                             a.status === 'done' ? 'bg-positive-soft text-positive-ink' : a.status === 'no_show' ? 'bg-critical-soft text-critical-ink line-through' :
                             a.status === 'arrived' ? 'bg-caution-soft text-caution' : a.status === 'in_visit' ? 'bg-accent text-white' : a.status === 'confirmed' ? 'bg-accent-soft text-accent-ink' : 'bg-sheet text-ink ring-1 ring-inset ring-control',
                             movable && 'cursor-grab active:cursor-grabbing')}
@@ -201,7 +201,7 @@ export function Calendar() {
 
       <ApptDrawer appt={open} onClose={() => setOpen(null)} onChanged={refresh} />
       <Dialog open={!!drop} onClose={() => setDrop(null)} title={t('Move this booking?')}
-        footer={<><Button variant="outline" onClick={() => setDrop(null)}>{t('Cancel')}</Button><Button variant="accent" busy={busy} onClick={confirmMove}>{t('Move it')}</Button></>}>
+        footer={<><Button variant="outline" onClick={() => setDrop(null)}>{t('Cancel')}</Button><Button busy={busy} onClick={confirmMove}>{t('Move it')}</Button></>}>
         {drop && (
           <div className="space-y-3">
             <p><b className="font-semibold"><bdi>{drop.a.patient}</bdi></b> {t('to')} <b className="font-semibold">{drop.label}</b></p>
@@ -223,14 +223,14 @@ function AgendaList({ days, appts, onOpen, tz }: { days: string[]; appts: ApptCa
         const list = appts.filter(a => a.session_date === d).sort((x, y) => +new Date(x.est_at || x.starts_at) - +new Date(y.est_at || y.starts_at));
         return (
           <section key={d} className="card overflow-hidden">
-            <h2 className="border-b border-rule bg-raised/60 px-4 py-2 text-[13px] font-semibold">{dayLabel(d, tz)} <span className="font-normal text-muted">· {t('{n} bookings', { n: list.length })}</span></h2>
-            {list.length === 0 ? <p className="px-4 py-3 text-[13px] text-muted">{t('Nothing booked.')}</p> : (
+            <h2 className="border-b border-rule bg-raised/60 px-5 py-2 text-[13px] font-semibold">{dayLabel(d, tz)} <span className="font-normal text-muted">· {t('{n} bookings', { n: list.length })}</span></h2>
+            {list.length === 0 ? <p className="px-5 py-3 text-[13px] text-muted">{t('Nothing booked.')}</p> : (
               <ul className="divide-y divide-rule">
                 {list.map(a => {
                   const doc = doctors.find(x => x.id === a.doctor_id);
                   return (
                     <li key={a.id}>
-                      <button onClick={() => onOpen(a)} className="grid w-full grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-start hover:bg-raised">
+                      <button onClick={() => onOpen(a)} className="grid w-full grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-3 px-5 py-2.5 text-start hover:bg-raised">
                         <span className="text-[13px] font-semibold tabular-nums">{a.queue_no ? `#${a.queue_no}` : clock(a.est_at || a.starts_at, tz)}</span>
                         <span className="min-w-0">
                           <span className="block truncate text-[13.5px] font-medium">{a.patient}</span>

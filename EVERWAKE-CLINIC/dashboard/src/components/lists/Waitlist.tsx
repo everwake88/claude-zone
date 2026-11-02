@@ -41,7 +41,7 @@ export function Waitlist() {
           <ul className="divide-y divide-rule">
             <AnimatePresence initial={false}>
               {data.map(w => (
-                <motion.li key={w.id} layout exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <motion.li key={w.id} layout exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="flex flex-wrap items-center gap-3 px-5 py-3">
                   <Avatar name={w.patient} size={34} />
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 text-[14px] font-medium"><bdi>{w.patient}</bdi>

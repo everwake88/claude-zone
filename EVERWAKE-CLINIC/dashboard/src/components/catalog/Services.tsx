@@ -1,5 +1,5 @@
 'use client';
-import { Bot, EyeOff, FileUp, Plus, Sparkles, Stethoscope, Tag } from 'lucide-react';
+import { Bot, ChevronDown, EyeOff, FileUp, Plus, Sparkles, Stethoscope, Tag } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useMemo, useState } from 'react';
 import { docName, serviceName, useClinic } from '@/lib/clinic-data';
@@ -64,7 +64,7 @@ export function Services() {
         actions={<>
           <Button variant="ghost" onClick={() => setDigest(true)}><Bot className="size-4" aria-hidden />{t('What the assistant reads')}</Button>
           {can.edit && <Button variant="outline" onClick={() => setImporting(true)}><FileUp className="size-4" aria-hidden />{t('Import a price list')}</Button>}
-          {can.edit && <Button variant="accent" onClick={() => setOpen('new')}><Plus className="size-4" aria-hidden />{t('Add a service')}</Button>}
+          {can.edit && <Button onClick={() => setOpen('new')}><Plus className="size-4" aria-hidden />{t('Add a service')}</Button>}
         </>} />
       {docs.length > 1 && (
         <div className="rail -mx-1 overflow-x-auto px-1">
@@ -78,17 +78,11 @@ export function Services() {
       ) : (
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 space-y-5">
-            {groups.map(g => (
-              <Card key={g.key} pad={false} title={t(g.label)} sub={t('{n} services', { n: g.list.length })}>
-                <ul className="divide-y divide-rule">
-                  {g.list.map((s, i) => <ServiceRow key={s.id} s={s} i={i} onOpen={() => setOpen(s)} />)}
-                </ul>
-              </Card>
-            ))}
+            {groups.map((g, gi) => <CategoryCard key={g.key} label={t(g.label)} list={g.list} startOpen={gi === 0} onOpen={setOpen} delay={gi * 50} />)}
           </div>
           <div className="min-w-0 space-y-5">
             <Offers />
-            <p className="rounded-[10px] bg-raised px-4 py-3 text-[13px] leading-relaxed text-muted ring-1 ring-inset ring-border">
+            <p className="rounded-2xl bg-raised px-5 py-3 text-[13px] leading-relaxed text-muted ring-1 ring-inset ring-border">
               <Sparkles className="me-1.5 inline size-4 text-accent" aria-hidden />
               {t('Change a price here and the next patient who asks hears the new one. You can also change prices from your own WhatsApp: “ارفع سعر التنضيف لـ 700”.')}
             </p>
@@ -100,6 +94,35 @@ export function Services() {
       <ImportDrawer open={importing} onClose={() => setImporting(false)} />
       <DigestDrawer open={digest} onClose={() => setDigest(false)} />
     </div>
+  );
+}
+
+// a category folds to one line: its name, how many services, and the price range
+function CategoryCard({ label, list, startOpen, onOpen, delay }: { label: string; list: Service[]; startOpen: boolean; onOpen: (s: Service) => void; delay: number }) {
+  const { tenant } = useTenant();
+  const { t } = useLang();
+  const [open, setOpen] = useState(startOpen);
+  const priced = list.map(s => [s.price, s.price_max]).flat().filter((x): x is number => x != null && x > 0);
+  const range = priced.length ? (Math.min(...priced) === Math.max(...priced) ? money(Math.min(...priced), tenant.currency_symbol)
+    : `${money(Math.min(...priced), tenant.currency_symbol)} – ${money(Math.max(...priced), tenant.currency_symbol)}`) : null;
+  return (
+    <section className="card c-rise overflow-hidden" style={{ animationDelay: `${delay}ms` }}>
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex w-full items-center gap-3 px-5 py-4 text-start hover:bg-raised/60">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">{label}</span>
+          <span className="block text-[12.5px] text-faint">{t('{n} services', { n: list.length })}{range ? ` · ${range}` : ''}</span>
+        </span>
+        <ChevronDown className={cx('size-5 shrink-0 text-faint transition-transform duration-300 ease-[var(--ease-out)]', open && 'rotate-180')} aria-hidden />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.ul initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }} className="divide-y divide-rule overflow-hidden border-t border-rule">
+            {list.map((s, i) => <ServiceRow key={s.id} s={s} i={i} onOpen={() => onOpen(s)} />)}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </section>
   );
 }
 
@@ -126,7 +149,7 @@ function ServiceRow({ s, i, onOpen }: { s: Service; i: number; onOpen: () => voi
   };
   return (
     <li className="c-rise" style={{ animationDelay: `${Math.min(i, 12) * 16}ms` }}>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3">
         <button onClick={onOpen} className="min-w-0 text-start">
           <span className="flex items-center gap-2 text-[14px] font-medium">
             <span className="truncate"><bdi>{serviceName(s, lang)}</bdi></span>
@@ -144,7 +167,7 @@ function ServiceRow({ s, i, onOpen }: { s: Service; i: number; onOpen: () => voi
         <div className="text-end">
           {edit ? null : (
             <button onClick={() => can.edit && setEdit(true)} disabled={!can.edit}
-              className={cx('press rounded-[7px] px-2 py-1 text-[14px] font-semibold tabular-nums hover:bg-raised', noPrice && 'text-caution')}>
+              className={cx('press rounded-full px-3 py-1 text-[13.5px] font-semibold tabular-nums ring-1 ring-inset', noPrice ? 'bg-caution-soft text-caution ring-caution-line' : 'bg-raised ring-border hover:bg-sunk/70')}>
               {noPrice ? t('Add a price') : priceText(s.price_kind, s.price, s.price_max, s.price_unit, sym)}
             </button>
           )}
@@ -155,14 +178,14 @@ function ServiceRow({ s, i, onOpen }: { s: Service; i: number; onOpen: () => voi
         {edit && (
           <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
             className="overflow-hidden" onSubmit={e => { e.preventDefault(); save(); }}>
-            <div className="flex flex-wrap items-center gap-2 border-t border-rule bg-raised/70 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2 border-t border-rule bg-raised/70 px-5 py-3">
               <Segmented label={`kind-${s.id}`} size="sm" value={kind} onChange={setKind} options={KINDS.map(k => ({ value: k.value, label: t(k.label) }))} />
               {!['after_exam', 'free'].includes(kind) && <Input autoFocus inputMode="numeric" aria-label={t('Price')} value={p} onChange={e => setP(e.target.value.replace(/[^\d.]/g, ''))} className="!w-24 tabular-nums" placeholder={t('Price')} />}
               {kind === 'range' && <><span className="text-muted">–</span><Input inputMode="numeric" aria-label={t('Up to')} value={mx} onChange={e => setMx(e.target.value.replace(/[^\d.]/g, ''))} className="!w-24 tabular-nums" placeholder={t('Up to')} /></>}
               <span className="text-[13px] text-muted">{sym}</span>
               <span className="ms-auto flex gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setEdit(false)}>{t('Cancel')}</Button>
-                <Button size="sm" variant="accent" type="submit" busy={busy}>{t('Save')}</Button>
+                <Button size="sm" type="submit" busy={busy}>{t('Save')}</Button>
               </span>
             </div>
           </motion.form>
@@ -198,7 +221,7 @@ function Offers() {
       action={can.edit && !adding ? <Button size="sm" variant="ghost" onClick={() => setAdding(true)}><Plus className="size-3.5" aria-hidden />{t('Add')}</Button> : undefined}>
       <ul className="divide-y divide-rule">
         {live.map(o => (
-          <li key={o.id} className="flex items-start gap-3 px-4 py-3">
+          <li key={o.id} className="flex items-start gap-3 px-5 py-3">
             <div className="min-w-0 flex-1">
               <p className="text-[13.5px] font-medium"><bdi>{o.title_ar}</bdi></p>
               <p className="text-xs text-muted">
@@ -207,17 +230,17 @@ function Offers() {
                 {o.ends_at ? ` · ${t('until {d}', { d: dateShort(o.ends_at, tenant.timezone) })}` : ''}
               </p>
             </div>
-            {can.edit && <button onClick={() => end(o)} className="press shrink-0 rounded-[6px] px-2 py-1 text-xs text-muted ring-1 ring-inset ring-border hover:bg-raised">{t('End')}</button>}
+            {can.edit && <button onClick={() => end(o)} className="press shrink-0 rounded-lg px-2 py-1 text-xs text-muted ring-1 ring-inset ring-border hover:bg-raised">{t('End')}</button>}
           </li>
         ))}
-        {!live.length && !adding && <li className="px-4 py-3 text-[13px] text-muted">{t('No offers running.')}</li>}
+        {!live.length && !adding && <li className="px-5 py-3 text-[13px] text-muted">{t('No offers running.')}</li>}
       </ul>
       {adding && (
         <form className="c-fade space-y-2 border-t border-rule bg-raised/60 p-3" onSubmit={e => { e.preventDefault(); if (title.trim()) add(); }}>
           <Input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="خصم 20% على التبييض" aria-label={t('Offer')} />
           <div className="flex gap-2">
             <Input inputMode="numeric" value={value} onChange={e => setValue(e.target.value.replace(/\D/g, ''))} placeholder="%" aria-label={t('Percent off')} className="!w-16" />
-            <select value={svc} onChange={e => setSvc(e.target.value)} aria-label={t('Service')} className="h-9 min-w-0 flex-1 rounded-[7px] border border-control bg-sheet px-2 text-sm">
+            <select value={svc} onChange={e => setSvc(e.target.value)} aria-label={t('Service')} className="h-9 min-w-0 flex-1 rounded-full border border-control bg-sheet px-2 text-sm">
               <option value="">{t('Any service')}</option>
               {services.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{serviceName(s, lang)}</option>)}
             </select>
@@ -225,7 +248,7 @@ function Offers() {
           <div className="flex items-center gap-2">
             <Input type="date" value={ends} onChange={e => setEnds(e.target.value)} aria-label={t('Ends on')} className="flex-1" />
             <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>{t('Cancel')}</Button>
-            <Button size="sm" variant="accent" type="submit" busy={busy}>{t('Add')}</Button>
+            <Button size="sm" type="submit" busy={busy}>{t('Add')}</Button>
           </div>
         </form>
       )}
@@ -244,7 +267,7 @@ function DigestDrawer({ open, onClose }: { open: boolean; onClose: () => void })
   return (
     <Drawer open={open} onClose={onClose} width="max-w-[620px]" title={<span className="inline-flex items-center gap-2"><Stethoscope className="size-4 text-accent" aria-hidden />{t('What the assistant reads')}</span>}>
       <p className="mb-3 text-[13px] text-muted">{t('Before every reply the assistant reads this, built from your services, prices, offers, answers and rules. It quotes prices only from here.')}</p>
-      {!data ? <Skeleton className="h-96" /> : <pre dir="rtl" className="whitespace-pre-wrap rounded-[10px] bg-raised p-4 font-sans text-[13px] leading-relaxed ring-1 ring-inset ring-border">{data.digest}</pre>}
+      {!data ? <Skeleton className="h-96" /> : <pre dir="rtl" className="whitespace-pre-wrap rounded-2xl bg-raised p-4 font-sans text-[13px] leading-relaxed ring-1 ring-inset ring-border">{data.digest}</pre>}
     </Drawer>
   );
 }

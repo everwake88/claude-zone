@@ -95,10 +95,10 @@ export function ApptDrawer({ appt, onClose, onChanged }: { appt: ApptCard | null
       <Drawer open={!!appt} onClose={onClose} title={<span className="flex items-center gap-2">{t('Appointment')} <span className="text-[13px] font-normal text-muted tabular-nums" dir="ltr">{a.ref_no}</span></span>}
         footer={moving ? <>
           <Button variant="outline" onClick={() => setMoving(false)}>{t('Back')}</Button>
-          <Button variant="accent" busy={busy} disabled={!slot} onClick={move}>{t('Move it')}</Button>
+          <Button busy={busy} disabled={!slot} onClick={move}>{t('Move it')}</Button>
         </> : live ? <>
           {a.status === 'booked' && <Button variant="outline" busy={busy} onClick={() => step('confirmed', t('Marked as confirmed.'))}><Check className="size-4" aria-hidden />{t('Confirmed by phone')}</Button>}
-          {next && <Button variant="accent" busy={busy} onClick={() => step(next.status, next.said)}>{next.label}</Button>}
+          {next && <Button busy={busy} onClick={() => step(next.status, next.said)}>{next.label}</Button>}
         </> : (a.status === 'done' || a.status === 'no_show') ? <Button variant="outline" busy={busy} onClick={() => set(a.status === 'done' ? 'in_visit' : 'booked', t('Undone.'))}>{t('Undo')}</Button> : undefined}>
         {moving ? (
           <div className="space-y-4">
@@ -126,7 +126,7 @@ export function ApptDrawer({ appt, onClose, onChanged }: { appt: ApptCard | null
               </div>
             </div>
             {a.allergies && a.allergies.length > 0 && (
-              <p className="flex flex-wrap items-center gap-1.5 rounded-[9px] bg-critical-soft px-3 py-2 text-[13px] text-critical-ink">
+              <p className="flex flex-wrap items-center gap-1.5 rounded-xl bg-critical-soft px-3 py-2 text-[13px] text-critical-ink">
                 <AlertTriangle className="size-4 shrink-0" aria-hidden /><b className="font-semibold">{t('Allergic to')}</b>{a.allergies.join('، ')}
               </p>
             )}
@@ -159,13 +159,13 @@ export function ApptDrawer({ appt, onClose, onChanged }: { appt: ApptCard | null
               <dt className="text-muted">{t('Booked')}</dt><dd>{t(SOURCE[a.source] || a.source)}{a.created_at ? <span className="text-muted"> · {timeAgo(a.created_at)}</span> : null}</dd>
               {a.delay_reply && <><dt className="text-muted">{t('Delay')}</dt><dd className={a.delay_reply === 'accepted' ? 'text-positive' : 'text-caution'}>{t(DELAY_REPLY[a.delay_reply] || a.delay_reply)}</dd></>}
             </dl>
-            {a.reason && <blockquote className="rounded-[9px] bg-raised px-3 py-2.5 text-[13.5px] leading-relaxed" dir="auto">“{a.reason}”</blockquote>}
+            {a.reason && <blockquote className="rounded-xl bg-raised px-3 py-2.5 text-[13.5px] leading-relaxed" dir="auto">“{a.reason}”</blockquote>}
             {a.staff_notes && <p className="text-[13px] text-muted"><FileText className="me-1 inline size-3.5" aria-hidden />{a.staff_notes}</p>}
 
             {/* reach them */}
             <div className="flex flex-wrap gap-2">
-              {a.conversation_id && <Link href={`${base}/inbox?c=${a.conversation_id}`} className="press inline-flex h-8 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] ring-1 ring-inset ring-border hover:bg-raised"><MessageCircle className="size-4 text-positive" aria-hidden />{t('Chat')}</Link>}
-              {a.phone && <a href={`tel:+${a.phone}`} className="press inline-flex h-8 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] ring-1 ring-inset ring-border hover:bg-raised"><Phone className="size-4 text-muted" aria-hidden /><bdi dir="ltr">{fmtPhone(a.phone)}</bdi></a>}
+              {a.conversation_id && <Link href={`${base}/inbox?c=${a.conversation_id}`} className="press inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] ring-1 ring-inset ring-border hover:bg-raised"><MessageCircle className="size-4 text-positive" aria-hidden />{t('Chat')}</Link>}
+              {a.phone && <a href={`tel:+${a.phone}`} className="press inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] ring-1 ring-inset ring-border hover:bg-raised"><Phone className="size-4 text-muted" aria-hidden /><bdi dir="ltr">{fmtPhone(a.phone)}</bdi></a>}
             </div>
 
             {(a.status === 'booked' || a.status === 'confirmed') && (

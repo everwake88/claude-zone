@@ -49,10 +49,10 @@ export default function NewClinic() {
     const on = spec === p.code;
     return (
       <button key={p.code} type="button" onClick={() => setSpec(p.code)} aria-pressed={on}
-        className={cx('press flex min-h-10 items-center justify-between gap-2 rounded-[8px] border px-3 py-2 text-start text-[13px]',
-          on ? 'border-accent bg-accent-soft font-medium text-accent-ink' : 'border-border bg-sheet text-ink hover:border-control hover:bg-raised')}>
+        className={cx('press flex min-h-10 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-start text-[13px]',
+          on ? 'border-accent bg-accent-soft font-medium text-gold-ink-ink' : 'border-border bg-sheet text-ink hover:border-control hover:bg-raised')}>
         <span className="min-w-0 leading-snug">{lang === 'ar' ? p.name_ar : p.name_en}</span>
-        {on && <Check className="c-pop size-4 shrink-0" aria-hidden />}
+        {on && <Check className="c-pop size-4 shrink-0 text-gold-bright" aria-hidden />}
       </button>
     );
   };
@@ -61,14 +61,14 @@ export default function NewClinic() {
     <main className="relative min-h-dvh px-4 py-10">
       <LangSwitch className="absolute end-4 top-4" />
       <form onSubmit={create} className="c-rise mx-auto w-full max-w-2xl">
-        <div className="mb-5 flex items-center gap-3 px-1">
-          <Mark />
+        <div className="mb-6 flex items-center gap-4 px-1">
+          <span className="rounded-2xl bg-navy p-2.5"><Mark size={40} /></span>
           <div>
             <h1 className="text-[20px] font-semibold leading-tight">{t('Sign up your clinic')}</h1>
             <p className="text-[13px] text-muted">{t('A checklist walks you through the rest. Nothing reaches patients until you say so.')}</p>
           </div>
         </div>
-        <div className="sheet space-y-6 p-6">
+        <div className="card space-y-6 p-6 sm:p-7">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('Clinic name in Arabic')}><Input dir="rtl" required value={nameAr} onChange={e => setNameAr(e.target.value)} placeholder="عيادات النيل" /></Field>
             <Field label={t('Clinic name in English')} hint={t('Also used for the clinic’s web address.')}>
@@ -101,9 +101,9 @@ export default function NewClinic() {
             )}
           </div>
 
-          {err && <p role="alert" className="rounded-[7px] bg-critical-soft px-3 py-2 text-sm text-critical-ink">{err}</p>}
+          {err && <p role="alert" className="rounded-full bg-critical-soft px-3 py-2 text-sm text-critical-ink">{err}</p>}
           <div className="flex justify-end">
-            <Button type="submit" variant="accent" busy={busy}>{t('Create the clinic')}</Button>
+            <Button type="submit" busy={busy}>{t('Create the clinic')}</Button>
           </div>
         </div>
       </form>

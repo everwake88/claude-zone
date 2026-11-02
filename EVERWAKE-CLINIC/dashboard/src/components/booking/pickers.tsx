@@ -19,8 +19,8 @@ export function ChipPick<T extends { id: string }>({ items, value, onChange, lab
         const on = x.id === value;
         return (
           <button key={x.id} type="button" role="radio" aria-checked={on} onClick={() => onChange(x.id)}
-            className={cx('press relative inline-flex h-9 items-center gap-2 rounded-[8px] px-3 text-[13px]', on ? 'font-medium text-accent-ink' : 'text-ink ring-1 ring-inset ring-border hover:bg-raised')}>
-            {on && <motion.span layoutId={`chip-${layout}`} className="absolute inset-0 rounded-[8px] bg-accent-soft ring-1 ring-inset ring-accent/40"
+            className={cx('press relative inline-flex h-9 items-center gap-2 rounded-xl px-3 text-[13px]', on ? 'font-medium text-gold-ink-ink' : 'text-ink ring-1 ring-inset ring-border hover:bg-raised')}>
+            {on && <motion.span layoutId={`chip-${layout}`} className="absolute inset-0 rounded-xl bg-accent-soft ring-1 ring-inset ring-accent/40"
                                 transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }} />}
             <span className="relative inline-flex items-center gap-2">{render(x)}{on && <Check className="size-3.5" aria-hidden />}</span>
           </button>

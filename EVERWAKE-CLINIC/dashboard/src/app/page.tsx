@@ -39,7 +39,7 @@ export default async function Home() {
             <span className="shrink-0 text-sm text-muted">{t(c.role)}</span>
           </Link>
         ))}
-        <Link href="/new" className="block px-5 py-3.5 text-sm font-medium text-accent hover:bg-raised">+ {t('Sign up another clinic')}</Link>
+        <Link href="/new" className="block px-5 py-3.5 text-sm font-medium text-gold-ink hover:bg-raised">+ {t('Sign up another clinic')}</Link>
       </div>
     </main>
   );

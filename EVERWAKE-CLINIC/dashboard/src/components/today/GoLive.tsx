@@ -49,7 +49,7 @@ export function GoLive() {
         <div className="h-1.5 w-40 overflow-hidden rounded-full bg-rule max-sm:w-full">
           <span className="c-bar block h-full rounded-full bg-accent" style={{ width: `${(done / c.items.length) * 100}%` }} />
         </div>
-        {can.owner && <Button variant="accent" disabled={!c.ready} busy={busy} onClick={live}><Rocket className="size-4" aria-hidden />{t('Go live')}</Button>}
+        {can.owner && <Button disabled={!c.ready} busy={busy} onClick={live}><Rocket className="size-4" aria-hidden />{t('Go live')}</Button>}
       </div>
       <ol className="grid border-t border-rule sm:grid-cols-2 lg:grid-cols-4">
         {c.items.map((i, n) => (

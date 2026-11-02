@@ -1,5 +1,5 @@
 'use client';
-import { AlertTriangle, ArrowLeft, CalendarPlus, FileText, Lock, MessageCircle, Pencil, Phone, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarPlus, FileText, Lock, MessageCircle, Mic, Pencil, Phone, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useClinic } from '@/lib/clinic-data';
@@ -24,7 +24,7 @@ type Tab = 'overview' | 'visits' | 'dental' | 'files' | 'appointments';
 // One patient: who they are and how to reach them, what the doctor must not miss (allergies first),
 // their visits, their teeth when the clinic has a dentist, their files, and every appointment.
 export function PatientProfile({ id }: { id: number }) {
-  const { tenant, base } = useTenant();
+  const { tenant, base, can } = useTenant();
   const { t, lang } = useLang();
   const shell = useShell();
   const { doctors } = useClinic();
@@ -47,6 +47,9 @@ export function PatientProfile({ id }: { id: number }) {
   const now = Date.now();
   const upcoming = p.appointments.filter(a => ['booked', 'confirmed', 'held'].includes(a.status) && +new Date(a.ends_at) > now).reverse();
   const activeAllergies = (p.allergies || []).filter(a => a.status === 'active');
+  // today's visit, to open the visit workspace on
+  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+  const visitAppt = p.appointments.find(a => a.session_date === todayKey && ['arrived', 'in_visit', 'confirmed', 'booked'].includes(a.status));
   const wa = p.contacts.find(c => c.conversation_id);
   const tabs: { value: Tab; label: string }[] = [
     { value: 'overview', label: t('Overview') }, { value: 'visits', label: t('Visits') },
@@ -59,7 +62,7 @@ export function PatientProfile({ id }: { id: number }) {
       <Link href={`${base}/patients`} className="inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" aria-hidden />{t('Patients')}</Link>
 
       {/* who */}
-      <header className="flex flex-wrap items-start gap-4">
+      <header className="card c-rise flex flex-wrap items-start gap-4 p-5 sm:p-6">
         <Avatar name={pt.full_name} size={56} />
         <div className="min-w-0 flex-1">
           <h1 className="text-[22px] font-semibold leading-tight">{pt.full_name}</h1>
@@ -80,15 +83,18 @@ export function PatientProfile({ id }: { id: number }) {
           )}
         </div>
         <div className="flex flex-wrap gap-2 max-sm:w-full">
-          {pt.phone && <a href={`tel:+${pt.phone}`} className="press inline-flex h-9 items-center gap-1.5 rounded-[7px] px-3 text-[13px] ring-1 ring-inset ring-control hover:bg-raised"><Phone className="size-4 text-muted" aria-hidden /><bdi dir="ltr">{fmtPhone(pt.phone)}</bdi></a>}
-          {wa && <Link href={`${base}/inbox?c=${wa.conversation_id}`} className="press inline-flex h-9 items-center gap-1.5 rounded-[7px] px-3 text-[13px] ring-1 ring-inset ring-control hover:bg-raised"><MessageCircle className="size-4 text-positive" aria-hidden />{t('Chat')}</Link>}
+          {pt.phone && <a href={`tel:+${pt.phone}`} className="press inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] ring-1 ring-inset ring-control hover:bg-raised"><Phone className="size-4 text-muted" aria-hidden /><bdi dir="ltr">{fmtPhone(pt.phone)}</bdi></a>}
+          {wa && <Link href={`${base}/inbox?c=${wa.conversation_id}`} className="press inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] ring-1 ring-inset ring-control hover:bg-raised"><MessageCircle className="size-4 text-positive" aria-hidden />{t('Chat')}</Link>}
           <Button variant="ghost" onClick={() => setEdit(true)}><Pencil className="size-4" aria-hidden />{t('Details')}</Button>
-          <Button variant="accent" onClick={() => shell.newBooking({ patientId: pt.id, patientName: pt.full_name })}><CalendarPlus className="size-4" aria-hidden />{t('Book')}</Button>
+          {visitAppt && can.clinical
+            ? <Link href={`${base}/visit/${visitAppt.id}`} className="press inline-flex h-10 items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-semibold text-navy hover:bg-gold-bright"><Mic className="size-4" aria-hidden />{t('Start visit')}</Link>
+            : null}
+          <Button onClick={() => shell.newBooking({ patientId: pt.id, patientName: pt.full_name })}><CalendarPlus className="size-4" aria-hidden />{t('Book')}</Button>
         </div>
       </header>
 
       {upcoming[0] && (
-        <button onClick={() => setOpen(upcoming[0])} className="lift flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-[10px] bg-accent-soft px-4 py-2.5 text-start text-[13.5px] text-accent-ink ring-1 ring-inset ring-accent-track">
+        <button onClick={() => setOpen(upcoming[0])} className="lift flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-accent-soft px-5 py-2.5 text-start text-[13.5px] text-accent-ink ring-1 ring-inset ring-accent-track">
           <span className="font-semibold">{t('Next visit')}</span>
           <span>{dateShort(upcoming[0].est_at || upcoming[0].starts_at, tz)} · {clock(upcoming[0].est_at || upcoming[0].starts_at, tz)}</span>
           <span className="text-accent-ink/80"><bdi>{(lang === 'en' && upcoming[0].service_en) || upcoming[0].service}</bdi></span>
@@ -99,7 +105,7 @@ export function PatientProfile({ id }: { id: number }) {
       <div className="rail -mx-1 overflow-x-auto px-1"><Segmented label="patient-tab" value={tab} onChange={setTab} options={tabs} /></div>
 
       {!p.clinical && tab !== 'appointments' && (
-        <p className="flex items-center gap-2 rounded-[10px] bg-raised px-4 py-3 text-[13px] text-muted ring-1 ring-inset ring-border">
+        <p className="flex items-center gap-2 rounded-2xl bg-raised px-5 py-3 text-[13px] text-muted ring-1 ring-inset ring-border">
           <Lock className="size-4 shrink-0 text-faint" aria-hidden />{t('Medical records are for the doctors and nurses. You can see the patient’s details and appointments.')}
         </p>
       )}
@@ -135,7 +141,7 @@ export function PatientProfile({ id }: { id: number }) {
               <ul className="divide-y divide-rule">
                 {p.appointments.map(a => (
                   <li key={a.id}>
-                    <button onClick={() => setOpen(a)} className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-start hover:bg-raised">
+                    <button onClick={() => setOpen(a)} className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 py-2.5 text-start hover:bg-raised">
                       <span className="min-w-0">
                         <span className="block text-[13.5px] font-medium">{dateShort(a.est_at || a.starts_at, tz)} · {clock(a.est_at || a.starts_at, tz)}</span>
                         <span className="block truncate text-xs text-muted"><bdi>{(lang === 'en' && a.service_en) || a.service || '—'}</bdi>{a.price_text ? ` · ${a.price_text}` : ''}</span>
@@ -173,7 +179,7 @@ function Family({ p }: { p: Profile }) {
           </li>
         ))}
         {p.family.map(f => (
-          <li key={f.id}><Link href={`${base}/patients/${f.id}`} className="text-accent hover:underline"><bdi>{f.full_name}</bdi></Link> <span className="text-xs text-muted">· {t('same WhatsApp number')}</span></li>
+          <li key={f.id}><Link href={`${base}/patients/${f.id}`} className="text-gold-ink hover:underline"><bdi>{f.full_name}</bdi></Link> <span className="text-xs text-muted">· {t('same WhatsApp number')}</span></li>
         ))}
       </ul>
     </Card>
@@ -191,12 +197,12 @@ function Files({ p }: { p: Profile }) {
       {docs.map(d => (
         <article key={d.id} className="card p-4">
           <header className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-[8px] bg-raised ring-1 ring-inset ring-border"><FileText className="size-4 text-muted" aria-hidden /></span>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-raised ring-1 ring-inset ring-border"><FileText className="size-4 text-muted" aria-hidden /></span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-medium"><bdi>{d.title || t(DOC_KIND[d.kind] || 'File')}</bdi></p>
               <p className="text-xs text-muted">{t(DOC_KIND[d.kind] || 'File')} · {d.source === 'whatsapp' ? t('from WhatsApp') : t('uploaded')} · {dateShort(d.created_at, tenant.timezone)}</p>
             </div>
-            {d.url && <a href={d.url} target="_blank" rel="noreferrer" className="text-[13px] font-medium text-accent hover:underline">{t('Open')}</a>}
+            {d.url && <a href={d.url} target="_blank" rel="noreferrer" className="text-[13px] font-medium text-gold-ink hover:underline">{t('Open')}</a>}
           </header>
           {d.ai_summary && <p className="mt-3 text-[13px] leading-relaxed"><bdi>{d.ai_summary}</bdi></p>}
           {d.ai_values && d.ai_values.length > 0 && (

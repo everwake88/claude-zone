@@ -51,7 +51,7 @@ export function DoctorsSection() {
   if (!ready) return <Skeleton className="h-64" />;
   return (
     <>
-      <div className="mb-4 flex justify-end"><Button variant="accent" onClick={() => setOpen('new')}><UserPlus className="size-4" aria-hidden />{t('Add a doctor')}</Button></div>
+      <div className="mb-4 flex justify-end"><Button onClick={() => setOpen('new')}><UserPlus className="size-4" aria-hidden />{t('Add a doctor')}</Button></div>
       <div className="grid gap-3 sm:grid-cols-2">
         {doctors.map(d => (
           <button key={d.id} onClick={() => setOpen(d)} className={cx('card lift flex items-start gap-3 p-4 text-start', !d.is_active && 'opacity-60')}>
@@ -94,7 +94,7 @@ function DoctorDrawer({ doctor, open, onClose, presets }: { doctor: Doctor | nul
   };
   return (
     <Drawer open={open} onClose={onClose} title={doctor ? docName(doctor, lang) : t('Add a doctor')}
-      footer={<><Button variant="outline" onClick={onClose}>{t('Cancel')}</Button><Button variant="accent" busy={busy} disabled={!f.name_ar?.trim()} onClick={submit}>{t('Save')}</Button></>}>
+      footer={<><Button variant="outline" onClick={onClose}>{t('Cancel')}</Button><Button busy={busy} disabled={!f.name_ar?.trim()} onClick={submit}>{t('Save')}</Button></>}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('Name in Arabic')}><Input dir="rtl" value={f.name_ar || ''} onChange={e => set('name_ar', e.target.value)} placeholder="منى عادل" /></Field>
         <Field label={t('Name in English')}><Input dir="ltr" value={f.name_en || ''} onChange={e => set('name_en', e.target.value)} placeholder="Mona Adel" /></Field>
@@ -109,8 +109,8 @@ function DoctorDrawer({ doctor, open, onClose, presets }: { doctor: Doctor | nul
         <Field label={t('Colour on the calendar')} className="sm:col-span-2">
           <div className="flex flex-wrap gap-2">{COLORS.map(c => <button key={c} type="button" onClick={() => set('color', c)} aria-label={c} aria-pressed={f.color === c} className={cx('press size-8 rounded-full ring-2 ring-offset-2 ring-offset-sheet', f.color === c ? 'ring-ink' : 'ring-transparent')} style={{ background: c }} />)}</div>
         </Field>
-        <label className="flex items-center justify-between gap-3 rounded-[9px] px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border">{t('Takes new patients')}<Switch checked={!!f.accepts_new} onChange={v => set('accepts_new', v)} label={t('Takes new patients')} /></label>
-        <label className="flex items-center justify-between gap-3 rounded-[9px] px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border">{t('Working now')}<Switch checked={!!f.is_active} onChange={v => set('is_active', v)} label={t('Working now')} /></label>
+        <label className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border">{t('Takes new patients')}<Switch checked={!!f.accepts_new} onChange={v => set('accepts_new', v)} label={t('Takes new patients')} /></label>
+        <label className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-[13.5px] ring-1 ring-inset ring-border">{t('Working now')}<Switch checked={!!f.is_active} onChange={v => set('is_active', v)} label={t('Working now')} /></label>
         {!doctor && <div className="sm:col-span-2"><Checkbox checked={starter} onChange={setStarter} label={t('Add the speciality’s usual services (prices left for you)')} /></div>}
       </div>
     </Drawer>
@@ -128,7 +128,7 @@ export function LocationsSection() {
   if (!ready) return <Skeleton className="h-64" />;
   return (
     <>
-      <div className="mb-4 flex justify-end"><Button variant="accent" onClick={() => setOpen('new')}><Plus className="size-4" aria-hidden />{t('Add a location')}</Button></div>
+      <div className="mb-4 flex justify-end"><Button onClick={() => setOpen('new')}><Plus className="size-4" aria-hidden />{t('Add a location')}</Button></div>
       <div className="space-y-4">
         {locations.map(l => (
           <Card key={l.id} title={<span className="inline-flex items-center gap-2"><MapPin className="size-4 text-accent" aria-hidden />{placeName(l, lang)}</span>}
@@ -176,7 +176,7 @@ function LocationDrawer({ loc, open, onClose }: { loc: Location | null; open: bo
   };
   return (
     <Drawer open={open} onClose={onClose} title={loc ? loc.name_ar : t('Add a location')}
-      footer={<><Button variant="outline" onClick={onClose}>{t('Cancel')}</Button><Button variant="accent" busy={busy} disabled={!f.name_ar?.trim()} onClick={submit}>{t('Save')}</Button></>}>
+      footer={<><Button variant="outline" onClick={onClose}>{t('Cancel')}</Button><Button busy={busy} disabled={!f.name_ar?.trim()} onClick={submit}>{t('Save')}</Button></>}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('Name in Arabic')}><Input dir="rtl" value={f.name_ar || ''} onChange={set('name_ar')} placeholder="المعادي" /></Field>
         <Field label={t('Name in English')}><Input dir="ltr" value={f.name_en || ''} onChange={set('name_en')} placeholder="Maadi" /></Field>
@@ -223,11 +223,11 @@ export function SchedulesSection() {
           {WEEK.map(w => {
             const rows = mine.filter(s => s.weekday === w);
             return (
-              <li key={w} className="grid gap-2 px-4 py-3 sm:grid-cols-[88px_minmax(0,1fr)]">
+              <li key={w} className="grid gap-2 px-5 py-3 sm:grid-cols-[88px_minmax(0,1fr)]">
                 <span className="pt-1.5 text-[13.5px] font-medium">{t(DAY_LABEL[w])}</span>
                 <div className="space-y-2">
                   {rows.map(s => (
-                    <div key={s.id} className={cx('flex flex-wrap items-center gap-2 rounded-[9px] bg-raised p-2 ring-1 ring-inset ring-border', !s.is_active && 'opacity-60')}>
+                    <div key={s.id} className={cx('flex flex-wrap items-center gap-2 rounded-xl bg-raised p-2 ring-1 ring-inset ring-border', !s.is_active && 'opacity-60')}>
                       <Select aria-label={t('Location')} value={s.location_id} onChange={e => upd(s, { location_id: e.target.value })} className="!h-8 !w-36">{locations.map(l => <option key={l.id} value={l.id}>{placeName(l, lang)}</option>)}</Select>
                       <Input type="time" aria-label={t('From')} defaultValue={s.start_time.slice(0, 5)} onBlur={e => e.target.value !== s.start_time.slice(0, 5) && upd(s, { start_time: e.target.value })} className="!h-8 !w-[124px]" />
                       <span className="text-muted">–</span>
@@ -237,10 +237,10 @@ export function SchedulesSection() {
                       </Select>
                       {s.mode !== 'slots' && <Input inputMode="numeric" aria-label={t('Places in the queue')} title={t('Places in the queue')} defaultValue={s.capacity ?? ''} onBlur={e => upd(s, { capacity: Number(e.target.value) || null })} className="!h-8 !w-16" placeholder="20" />}
                       <label className="ms-auto inline-flex items-center gap-2 text-xs text-muted">{t('On WhatsApp')}<Switch checked={s.online_booking} onChange={v => upd(s, { online_booking: v })} label={t('On WhatsApp')} /></label>
-                      <button onClick={() => remove('schedules', s.id)} className="press rounded-[6px] p-1.5 text-muted hover:bg-active hover:text-critical" aria-label={t('Remove')}><Trash2 className="size-4" /></button>
+                      <button onClick={() => remove('schedules', s.id)} className="press rounded-lg p-1.5 text-muted hover:bg-active hover:text-critical" aria-label={t('Remove')}><Trash2 className="size-4" /></button>
                     </div>
                   ))}
-                  <button onClick={() => add(w)} disabled={busy || !doctor} className="press inline-flex h-8 items-center gap-1.5 rounded-[7px] px-2 text-[13px] text-accent hover:bg-raised">
+                  <button onClick={() => add(w)} disabled={busy || !doctor} className="press inline-flex h-8 items-center gap-1.5 rounded-full px-2 text-[13px] text-accent hover:bg-raised">
                     <Plus className="size-3.5" aria-hidden />{rows.length ? t('Another session') : t('Add a session')}
                   </button>
                 </div>
@@ -252,13 +252,13 @@ export function SchedulesSection() {
       <Card pad={false} title={t('Days off and changes')} action={<Button size="sm" variant="outline" onClick={() => shell.blockTime(doctor)}><CalendarOff className="size-4" aria-hidden />{t('Block time')}</Button>}>
         <ul className="divide-y divide-rule">
           {(offs || []).map(o => (
-            <li key={o.id} className="flex items-center gap-3 px-4 py-2.5 text-[13.5px]">
+            <li key={o.id} className="flex items-center gap-3 px-5 py-2.5 text-[13.5px]">
               <span className="w-28 font-medium">{dateShort(o.on_date, tenant.timezone)}</span>
               <span className="min-w-0 flex-1 text-muted">{t(o.kind === 'off' ? 'Off' : o.kind === 'extra' ? 'Extra session' : 'Changed hours')}{o.start_time ? ` · ${o.start_time.slice(0, 5)}–${(o.end_time || '').slice(0, 5)}` : ` · ${t('all day')}`}{o.reason ? <> · <bdi>{o.reason}</bdi></> : null}</span>
-              <button onClick={async () => { await remove('schedule_exceptions', o.id); refresh(); }} className="press rounded-[6px] p-1.5 text-muted hover:bg-raised hover:text-critical" aria-label={t('Remove')}><Trash2 className="size-4" /></button>
+              <button onClick={async () => { await remove('schedule_exceptions', o.id); refresh(); }} className="press rounded-lg p-1.5 text-muted hover:bg-raised hover:text-critical" aria-label={t('Remove')}><Trash2 className="size-4" /></button>
             </li>
           ))}
-          {offs && !offs.length && <li className="px-4 py-3 text-[13px] text-muted">{t('No days off coming up.')}</li>}
+          {offs && !offs.length && <li className="px-5 py-3 text-[13px] text-muted">{t('No days off coming up.')}</li>}
         </ul>
       </Card>
     </div>
@@ -294,7 +294,7 @@ export function WhatsAppSection() {
           sub={`${c.label || ''} · Evolution · ${c.instance_name}`} action={<Pill tone={c.status === 'connected' ? 'positive' : 'caution'}>{t(c.status === 'connected' ? 'Connected' : 'Not connected yet')}</Pill>}>
           <p className="text-[13px] text-muted">{t('In Evolution, set this instance’s webhook to your n8n:')}</p>
           {token[c.id] ? (
-            <p className="mt-2 flex items-center gap-2 rounded-[8px] bg-raised px-3 py-2 font-mono text-[12px] ring-1 ring-inset ring-border" dir="ltr">
+            <p className="mt-2 flex items-center gap-2 rounded-xl bg-raised px-3 py-2 font-mono text-[12px] ring-1 ring-inset ring-border" dir="ltr">
               <span className="min-w-0 flex-1 truncate">https://YOUR-N8N/webhook/clinic-evo?token={token[c.id]}</span>
               <button onClick={() => { navigator.clipboard?.writeText(`/webhook/clinic-evo?token=${token[c.id]}`); toast(t('Copied.')); }} className="press rounded p-1 text-muted hover:bg-active" aria-label={t('Copy')}><Copy className="size-3.5" /></button>
             </p>
@@ -309,7 +309,7 @@ export function WhatsAppSection() {
           <Field label={t('Evolution instance name')}><Input dir="ltr" value={f.instance_name} onChange={e => setF({ ...f, instance_name: e.target.value })} /></Field>
           <Field label={t('Evolution address')}><Input dir="ltr" value={f.base_url} onChange={e => setF({ ...f, base_url: e.target.value })} placeholder="https://evo.example.com" /></Field>
           <Field label={t('Evolution API key')} hint={t('Stored in the database; the dashboard never shows it again.')} className="sm:col-span-2"><Input dir="ltr" type="password" value={f.api_key} onChange={e => setF({ ...f, api_key: e.target.value })} /></Field>
-          <div className="flex justify-end sm:col-span-2"><Button type="submit" variant="accent" busy={busy} disabled={!f.instance_name || !f.base_url}>{t('Connect')}</Button></div>
+          <div className="flex justify-end sm:col-span-2"><Button type="submit" busy={busy} disabled={!f.instance_name || !f.base_url}>{t('Connect')}</Button></div>
         </form>
       </Card>
     </div>
@@ -344,7 +344,7 @@ export function TeamSection() {
       <Card pad={false} title={t('Who can sign in')}>
         <ul className="divide-y divide-rule">
           {(data?.m || []).map(m => (
-            <li key={m.user_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <li key={m.user_id} className="flex flex-wrap items-center gap-3 px-5 py-3">
               <Avatar name={m.display_name || m.email} size={34} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[14px] font-medium"><bdi>{m.display_name || m.email}</bdi></p>
@@ -357,11 +357,11 @@ export function TeamSection() {
               ) : <Pill>{t(m.role)}</Pill>}
               {m.clinical && <Pill tone="accent">{t('Sees records')}</Pill>}
               {m.doctor_id && <span className="inline-flex items-center gap-1 text-xs text-muted"><DocDot color={doctors.find(d => d.id === m.doctor_id)?.color} />{docName(doctors.find(d => d.id === m.doctor_id), lang)}</span>}
-              {can.owner && m.role !== 'owner' && <button onClick={() => call('remove_member', { p_tenant: tenant.id, p_user: m.user_id }, t('Removed.'))} className="press rounded-[6px] p-1.5 text-muted hover:bg-raised hover:text-critical" aria-label={t('Remove')}><Trash2 className="size-4" /></button>}
+              {can.owner && m.role !== 'owner' && <button onClick={() => call('remove_member', { p_tenant: tenant.id, p_user: m.user_id }, t('Removed.'))} className="press rounded-lg p-1.5 text-muted hover:bg-raised hover:text-critical" aria-label={t('Remove')}><Trash2 className="size-4" /></button>}
             </li>
           ))}
           {(data?.i || []).map(i => (
-            <li key={i.id} className="flex items-center gap-3 px-4 py-3 text-[13.5px] text-muted">
+            <li key={i.id} className="flex items-center gap-3 px-5 py-3 text-[13.5px] text-muted">
               <span className="flex size-[34px] items-center justify-center rounded-full border border-dashed border-control"><UserPlus className="size-4" aria-hidden /></span>
               <span className="min-w-0 flex-1 truncate" dir="ltr">{i.email}</span><Pill tone="caution">{t('Invited')} · {t(i.role)}</Pill>
             </li>
@@ -377,7 +377,7 @@ export function TeamSection() {
             <Field label={t('Role')}><Select value={inv.role} onChange={e => setInv({ ...inv, role: e.target.value as Role })}>{ROLES.map(r => <option key={r} value={r}>{t(r)}</option>)}</Select></Field>
             <p className="-mt-2 text-xs text-muted sm:col-span-2">{t(ROLE_HINT[inv.role])}</p>
             {inv.role === 'doctor' && <Field label={t('Which doctor are they')}><Select value={inv.doctor} onChange={e => setInv({ ...inv, doctor: e.target.value })}><option value="">—</option>{doctors.map(d => <option key={d.id} value={d.id}>{docName(d, lang)}</option>)}</Select></Field>}
-            <div className="flex items-end justify-end sm:col-span-2"><Button type="submit" variant="accent" busy={busy}>{t('Send the invite')}</Button></div>
+            <div className="flex items-end justify-end sm:col-span-2"><Button type="submit" busy={busy}>{t('Send the invite')}</Button></div>
           </form>
         </Card>
       )}

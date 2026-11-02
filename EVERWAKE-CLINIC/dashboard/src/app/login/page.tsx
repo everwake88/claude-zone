@@ -1,7 +1,7 @@
 'use client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
-import { Mark } from '@/components/mark';
+import { Mark, Wordmark } from '@/components/mark';
 import { Button, Field, Input, Segmented } from '@/components/ui';
 import { LangSwitch, useT } from '@/lib/i18n';
 import { sb } from '@/lib/supabase/client';
@@ -45,19 +45,27 @@ function LoginForm() {
   };
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center p-4">
-      <LangSwitch className="absolute end-4 top-4" />
-      <div className="c-rise w-full max-w-[380px]">
-        <div className="mb-5 flex items-center gap-3 px-1">
-          <Mark />
-          <div>
-            <p className="text-[17px] font-semibold leading-tight">Everwake Clinic</p>
-            <p className="text-[13px] text-muted">{t('Your clinic’s day, and the assistant that books it')}</p>
-          </div>
+    <main className="relative grid min-h-dvh gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      {/* the brand, on its navy slab */}
+      <section className="relative hidden overflow-hidden rounded-[28px] bg-navy p-10 text-white lg:flex lg:flex-col">
+        <Wordmark />
+        <div className="my-auto max-w-md">
+          <Mark size={120} draw />
+          <h1 className="mt-8 text-[30px] font-semibold leading-tight tracking-[-0.015em]">{t('Your clinic’s day, and the assistant that books it')}</h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-on-navy-muted">{t('Appointments, patients and their records, and a WhatsApp assistant that answers every patient, day and night.')}</p>
         </div>
-        <div className="sheet p-6">
-          <Segmented label="login-mode" value={mode} onChange={(m) => { setMode(m); setMsg(null); }}
-            options={[{ value: 'signin', label: t('Sign in') }, { value: 'signup', label: t('Create account') }, { value: 'link', label: t('E-mail link') }]} />
+        <span aria-hidden className="c-glow pointer-events-none absolute -bottom-40 -end-40 size-[420px] rounded-full bg-gold/15" />
+      </section>
+      <section className="relative flex items-center justify-center px-2 py-10">
+        <LangSwitch className="absolute end-3 top-3" />
+        <div className="c-rise w-full max-w-[380px]">
+          <div className="mb-6 lg:hidden"><span className="inline-flex rounded-2xl bg-navy px-4 py-3"><Wordmark /></span></div>
+          <h2 className="text-[24px] font-semibold tracking-[-0.012em]">{mode === 'signup' ? t('Create account') : t('Sign in')}</h2>
+          <p className="mt-1 text-[14px] text-muted">{t('Invited by your clinic? Sign up with the same e-mail and you will be added automatically.')}</p>
+          <div className="mt-6">
+            <Segmented label="login-mode" value={mode} onChange={(m) => { setMode(m); setMsg(null); }}
+              options={[{ value: 'signin', label: t('Sign in') }, { value: 'signup', label: t('Create account') }, { value: 'link', label: t('E-mail link') }]} />
+          </div>
           <form onSubmit={submit} className="mt-5 space-y-4">
             <Field label={t('E-mail')}><Input type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" dir="ltr" /></Field>
             {mode !== 'link' && (
@@ -66,14 +74,13 @@ function LoginForm() {
                   onChange={e => setPassword(e.target.value)} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} dir="ltr" />
               </Field>
             )}
-            {msg && <p role={msg.tone === 'err' ? 'alert' : 'status'} className={`c-fade rounded-[7px] px-3 py-2 text-sm ${msg.tone === 'ok' ? 'bg-positive-soft text-positive-ink' : 'bg-critical-soft text-critical-ink'}`}>{msg.text}</p>}
-            <Button type="submit" variant="accent" className="w-full" busy={busy}>
+            {msg && <p role={msg.tone === 'err' ? 'alert' : 'status'} className={`c-fade rounded-xl px-3 py-2 text-sm ${msg.tone === 'ok' ? 'bg-positive-soft text-positive-ink' : 'bg-critical-soft text-critical-ink'}`}>{msg.text}</p>}
+            <Button type="submit" className="w-full" busy={busy}>
               {mode === 'signin' ? t('Sign in') : mode === 'signup' ? t('Create account') : t('Send me a link')}
             </Button>
           </form>
         </div>
-        <p className="mt-4 px-1 text-xs leading-relaxed text-muted">{t('Invited by your clinic? Sign up with the same e-mail and you will be added automatically.')}</p>
-      </div>
+      </section>
     </main>
   );
 }

@@ -18,8 +18,8 @@ export function SettingsIndex() {
           const allowed = s.need === 'owner' ? can.owner : can.edit;
           return (
             <Link key={s.key} href={`${base}/settings/${s.key}`} aria-disabled={!allowed}
-              className={cx('c-rise group flex items-center gap-4 px-4 py-3.5 hover:bg-raised', !allowed && 'opacity-60')} style={{ animationDelay: `${i * 22}ms` }}>
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-accent"><s.icon className="size-[18px]" aria-hidden /></span>
+              className={cx('c-rise group flex items-center gap-4 px-5 py-4 hover:bg-raised', !allowed && 'opacity-60')} style={{ animationDelay: `${i * 22}ms` }}>
+              <s.icon className="size-5 shrink-0 text-faint transition-colors group-hover:text-gold-ink" aria-hidden />
               <span className="min-w-0 flex-1">
                 <span className="block text-[14px] font-medium">{t(s.label)}</span>
                 <span className="block truncate text-[12.5px] text-muted">{t(s.sub)}</span>

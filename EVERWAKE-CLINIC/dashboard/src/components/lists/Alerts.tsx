@@ -62,9 +62,9 @@ export function Alerts() {
                     {closed && a.acknowledged_by_name && <p className="mt-1 text-xs text-faint">{t('Seen by {name}', { name: a.acknowledged_by_name })}</p>}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {a.phone && <a href={`tel:+${a.phone}`} className="press inline-flex h-8 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] ring-1 ring-inset ring-border hover:bg-raised"><Phone className="size-3.5 text-muted" aria-hidden /><bdi dir="ltr">{fmtPhone(a.phone)}</bdi></a>}
-                    {a.conversation_id && <Link href={`${base}/inbox?c=${a.conversation_id}`} className="press inline-flex h-8 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] ring-1 ring-inset ring-border hover:bg-raised"><MessageCircle className="size-3.5 text-positive" aria-hidden />{t('Chat')}</Link>}
-                    {!closed && <button onClick={() => done(a.id)} className="press inline-flex h-8 items-center gap-1.5 rounded-[7px] bg-ink px-3 text-[13px] font-medium text-white hover:bg-[#1e2a42]"><Check className="size-3.5" aria-hidden />{t('Done')}</button>}
+                    {a.phone && <a href={`tel:+${a.phone}`} className="press inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] ring-1 ring-inset ring-border hover:bg-raised"><Phone className="size-3.5 text-muted" aria-hidden /><bdi dir="ltr">{fmtPhone(a.phone)}</bdi></a>}
+                    {a.conversation_id && <Link href={`${base}/inbox?c=${a.conversation_id}`} className="press inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] ring-1 ring-inset ring-border hover:bg-raised"><MessageCircle className="size-3.5 text-positive" aria-hidden />{t('Chat')}</Link>}
+                    {!closed && <button onClick={() => done(a.id)} className="press inline-flex h-8 items-center gap-1.5 rounded-full bg-ink px-3 text-[13px] font-medium text-white hover:bg-[#1e2a42]"><Check className="size-3.5" aria-hidden />{t('Done')}</button>}
                   </div>
                 </motion.li>
               );

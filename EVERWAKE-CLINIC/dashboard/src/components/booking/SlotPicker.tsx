@@ -49,7 +49,7 @@ export function SlotPicker({ query, value, onChange, layout = 'slot', startDate 
   if (slots === null) return <div className="space-y-2"><Skeleton className="h-14" /><Skeleton className="h-24" /></div>;
   if (days.length === 0) {
     return (
-      <p className="rounded-[9px] border border-dashed border-control px-3 py-3 text-[13px] text-muted">
+      <p className="rounded-xl border border-dashed border-control px-3 py-3 text-[13px] text-muted">
         {why?.includes('AGE_NOT_SERVED') ? t('This service is not for the patient’s age.') : t('Nothing free in the next three weeks. Try another doctor, place or service.')}
       </p>
     );
@@ -61,9 +61,9 @@ export function SlotPicker({ query, value, onChange, layout = 'slot', startDate 
           const on = d === day;
           return (
             <button key={d} type="button" onClick={() => { setDay(d); onChange(null); }} aria-pressed={on}
-              className={cx('press relative flex h-14 w-[58px] shrink-0 flex-col items-center justify-center rounded-[9px] text-center',
+              className={cx('press relative flex h-14 w-[58px] shrink-0 flex-col items-center justify-center rounded-xl text-center',
                 on ? 'text-white' : 'ring-1 ring-inset ring-border hover:bg-raised')}>
-              {on && <motion.span layoutId={`${layout}-day`} className="absolute inset-0 rounded-[9px] bg-accent" transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }} />}
+              {on && <motion.span layoutId={`${layout}-day`} className="absolute inset-0 rounded-xl bg-accent" transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }} />}
               <span className={cx('relative text-[11px]', on ? 'text-white/80' : 'text-muted')}>{dayLabel(d, tenant.timezone, { weekday: 'short' })}</span>
               <span className="relative text-[15px] font-semibold tabular-nums">{dayLabel(d, tenant.timezone, { day: 'numeric' })}</span>
               <span className={cx('relative text-[10px] tabular-nums', on ? 'text-white/75' : 'text-faint')}>{list[0].kind === 'queue' ? t('queue') : list.length}</span>
@@ -77,7 +77,7 @@ export function SlotPicker({ query, value, onChange, layout = 'slot', startDate 
           const on = sameSlot(value, s);
           return s.kind === 'queue' ? (
             <button key={'q' + s.location_id} type="button" onClick={() => onChange(s)} aria-pressed={on}
-              className={cx('press col-span-4 flex min-h-12 flex-wrap items-center justify-between gap-x-3 rounded-[8px] px-3 py-1.5 text-start text-[13px] sm:col-span-5',
+              className={cx('press col-span-4 flex min-h-12 flex-wrap items-center justify-between gap-x-3 rounded-xl px-3 py-1.5 text-start text-[13px] sm:col-span-5',
                 on ? 'bg-accent text-white' : 'ring-1 ring-inset ring-border hover:bg-raised')}>
               <span><span className="font-semibold">{t('Number {n} in the queue', { n: s.queue_no })}</span>
                 <span className={cx('ms-2', on ? 'text-white/80' : 'text-muted')}>{t('expected about {t}', { t: clock(s.est_at, tenant.timezone) })}</span></span>
@@ -85,7 +85,7 @@ export function SlotPicker({ query, value, onChange, layout = 'slot', startDate 
             </button>
           ) : (
             <button key={s.starts_at + s.location_id} type="button" onClick={() => onChange(s)} aria-pressed={on} style={{ animationDelay: `${Math.min(i, 12) * 14}ms` }}
-              className={cx('c-rise press h-9 rounded-[8px] text-[13px] font-medium tabular-nums', on ? 'bg-accent text-white' : 'ring-1 ring-inset ring-border hover:bg-raised')}>
+              className={cx('c-rise press h-9 rounded-xl text-[13px] font-medium tabular-nums', on ? 'bg-accent text-white' : 'ring-1 ring-inset ring-border hover:bg-raised')}>
               {clock(s.starts_at, tenant.timezone)}
             </button>
           );

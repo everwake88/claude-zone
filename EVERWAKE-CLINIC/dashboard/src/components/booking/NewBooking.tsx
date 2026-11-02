@@ -99,7 +99,7 @@ export function NewBooking({ open, onClose, prefill }: { open: boolean; onClose:
     <Drawer open={open} onClose={onClose} title={t('New booking')} width="max-w-[560px]"
       footer={<>
         <Button variant="outline" onClick={onClose}>{t('Cancel')}</Button>
-        <Button variant="accent" busy={busy} disabled={!ready} onClick={book}>
+        <Button busy={busy} disabled={!ready} onClick={book}>
           {slot ? t('Book {when}', { when: slot.kind === 'queue' ? t('number {n}', { n: slot.queue_no }) : clock(slot.starts_at, tenant.timezone) }) : t('Book')}
         </Button>
       </>}>
@@ -108,7 +108,7 @@ export function NewBooking({ open, onClose, prefill }: { open: boolean; onClose:
         <section className="space-y-2.5">
           <h3 className="text-[13px] font-medium">{t('Patient')}</h3>
           {patient && !isNew ? (
-            <div className="c-pop flex items-center gap-3 rounded-[9px] bg-raised px-3 py-2.5 ring-1 ring-inset ring-border">
+            <div className="c-pop flex items-center gap-3 rounded-xl bg-raised px-3 py-2.5 ring-1 ring-inset ring-border">
               <Avatar name={patient.name} size={32} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{patient.name}</p>
@@ -127,7 +127,7 @@ export function NewBooking({ open, onClose, prefill }: { open: boolean; onClose:
                     options={[{ value: 'female', label: t('F') }, { value: 'male', label: t('M') }]} />
                 </Field>
               </div>
-              <button onClick={() => setIsNew(false)} className="justify-self-start text-[13px] font-medium text-accent hover:underline sm:col-span-2">{t('Search existing patients instead')}</button>
+              <button onClick={() => setIsNew(false)} className="justify-self-start text-[13px] font-medium text-gold-ink hover:underline sm:col-span-2">{t('Search existing patients instead')}</button>
             </div>
           ) : (
             <div>
@@ -138,7 +138,7 @@ export function NewBooking({ open, onClose, prefill }: { open: boolean; onClose:
               <AnimatePresence initial={false}>
                 {found && (
                   <motion.ul initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}
-                    className="mt-1.5 divide-y divide-rule overflow-hidden rounded-[9px] ring-1 ring-border">
+                    className="mt-1.5 divide-y divide-rule overflow-hidden rounded-xl ring-1 ring-border">
                     {found.map(p => (
                       <li key={p.id}>
                         <button onClick={() => setPatient({ id: p.id, name: p.full_name, sub: [p.file_no && `#${p.file_no}`, p.age, fmtPhone(p.phone)].filter(Boolean).join(' · ') })}
@@ -156,7 +156,7 @@ export function NewBooking({ open, onClose, prefill }: { open: boolean; onClose:
                 )}
               </AnimatePresence>
               <button onClick={() => { setIsNew(true); setNp(n => ({ ...n, full_name: /\d{5}/.test(q) ? '' : q, phone: /\d{5}/.test(q) ? q : '' })); }}
-                className="press mt-2 inline-flex items-center gap-1.5 rounded-[7px] px-1 text-[13px] font-medium text-accent hover:underline">
+                className="press mt-2 inline-flex items-center gap-1.5 rounded-full px-1 text-[13px] font-medium text-gold-ink hover:underline">
                 <UserPlus className="size-4" aria-hidden />{t('A new patient')}
               </button>
             </div>
@@ -191,7 +191,7 @@ export function NewBooking({ open, onClose, prefill }: { open: boolean; onClose:
           </div>
         </section>
         {doctor && slot && (
-          <p className="c-fade rounded-[9px] bg-accent-soft px-3 py-2.5 text-[13px] text-accent-ink">
+          <p className="c-fade rounded-xl bg-accent-soft px-3 py-2.5 text-[13px] text-accent-ink">
             {docName(doctors.find(d => d.id === doctor), lang)} · {dayLabel(slot.date, tenant.timezone)} · {slot.kind === 'queue' ? t('number {n}', { n: slot.queue_no }) : clock(slot.starts_at, tenant.timezone)}
           </p>
         )}

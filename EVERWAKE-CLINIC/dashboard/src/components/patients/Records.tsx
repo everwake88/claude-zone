@@ -44,7 +44,7 @@ export function RecordList({ patientId, table, rows, onChanged }: { patientId: n
         <AnimatePresence initial={false}>
           {rows.map(r => (
             <motion.li key={r.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18 }}
-              className="group flex items-start gap-3 px-4 py-2.5">
+              className="group flex items-start gap-3 px-5 py-2.5">
               <div className={cx('min-w-0 flex-1', !active(r) && 'text-faint')}>
                 <p className={cx('text-[13.5px] font-medium', spec.tone === 'critical' && active(r) && 'text-critical-ink', !active(r) && 'line-through')}>
                   {table === 'patient_history' && <span className="me-1.5 text-xs font-normal text-muted">{t(HISTORY_LABEL[String(r.kind)] || String(r.kind))}</span>}
@@ -58,18 +58,18 @@ export function RecordList({ patientId, table, rows, onChanged }: { patientId: n
               </div>
               {can.clinical && (
                 <div className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
-                  {table === 'medications' && active(r) && <button onClick={() => save({ id: r.id, status: 'stopped', stopped_on: new Date().toISOString().slice(0, 10) })} className="press rounded-[6px] px-2 py-1 text-xs text-muted ring-1 ring-inset ring-border hover:bg-raised">{t('Stopped')}</button>}
-                  {table === 'conditions' && active(r) && <button onClick={() => save({ id: r.id, status: 'resolved' })} className="press rounded-[6px] px-2 py-1 text-xs text-muted ring-1 ring-inset ring-border hover:bg-raised">{t('Resolved')}</button>}
-                  <button onClick={() => save({ id: r.id, delete: true })} className="press rounded-[6px] p-1.5 text-muted hover:bg-raised hover:text-critical" aria-label={t('Remove')}><Trash2 className="size-3.5" /></button>
+                  {table === 'medications' && active(r) && <button onClick={() => save({ id: r.id, status: 'stopped', stopped_on: new Date().toISOString().slice(0, 10) })} className="press rounded-lg px-2 py-1 text-xs text-muted ring-1 ring-inset ring-border hover:bg-raised">{t('Stopped')}</button>}
+                  {table === 'conditions' && active(r) && <button onClick={() => save({ id: r.id, status: 'resolved' })} className="press rounded-lg px-2 py-1 text-xs text-muted ring-1 ring-inset ring-border hover:bg-raised">{t('Resolved')}</button>}
+                  <button onClick={() => save({ id: r.id, delete: true })} className="press rounded-lg p-1.5 text-muted hover:bg-raised hover:text-critical" aria-label={t('Remove')}><Trash2 className="size-3.5" /></button>
                 </div>
               )}
             </motion.li>
           ))}
         </AnimatePresence>
-        {rows.length === 0 && !adding && <li className="px-4 py-3 text-[13px] text-muted">{t(spec.empty)}</li>}
+        {rows.length === 0 && !adding && <li className="px-5 py-3 text-[13px] text-muted">{t(spec.empty)}</li>}
       </ul>
       {adding && (
-        <form className="c-fade flex flex-wrap items-end gap-2 border-t border-rule bg-raised/60 px-4 py-3" onSubmit={e => { e.preventDefault(); if (form[spec.main]?.trim()) save({ ...form }); }}>
+        <form className="c-fade flex flex-wrap items-end gap-2 border-t border-rule bg-raised/60 px-5 py-3" onSubmit={e => { e.preventDefault(); if (form[spec.main]?.trim()) save({ ...form }); }}>
           {table === 'patient_history' && (
             <Select aria-label={t('Kind')} value={form.kind} onChange={e => setForm(f => ({ ...f, kind: e.target.value }))} className="!w-36">
               {HISTORY_KINDS.map(k => <option key={k} value={k}>{t(HISTORY_LABEL[k])}</option>)}
@@ -78,7 +78,7 @@ export function RecordList({ patientId, table, rows, onChanged }: { patientId: n
           <Input autoFocus aria-label={t(spec.mainLabel)} placeholder={t(spec.mainLabel)} value={form[spec.main] || ''} onChange={e => setForm(f => ({ ...f, [spec.main]: e.target.value }))} className="min-w-40 flex-1" />
           {(spec.extra || []).map(e => <Input key={e.key} aria-label={t(e.label)} placeholder={t(e.label)} value={form[e.key] || ''} onChange={ev => setForm(f => ({ ...f, [e.key]: ev.target.value }))} className="min-w-28 flex-1" />)}
           <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>{t('Cancel')}</Button>
-          <Button size="sm" variant="accent" type="submit" busy={busy}>{t('Add')}</Button>
+          <Button size="sm" type="submit" busy={busy}>{t('Add')}</Button>
         </form>
       )}
     </Card>

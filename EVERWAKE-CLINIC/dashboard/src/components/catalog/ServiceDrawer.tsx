@@ -68,7 +68,7 @@ export function ServiceDrawer({ service, open, onClose }: { service: Service | n
       footer={ro ? <Button variant="outline" onClick={onClose}>{t('Close')}</Button> : <>
         {service && <Button variant="ghost" className="me-auto text-critical" onClick={remove}><Trash2 className="size-4" aria-hidden />{t('Remove')}</Button>}
         <Button variant="outline" onClick={onClose}>{t('Cancel')}</Button>
-        <Button variant="accent" busy={busy} disabled={!f.name_ar.trim()} onClick={save}>{t('Save')}</Button>
+        <Button busy={busy} disabled={!f.name_ar.trim()} onClick={save}>{t('Save')}</Button>
       </>}>
       <fieldset disabled={ro} className="space-y-6">
         <section className="grid gap-4 sm:grid-cols-2">
@@ -81,7 +81,7 @@ export function ServiceDrawer({ service, open, onClose }: { service: Service | n
           <Field label={t('How long (minutes)')} hint={t('Sets the length of the booking.')}><Input inputMode="numeric" value={f.duration_min} onChange={e => set('duration_min', e.target.value.replace(/\D/g, ''))} /></Field>
         </section>
 
-        <section className="space-y-3 rounded-[10px] bg-raised p-4 ring-1 ring-inset ring-border">
+        <section className="space-y-3 rounded-2xl bg-raised p-4 ring-1 ring-inset ring-border">
           <h3 className="text-[13px] font-semibold">{t('Price')}</h3>
           <Segmented label="svc-kind" value={f.price_kind} onChange={v => set('price_kind', v)}
             options={[{ value: 'fixed', label: t('Fixed') }, { value: 'range', label: t('From–to') }, { value: 'from', label: t('From') }, { value: 'after_exam', label: t('After check-up') }, { value: 'free', label: t('Free') }]} />
@@ -102,7 +102,7 @@ export function ServiceDrawer({ service, open, onClose }: { service: Service | n
                 {docs.map(d => {
                   const on = f.doctor_ids.includes(d.id);
                   return <button key={d.id} type="button" aria-pressed={on} onClick={() => set('doctor_ids', on ? f.doctor_ids.filter(x => x !== d.id) : [...f.doctor_ids, d.id])}
-                    className={`press inline-flex h-8 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] ${on ? 'bg-accent-soft font-medium text-accent-ink ring-1 ring-inset ring-accent/40' : 'ring-1 ring-inset ring-border hover:bg-raised'}`}><DocDot color={d.color} />{docName(d, 'ar')}</button>;
+                    className={`press inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] ${on ? 'bg-accent-soft font-medium text-gold-ink-ink ring-1 ring-inset ring-accent/40' : 'ring-1 ring-inset ring-border hover:bg-raised'}`}><DocDot color={d.color} />{docName(d, 'ar')}</button>;
                 })}
               </div>
             </Field>
@@ -112,7 +112,7 @@ export function ServiceDrawer({ service, open, onClose }: { service: Service | n
               {DAYS.map(d => {
                 const on = f.days.includes(d);
                 return <button key={d} type="button" aria-pressed={on} onClick={() => set('days', on ? f.days.filter(x => x !== d) : [...f.days, d])}
-                  className={`press h-8 w-12 rounded-[7px] text-[12.5px] ${on ? 'bg-accent text-white' : 'ring-1 ring-inset ring-border hover:bg-raised'}`}>{t(DAY_LABEL[d])}</button>;
+                  className={`press h-8 w-12 rounded-full text-[12.5px] ${on ? 'bg-accent text-white' : 'ring-1 ring-inset ring-border hover:bg-raised'}`}>{t(DAY_LABEL[d])}</button>;
               })}
             </div>
           </Field>
@@ -126,7 +126,7 @@ export function ServiceDrawer({ service, open, onClose }: { service: Service | n
           <Field label={t('Description')}><Textarea rows={2} value={f.description_ar} onChange={e => set('description_ar', e.target.value)} /></Field>
         </section>
 
-        <section className="divide-y divide-rule rounded-[10px] ring-1 ring-inset ring-border">
+        <section className="divide-y divide-rule rounded-2xl ring-1 ring-inset ring-border">
           {([
             ['agent_visible', 'The assistant may mention it and its price'],
             ['bookable', 'The assistant may book it directly'],
