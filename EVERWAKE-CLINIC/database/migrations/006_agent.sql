@@ -296,9 +296,15 @@ begin
                                                                'directions', l.directions_ar, 'maps_url', l.maps_url, 'lat', l.lat, 'lng', l.lng)
                                             order by l.sort)
                              from clinic.locations l where l.tenant_id = p_tenant and l.is_active), '[]'::jsonb),
-    'specialty_triage', coalesce((select jsonb_agg(sp.triage) from clinic.specialty_presets sp
-                                   where sp.code in (select d.specialty from clinic.doctors d where d.tenant_id = p_tenant and d.is_active)
-                                     and sp.triage <> '[]'::jsonb), '[]'::jsonb),
+    'specialty_triage', coalesce((select jsonb_agg(x || jsonb_build_object('specialty', sp.code))
+                                    from clinic.specialty_presets sp, jsonb_array_elements(sp.triage) x
+                                   where sp.code in (select d.specialty from clinic.doctors d where d.tenant_id = p_tenant and d.is_active)), '[]'::jsonb),
+    -- the clinic's hours, for placing a time said without ص/م
+    'hours', coalesce((select jsonb_agg(distinct jsonb_build_array(to_char(sc.start_time, 'HH24:MI'), to_char(sc.end_time, 'HH24:MI')))
+                         from clinic.schedules sc where sc.tenant_id = p_tenant and sc.is_active), '[]'::jsonb),
+    'doctors', coalesce((select jsonb_agg(jsonb_build_object('id', d.id, 'code', d.code, 'name', clinic.doctor_label(d.id, 'ar'),
+                                                             'specialty', d.specialty, 'gender', d.gender) order by d.sort)
+                           from clinic.doctors d where d.tenant_id = p_tenant and d.is_active), '[]'::jsonb),
     'specialty_keywords', coalesce((select jsonb_object_agg(sp.code, to_jsonb(sp.keywords)) from clinic.specialty_presets sp
                                      where sp.code in (select d.specialty from clinic.doctors d where d.tenant_id = p_tenant and d.is_active)), '{}'::jsonb));
 end $$;

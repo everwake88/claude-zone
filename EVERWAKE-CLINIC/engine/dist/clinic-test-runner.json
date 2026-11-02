@@ -1,0 +1,336 @@
+{
+  "name": "Everwake Clinic — Test Runner",
+  "nodes": [
+    {
+      "name": "Sticky — Test Runner",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        -380
+      ],
+      "parameters": {
+        "content": "## Everwake Clinic · Test Runner — chat with a clinic's assistant, nothing goes on WhatsApp\nOpen the chat and write as a patient. The real **Main** workflow answers from a pretend number (200000000001): you test exactly what patients get, the replies are only recorded, and it works while the clinic is still onboarding.\n**/reset** a brand-new patient · **/last** the latest turn again · **/later 5 <message>** 5 hours pass first · **#2 <message>** a second pretend patient · **@slug <message>** another clinic.\nThe clinic to test is set at the top of **Read Test Command** (nile_clinics).",
+        "width": 1500,
+        "height": 300,
+        "color": 6
+      },
+      "id": "ee0979cc-3482-5cf4-a859-cd90c22ba9c0"
+    },
+    {
+      "name": "Chat With The Assistant (test)",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -260,
+        0
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "id": "c95b678a-fb3d-5ac1-a4a4-f1e931e2be3c",
+      "webhookId": "46dc7295-b254-57d7-abf7-3577919435c6"
+    },
+    {
+      "name": "Read Test Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE CLINIC — Test Runner · NODE: Read Test Command\n// Chat with a clinic's assistant as a pretend patient. The real Main\n// workflow answers; nothing is sent on WhatsApp.\n//\n//   any text                 a patient's message\n//   /reset   (ريست)          forget the test chat: a brand-new patient\n//   /last    (آخر)           show the latest turn again, sending nothing\n//   /later 5 <message>       5 hours pass first, then the message\n//   #2 <message>             a second pretend patient (#1 … #99)\n//   @slug <message>          another clinic, by its slug\n// =====================================================================\nconst CLINIC = 'nile_clinics';     // the slug of the clinic to test\nconst NAME = 'تجربة';\n\nlet raw = String($input.first().json.chatInput ?? '').trim();\nlet clinicSlug = CLINIC, n = 1, m;\nif ((m = raw.match(/^@(\\S+)\\s*([\\s\\S]*)$/))) { clinicSlug = m[1]; raw = m[2].trim(); }\nif ((m = raw.match(/^#(\\d{1,2})\\s*([\\s\\S]*)$/))) { n = Math.min(Math.max(Number(m[1]), 1), 99); raw = m[2].trim(); }\nconst later = raw.match(/^\\/(?:later|بعد)\\s+(\\d+(?:\\.\\d+)?)\\s*([\\s\\S]*)$/i);\nif (later) raw = later[2].trim();\nconst reset = /^\\/?(reset|ريست)$/i.test(raw);\nconst last = /^\\/(last|آخر)$/i.test(raw);\nreturn [{ json: { restaurant: clinicSlug, clinic: clinicSlug, wa_id: '2000000000' + String(n).padStart(2, '0'),\n                  push_name: NAME + (n > 1 ? ' ' + n : ''), text: reset || last ? '' : raw, location: null, reset, last,\n                  later_hours: later ? Number(later[1]) : 0, empty: !reset && !last && !raw } }];\n"
+      },
+      "id": "9353e42d-ef6f-579b-a880-16b4715799aa"
+    },
+    {
+      "name": "Prepare Test Chat",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        180,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_CLINIC_DB",
+          "name": "Everwake Clinic DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select clinic.test_chat_prepare($1::text, $2::text, $3::boolean, $4::numeric) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $json.clinic, $json.wa_id, $json.reset, $json.later_hours ] }}"
+        }
+      },
+      "id": "3e29531b-dd7c-5c93-a1a7-b138b8713d95"
+    },
+    {
+      "name": "Route: A Message To Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        400,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6e11a425-46a0-597c-a753-0ce2bdb52efe",
+              "leftValue": "={{ !$('Read Test Command').first().json.reset && !$('Read Test Command').first().json.last && !$('Read Test Command').first().json.empty }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b0b45228-d6d0-5a51-a429-50e7e030b097"
+    },
+    {
+      "name": "Route: Show The Last Turn?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        620,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a504bd5f-7121-598f-a099-1854042b1bc4",
+              "leftValue": "={{ $('Read Test Command').first().json.last === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "2c037e19-93ab-55c0-a68e-5d5f7ae82b96"
+    },
+    {
+      "name": "Fake WhatsApp Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE CLINIC — Test Runner · NODE: Fake WhatsApp Message\n// The message as Evolution would deliver it, plus test_run: Main then\n// records its replies instead of sending them.\n// =====================================================================\nconst cmd = $('Read Test Command').first().json;\nconst r = $input.first().json.r;\nconst message = cmd.location\n  ? { locationMessage: { degreesLatitude: cmd.location.lat, degreesLongitude: cmd.location.lng, name: cmd.text || undefined } }\n  : { conversation: cmd.text };\nreturn [{\n  json: {\n    test_run: true,\n    query: { token: r.token },\n    body: {\n      event: 'messages.upsert',\n      instance: r.instance,\n      data: {\n        key: { remoteJid: `${r.wa_id}@s.whatsapp.net`, fromMe: false, id: 'TESTIN' + Date.now() + Math.random().toString(36).slice(2, 8) },\n        pushName: cmd.push_name,\n        messageType: cmd.location ? 'locationMessage' : 'conversation',\n        messageTimestamp: Math.floor(Date.now() / 1000),\n        message\n      }\n    }\n  }\n}];\n"
+      },
+      "id": "ba6763c6-b9b9-566d-aa2a-f8e8028ad60a"
+    },
+    {
+      "name": "Run The Assistant (Main)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        840,
+        -100
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SET_AFTER_IMPORT",
+          "mode": "list",
+          "cachedResultName": "Everwake Clinic — Main (Brain + Agent)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "id": "3def79b7-ea41-5d59-a45c-fd528f78a8b7"
+    },
+    {
+      "name": "Load The Reply",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1060,
+        -100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_CLINIC_DB",
+          "name": "Everwake Clinic DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select clinic.test_chat_result($1::uuid, $2::text, $3::timestamptz) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Test Chat').first().json.r.tenant_id, $('Prepare Test Chat').first().json.r.wa_id, $('Read Test Command').first().json.last ? ($('Prepare Test Chat').first().json.r.last_message_at || $('Prepare Test Chat').first().json.r.since) : $('Prepare Test Chat').first().json.r.since ] }}"
+        }
+      },
+      "executeOnce": true,
+      "id": "d4d55f7f-dca1-5858-a657-71b6a6b9fc37"
+    },
+    {
+      "name": "Format Test Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE CLINIC — Test Runner · NODE: Format Test Result\n// The reply exactly as the patient would get it, then what the assistant did.\n// =====================================================================\nconst cmd = $('Read Test Command').first().json;\nconst prep = $('Prepare Test Chat').first().json.r || {};\nconst res = ($input.first().json.r) || {};\nconst short = (v, n = 600) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return !s ? '' : s.length > n ? s.slice(0, n - 1) + '…' : s; };\nif (cmd.empty) return [{ json: { output: 'Type a patient message, or /reset, /last, /later 5 <message>.' } }];\nif (prep.reset) return [{ json: { output: `RESET — ${prep.clinic}: the test chat ${prep.wa_id} starts from zero (a brand-new patient).` } }];\nconst replies = Array.isArray(res.replies) ? res.replies : [];\nconst said = replies.map(m => m.kind === 'text' ? m.text : `[${m.kind}] ${m.text || ''}`).join('\\n[[NEXT]]\\n');\nconst t = res.turn || {};\nconst b = t.plan && typeof t.plan === 'object' ? t.plan : null;\nconst lines = [\n  `${cmd.last ? '(the latest turn again) ' : ''}${prep.later_hours ? `(${prep.later_hours} hours later) ` : ''}PATIENT: ${res.patient ?? cmd.text}`,\n  `ASSISTANT: ${said || '(no reply — see the Main execution)'}`,\n  '',\n  `${prep.clinic} · ${prep.status}${res.mode === 'human' ? ' · A PERSON TOOK OVER' : ''}${res.urgency ? ' · FLAGGED ' + res.urgency.toUpperCase() : ''} · stage=${t.stage ?? '-'} · ${t.seconds ?? '-'}s · ${t.tokens ?? '-'} tokens`,\n  ...((t.calls || []).map(c => `→ ${c.tool} ${short(c.asked, 220)} ⇒ ${c.status || '?'}${c.error ? ' «' + c.error + '»' : ''}${(c.problems || []).length ? ' ' + c.problems.join(',') : ''}`)),\n  (t.caught || []).length ? `caught=${short(t.caught, 800)}${t.rewritten ? ' → repaired' : ''}` : 'caught=none',\n  b && b.used ? `plan: ${b.stage} — ${b.objective}\\n  move: ${b.move}\\n  urgency: ${JSON.stringify(b.urgency || {})}` : `plan=${b ? '(none: ' + b.error + ')' : '-'}`,\n  res.draft ? `booking in progress=${short(res.draft, 400)}` : '',\n  res.appointments ? `appointments=${short(res.appointments, 500)}` : '',\n  t.booked ? `BOOKED ${t.booked}` : '',\n  t.handoff && t.handoff.needed ? `HANDOFF: ${t.handoff.reason}` : '',\n  t.ask_team && t.ask_team.length ? `ASKED THE DOCTOR: ${[].concat(t.ask_team).join(' | ')}` : ''\n].filter(l => l !== '');\nreturn [{ json: { output: lines.join('\\n'), reply: said || null } }];\n"
+      },
+      "id": "ce282594-7e04-5aff-a4b7-e4bdd9293369"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat With The Assistant (test)": {
+      "main": [
+        [
+          {
+            "node": "Read Test Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Test Command": {
+      "main": [
+        [
+          {
+            "node": "Prepare Test Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Test Chat": {
+      "main": [
+        [
+          {
+            "node": "Route: A Message To Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: A Message To Send?": {
+      "main": [
+        [
+          {
+            "node": "Fake WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route: Show The Last Turn?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Show The Last Turn?": {
+      "main": [
+        [
+          {
+            "node": "Load The Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Test Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fake WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Run The Assistant (Main)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run The Assistant (Main)": {
+      "main": [
+        [
+          {
+            "node": "Load The Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load The Reply": {
+      "main": [
+        [
+          {
+            "node": "Format Test Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

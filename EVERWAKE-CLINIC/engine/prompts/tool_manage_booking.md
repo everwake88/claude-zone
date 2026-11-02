@@ -1,0 +1,14 @@
+Books, moves and cancels visits at this clinic. Call it with an action and, when needed, details (a JSON object: only what is new).
+- find_slots: free times. details: any of doctor (name or code), service (its name, or the patient's words for it), location, date (YYYY-MM-DD) or from/to, band (morning|afternoon|evening), time_from/time_to (HH:MM), after ("last_offered" for a later time than the ones offered), and who it's for (full_name, age, relation) — use the dates in FACTS, never your own arithmetic. Returns up to 3 numbered OPTIONS with labels; offer those.
+- update: what the patient chose and told: option (the number of an offered time), full_name, age ("32", "6 سنين", "8 شهور"), sex (male|female), relation (self|child|parent|spouse|sibling|relative|other) or patient_id (one of known_patients), doctor, service, location, reason (their own words), urgency. A chosen option is held for a few minutes. Returns missing, problems, ready_for_summary.
+- summary: the text to show before booking (only when ready_for_summary).
+- book: only after they said yes to that summary, unchanged since. Returns BOOKED with the booking number and the place.
+- confirm: they confirm an upcoming visit (a reminder's "1"). details: ref_no if they have several.
+- accept_delay: they accept the new time after the doctor's delay.
+- reschedule: move an upcoming visit. Without option/time it returns OPTIONS (offer them); then reschedule again with option. details: ref_no if several.
+- cancel: cancel an upcoming visit (details: ref_no if several, reason), or drop the booking in progress.
+- take_offer: book the earlier time the clinic offered them from the waitlist (then summary and book).
+- accept_plan: they accept the treatment plan they were quoted; returns the first session's OPTIONS.
+- next_plan_session: OPTIONS for the next session of their treatment plan.
+- join_waitlist: they want an earlier time than any offered (details: doctor, to, band).
+- status: their upcoming visits and the booking in progress.

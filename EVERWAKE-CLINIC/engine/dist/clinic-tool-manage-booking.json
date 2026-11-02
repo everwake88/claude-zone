@@ -1,0 +1,144 @@
+{
+  "name": "Everwake Clinic — Tool: manage_booking",
+  "nodes": [
+    {
+      "name": "Sticky — manage_booking",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "content": "## Everwake Clinic · manage_booking\nCalled BY THE AGENT. Free times come only from the database (`available_slots`: schedules, days off, delays, chairs, the doctors' rules); a chosen time is held for a few minutes; a booking needs the summary the patient said yes to.\n**actions** find_slots · update · summary · book · confirm · accept_delay · reschedule · cancel · take_offer · accept_plan · next_plan_session · join_waitlist · status",
+        "width": 1200,
+        "height": 200,
+        "color": 5
+      },
+      "id": "00762945-07c5-59c6-a359-d77e1f0beb8c"
+    },
+    {
+      "name": "Tool Called By Agent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        320
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tenant_id"
+            },
+            {
+              "name": "wa_id"
+            },
+            {
+              "name": "action"
+            },
+            {
+              "name": "details",
+              "type": "any"
+            }
+          ]
+        }
+      },
+      "id": "b7ceebca-eb3a-5e7d-a3f9-69780a0bd112"
+    },
+    {
+      "name": "Read Args",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        320
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE CLINIC — Tool: manage_booking · NODE: Read Args\n// What the agent sent → the SQL call. details arrives as an object (n8n\n// \"json\" type) or as text; it goes to the database base64-encoded, so\n// quotes in Arabic text can never break the query.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201001234567 → 01001234567\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\nconst t = $input.first().json;\nlet details = t.details;\nif (typeof details === 'string') details = parseJson(details, {});\ndetails = obj(details);\ndelete details.none;\nreturn [{ json: { tenant_id: str(t.tenant_id), wa_id: str(t.wa_id), action: str(t.action).toLowerCase().trim() || 'status',\n                  details_b64: Buffer.from(JSON.stringify(details), 'utf8').toString('base64') } }];\n"
+      },
+      "id": "c04e2eea-cfea-5b18-a0d5-a5a7b0b9df01"
+    },
+    {
+      "name": "Booking",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_CLINIC_DB",
+          "name": "Everwake Clinic DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select clinic.booking_tool($1::uuid, $2::text, $3::text, convert_from(decode($4::text, 'base64'), 'UTF8')) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, $json.wa_id, $json.action, $json.details_b64 ] }}"
+        }
+      },
+      "id": "cc0b4845-d34e-590f-af7f-e7814ca7496f"
+    },
+    {
+      "name": "Return To Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        320
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE CLINIC — Tool: manage_booking · NODE: Return To Agent\n// The database's answer, as the agent reads it. Options keep their\n// number and their label (the true day and time) and lose the ids.\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201001234567 → 01001234567\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\nconst r = row($input.first().json);\nconst trimSlot = (o) => { const x = obj(o); return { option: x.option, label: x.label_ar, label_en: x.label_en, doctor: x.doctor, location: x.location,\n                                                    kind: x.kind, queue_no: x.queue_no, date: x.date, time: x.time, band: x.band }; };\nconst out = { ...r };\nif (Array.isArray(r.options)) out.options = r.options.map(trimSlot);\nfor (const p of arr(out.problems)) if (Array.isArray(p.suggested)) p.suggested = p.suggested.slice(0, 3).map(trimSlot);\nif (Array.isArray(r.suggested)) out.suggested = r.suggested.slice(0, 3).map(trimSlot);\nreturn [{ json: { response: JSON.stringify(out) } }];\n"
+      },
+      "id": "38e595be-161b-5d62-aac2-88d375b4d8be"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Tool Called By Agent": {
+      "main": [
+        [
+          {
+            "node": "Read Args",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Args": {
+      "main": [
+        [
+          {
+            "node": "Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking": {
+      "main": [
+        [
+          {
+            "node": "Return To Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

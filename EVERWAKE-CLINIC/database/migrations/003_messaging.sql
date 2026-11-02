@@ -275,9 +275,10 @@ returns text language sql stable as $$
    where t.id = p_tenant
 $$;
 
+-- the Test Runner's pretend numbers: 200000000001 … 200000000099
 create or replace function clinic.is_test_number(p_wa text)
 returns boolean language sql immutable as $$
-  select coalesce(p_wa, '') like '2000000%'
+  select coalesce(p_wa ~ '^20000000000[0-9]$|^2000000000[1-9][0-9]$', false)
 $$;
 
 -- a contact the clinic can write to (also one added from the dashboard by phone)

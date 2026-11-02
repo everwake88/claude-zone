@@ -1,0 +1,148 @@
+{
+  "name": "Everwake Clinic — Tool: staff_action",
+  "nodes": [
+    {
+      "name": "Sticky — staff_action",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "content": "## Everwake Clinic · staff_action\nCalled BY THE STAFF ASSISTANT for a team member writing from their own number: today's list, \"I'm 20 minutes late\", a cancelled session, time off, and changes to prices, services, offers, answers and rules. Everything is a PREVIEW first; **confirm** does it.",
+        "width": 1200,
+        "height": 160,
+        "color": 5
+      },
+      "id": "bb18150f-6a17-5b32-aa50-03d30ee030e5"
+    },
+    {
+      "name": "Tool Called By Staff Assistant",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        320
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tenant_id"
+            },
+            {
+              "name": "wa_id"
+            },
+            {
+              "name": "staff",
+              "type": "any"
+            },
+            {
+              "name": "action"
+            },
+            {
+              "name": "details",
+              "type": "any"
+            }
+          ]
+        }
+      },
+      "id": "7889f8e0-d70f-5c25-a933-05f4a62c86ec"
+    },
+    {
+      "name": "Read Args",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        320
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE CLINIC — Tool: staff_action · NODE: Read Args\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201001234567 → 01001234567\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\nconst t = $input.first().json;\nlet details = t.details;\nif (typeof details === 'string') details = parseJson(details, {});\ndetails = obj(details); delete details.none;\nlet staff = t.staff;\nif (typeof staff === 'string') staff = parseJson(staff, {});\nreturn [{ json: { tenant_id: str(t.tenant_id), wa_id: str(t.wa_id), action: str(t.action).toLowerCase().trim() || 'today',\n                  staff_json: JSON.stringify(obj(staff)), details_json: JSON.stringify(details) } }];\n"
+      },
+      "id": "da7d0095-5870-5b1f-abb3-5ef8f8644cf0"
+    },
+    {
+      "name": "Staff Action",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "EVERWAKE_CLINIC_DB",
+          "name": "Everwake Clinic DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select clinic.staff_tool($1::uuid, $2::text, $3::jsonb, $4::text, $5::text) as r;",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, $json.wa_id, $json.staff_json, $json.action, $json.details_json ] }}"
+        }
+      },
+      "id": "35b96ddf-16d1-5050-a814-d58ee6d0b45e"
+    },
+    {
+      "name": "Return To Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        320
+      ],
+      "parameters": {
+        "jsCode": "// =====================================================================\n// EVERWAKE CLINIC — Tool: staff_action · NODE: Return To Agent\n// =====================================================================\n// ---- shared: basics ----------------------------------------------------\nconst obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};\nconst arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);\nconst str = (v) => String(v == null ? '' : v).trim();\nconst num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };\nconst money = (n) => Math.round(num(n) * 100) / 100;\nconst fmt = (n) => String(money(n));\nconst b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nconst parseJson = (v, d) => {\n  if (v && typeof v === 'object') return v;\n  try { const x = JSON.parse(v); return x == null ? d : x; } catch (e) { return d; }\n};\n// a Postgres node returns { r: <jsonb> }; a missing row returns {}\nconst row = (j) => obj(parseJson(obj(j).r, {}));\n// an Egyptian number as people write it: 201001234567 → 01001234567\nconst localPhone = (p) => str(p).replace(/^\\+?20(1\\d{9})$/, '0$1');\nreturn [{ json: { response: JSON.stringify(row($input.first().json)) } }];\n"
+      },
+      "id": "619fa343-26d6-5d6b-a292-84aa86c2d3b6"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Tool Called By Staff Assistant": {
+      "main": [
+        [
+          {
+            "node": "Read Args",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Args": {
+      "main": [
+        [
+          {
+            "node": "Staff Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Staff Action": {
+      "main": [
+        [
+          {
+            "node": "Return To Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

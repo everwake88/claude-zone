@@ -533,6 +533,7 @@ begin
       v_local := v_est at time zone tz;
       if (v_cap is null or v_count < v_cap)
          and ses.ends_at > v_earliest
+         and (v_after is null or ses.starts_at >= v_after)      -- "a later one": the next session, not this one again
          and v_est < ses.ends_at + make_interval(mins => v_delay)
          and (v_band = 'any' or clinic.band_of((ses.starts_at at time zone tz)::time) = v_band)
          and (v_tfrom is null or v_local::time >= v_tfrom or (ses.ends_at at time zone tz)::time >= v_tfrom)
@@ -1110,7 +1111,8 @@ begin
     update clinic.delay_notice_items set status = 'accepted', replied_at = now() where appointment_id = a.id and status = 'sent';
     perform clinic.log_appt(a.id, case when v_action = 'accept_delay' then 'delay_accepted' else 'confirmed' end, '{}'::jsonb, 'patient');
     update clinic.conversations set state = state - 'pending_reminder' - 'pending_delay' where id = conv.id;
-    return jsonb_build_object('ok', true, 'status', upper(v_action) || 'ED', 'appointment', clinic.appointment_view(a, v_lang),
+    return jsonb_build_object('ok', true, 'status', case when v_action = 'accept_delay' then 'DELAY_ACCEPTED' else 'CONFIRMED' end,
+                              'appointment', clinic.appointment_view(a, v_lang),
                               'fact', case when v_action = 'accept_delay' then 'the new time is confirmed' else 'confirmed — the clinic sees it' end);
   end if;
 
