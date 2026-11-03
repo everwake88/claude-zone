@@ -5,13 +5,13 @@ import { notFound } from 'next/navigation';
 import { useLang } from '@/lib/i18n';
 import { PageTitle } from '../ui';
 import { useTenant } from '../tenant';
-import { AgentSection, BookingSection, BrandSection, ClinicSection, MessagesSection } from './ClinicSettings';
+import { AgentSection, BookingSection, BrandSection, ClinicSection, MessagesSection, ScribeSection } from './ClinicSettings';
 import { DoctorsSection, LocationsSection, SchedulesSection, TeamSection, WhatsAppSection } from './PeopleSettings';
 import { SETTINGS_SECTIONS } from './sections';
 
 const BODY: Record<string, () => React.ReactElement> = {
   clinic: ClinicSection, agent: AgentSection, doctors: DoctorsSection, locations: LocationsSection, schedules: SchedulesSection,
-  booking: BookingSection, messages: MessagesSection, whatsapp: WhatsAppSection, team: TeamSection, brand: BrandSection
+  booking: BookingSection, scribe: ScribeSection, messages: MessagesSection, whatsapp: WhatsAppSection, team: TeamSection, brand: BrandSection
 };
 
 export function SettingsSection({ section }: { section: string }) {

@@ -33,8 +33,9 @@ You need:
    | 009 | security |
    | 010 | engine extras |
    | 011 | the dashboard's reads and the patient's page |
+   | 012 | the doctor's AI: recordings, scribe runs, the assistant's chats and cards, pre-visit questions |
    | 020 | the speciality presets |
-   | 090 | storage buckets and live updates (Supabase only) |
+   | 090 | storage buckets (including the private `clinic-recordings` for visit audio) and live updates (Supabase only) |
 3. **Expose the schema.** Go to Settings → API → *Exposed schemas*, add `clinic` (keep `public`), and save.
 4. **Set the sign-in addresses** under Authentication → URL configuration:
    - **Site URL:** the dashboard's address, e.g. `https://clinic.everwake.tech`.
@@ -52,10 +53,17 @@ You need:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → the anon (publishable) key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → the service_role key. Server only; never prefix it with `NEXT_PUBLIC_`. It is used for the patient's page (`/a/<token>`) and to wake the assistant after a team answer. |
-| `OPENAI_API_KEY` | For importing a price list from a PDF or a photo. Without it, a pasted list is still read line by line. |
+| `OPENAI_API_KEY` | For listening to the visit, the assistant, and importing a price list from a PDF or a photo. Without it the doctor types the note and the assistant says it needs the key; a pasted price list is still read line by line. |
 | `CATALOG_AI_MODEL` | Optional. Defaults to `gpt-5.6-luna`. It must read PDFs and photos. |
 | `N8N_BASE_URL` | Your n8n's public address, e.g. `https://n8n.example.com` |
-| `N8N_OUTBOX_SECRET` | A long random string. The same value goes into n8n (step 3). |
+| `N8N_OUTBOX_SECRET` | A long random string. The same value goes into n8n (step 3). It also guards `/api/scribe/retention`. |
+| `SCRIBE_TRANSCRIBE_MODEL` | Optional, `gpt-transcribe`. Hears each 20-second piece during the visit. |
+| `SCRIBE_DIARIZE_MODEL` | Optional, `gpt-4o-transcribe-diarize`. Tells the doctor's words from the patient's after Stop; `off` skips it (the pieces' own words are used). |
+| `SCRIBE_EXTRACT_MODEL` | Optional, `gpt-5.6-luna`. Fills the form, a quote behind every value. |
+| `SCRIBE_VERIFY_MODEL` | Optional, `gpt-5-mini`. The independent check of every filled field. |
+| `ASSISTANT_MODEL` | Optional, `gpt-5.6-luna`. The doctor's assistant. |
+| `ASSISTANT_TRANSCRIBE_MODEL` | Optional, `gpt-transcribe`. Push-to-talk. |
+| `ASSISTANT_TTS_MODEL` | Optional, `gpt-4o-mini-tts`. "Read replies aloud". |
 
 ### Deploy
 
@@ -87,13 +95,14 @@ Then set `public_url` in the clinic's settings to the dashboard's address. The r
    | `clinic-main.json` | the assistant. Webhook `POST /webhook/clinic-evo?token=…` |
    | `clinic-tool-manage-booking.json` | the booking tool it calls |
    | `clinic-tool-staff-action.json` | the doctor's WhatsApp commands |
-   | `clinic-outbox.json` | sends messages every minute, and at once when the dashboard pings `POST /webhook/clinic-outbox` |
+   | `clinic-outbox.json` | sends messages every minute, and at once when the dashboard pings `POST /webhook/clinic-outbox`; every hour it asks the dashboard to delete visit audio past its days |
    | `clinic-test-runner.json` | chat with the assistant from n8n without a phone |
 
    Model names are environment variables read at build time:
    - `EW_MODEL` (default `gpt-5.6-luna`);
    - `EW_TRANSCRIBE_MODEL` (`gpt-transcribe`);
-   - `EW_VISION_MODEL` (`gpt-5-mini`).
+   - `EW_VISION_MODEL` (`gpt-5-mini`);
+   - `EW_DASHBOARD_URL`, the dashboard's address for the hourly audio deletion (`POST <it>/api/scribe/retention`, with the Outbox Secret header). Default `http://localhost:3000`.
 2. **Create three credentials in n8n,** with these exact names:
    - **Everwake Clinic DB** (Postgres): the Supabase connection. Use the pooler, port 6543, with SSL.
    - **OpenAi account** (OpenAI).
@@ -123,10 +132,10 @@ cd engine && PGPASSWORD=postgres npm test
 ```
 
 ```bash
-cd dashboard && npm run typecheck && npm run i18n:check && npm run build
+cd dashboard && npm run typecheck && npm run i18n:check && npm test && npm run build
 ```
 
 Expected results:
-- the SQL test files print "all 6 test files passed";
-- the engine tests run whole conversations against a real database (119 tests);
-- the dashboard checks that every text has its Arabic.
+- the SQL test files print "all 7 test files passed";
+- the engine tests run whole conversations against a real database (120 tests);
+- the dashboard checks that every text has its Arabic, and `npm test` runs 14 unit tests (the form's schema, the transcript, the evidence check, the upload queue, the assistant's loop with a scripted model).

@@ -185,6 +185,29 @@ export function BookingSection() {
   );
 }
 
+// Listening to the visit: how long the audio is kept (the words stay with the note)
+export function ScribeSection() {
+  const { t } = useLang();
+  const { row, save, busy } = useTenantRow();
+  const src = useMemo(() => row ? { days: str(((row.merged_settings.scribe || {}) as Obj).audio_days ?? 30) } : undefined, [row]);
+  const { d, setD, dirty, reset } = useDraft(src);
+  if (!d) return <Skeleton className="h-48" />;
+  const days = Math.min(365, Math.max(1, Number(d.days) || 30));
+  const submit = () => save({ settings: { scribe: { ...((row!.settings.scribe as Obj) || {}), audio_days: days } } });
+  return (
+    <>
+      <Card title={t('The audio')} sub={t('The patient agrees every time, and only doctors and nurses can listen.')}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t('Keep the audio (days)')} hint={t('Then it is deleted. The transcript and the signed note stay.')}>
+            <Input inputMode="numeric" value={d.days} onChange={e => setD({ ...d, days: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
+          </Field>
+        </div>
+      </Card>
+      <SaveBar dirty={dirty} busy={busy} onSave={submit} onReset={reset} />
+    </>
+  );
+}
+
 const TEMPLATES: { key: string; label: string; vars: string }[] = [
   { key: 'booking_confirmed', label: 'Booking confirmed', vars: '{name} {for} {when} {doctor} {location} {ref_no} {prep} {link}' },
   { key: 'reminder_day_before', label: 'Reminder the day before', vars: '{name} {for} {when} {doctor} {location} {link}' },

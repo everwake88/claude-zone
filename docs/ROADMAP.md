@@ -146,7 +146,7 @@ dashboard each restaurant runs. Everything is in `EVERWAKE-ORDERS/`.
 
 `EVERWAKE-CLINIC/` is a sister product of Orders with the same three parts: database, engine and dashboard. It serves doctors of any speciality, with dentists first. It is built in three stages, and stops for review after each one.
 
-### Stage 1 — the booking core ✅ BUILT (awaiting review)
+### Stage 1 — the booking core ✅ BUILT (reviewed)
 
 | Item | Where |
 |---|---|
@@ -155,13 +155,13 @@ dashboard each restaurant runs. Everything is in `EVERWAKE-ORDERS/`.
 | Slots, queue numbers (الدور) or both; chairs booked with the doctor; holds; the waitlist; follow-up pricing; treatment plans | `005` |
 | Two reminders with confirm / move / cancel; "the doctor is late" with timed follow-ups; cancelled sessions; time off | `007` |
 | 29 speciality presets (dentistry the richest) | `020` |
-| The WhatsApp assistant: Egyptian dates and red flags worked out in code; voice notes, photos and PDFs; the doctor's own WhatsApp for delays and prices; 119 tests | `engine/` |
+| The WhatsApp assistant: Egyptian dates and red flags worked out in code; voice notes, photos and PDFs; the doctor's own WhatsApp for delays and prices | `engine/` |
 | The dashboard, in Arabic and English, on phone and desktop | `dashboard/` |
 | The patient's own page from the reminder link | `/a/<token>` |
 | A living demo day for sales | `database/tools/showcase_clinic.sql` |
 
 The dashboard's pages:
-- Today, with the session ribbon;
+- Today, with the day timeline and three rings (redesigned in stage 2);
 - the calendar, with drag to move;
 - patients and records;
 - the dental chart and treatment plans;
@@ -172,13 +172,16 @@ The dashboard's pages:
 - knowledge and rules;
 - every setting.
 
-### Stage 2 — the doctor's AI — NEXT
+### Stage 2 — the doctor's AI ✅ BUILT (awaiting review)
 
-- **"Listen to the visit".** It records with consent and transcribes live. Then it fills the speciality's form, with a quoted piece of evidence for every field and a verifier pass, and the doctor reviews and signs. It also fills the dental chart and drafts the plan from what was said.
-- **The doctor's assistant, by chat and voice.**
-  - It reads records and the day.
-  - It changes prices, rules and schedules through the same functions, always with a confirm card.
-- **Pre-visit questions** after booking.
+| Item | Where |
+|---|---|
+| Recordings with consent, scribe runs with the evidence, signing that writes only what was ticked, audio retention, the assistant's chats and cards per user, pre-visit questions per speciality; test 70 | `database/migrations/012` |
+| The visit workspace: listen, the form filled with a quote behind every value, unclear fields left empty, new for the record by tick, sign; the SOAP note, the prescription and letters on the clinic's paper, the summary on WhatsApp, the follow-up | `dashboard/src/components/visit`, `app/api/scribe` |
+| The doctor's assistant by chat and voice: read with the member's own access, change only on Confirm, by role; fills the open visit | `dashboard/src/components/assistant`, `app/api/assistant` |
+| Pre-visit questions on WhatsApp after booking; an hourly audio deletion; 120 engine tests | `engine/` |
+| The dashboard redesigned in Everwake navy and gold: a navy slab, calm one-question cards, rings, the day timeline, restrained motion | `dashboard/` |
+| 14 unit tests for the scribe's and the assistant's logic | `dashboard/src/lib/**/*.test.ts` |
 
 ### Stage 3 — payments, analytics, extras
 

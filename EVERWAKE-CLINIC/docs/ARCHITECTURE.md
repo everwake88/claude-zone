@@ -98,7 +98,7 @@ Every change is shown first (who will be told, before → after) and applied onl
   - **Per-doctor and per-place prices** (`service_prices`).
   - **Other fields:** sessions and spacing, preparation and aftercare text, who does the service and on which days, age limits, a chair needed.
 - **Offers, answers (FAQs and policies), and the doctors' rules.**
-- **How changes are made.** Every change from the editor, the import, staff WhatsApp or (stage 2) the assistant goes through `catalog_change`:
+- **How changes are made.** Every change from the editor, the import, staff WhatsApp or the doctor's assistant goes through `catalog_change`:
   - it builds a preview, then applies;
   - the before and after are kept in `catalog_changes`;
   - `catalog_undo` reverts it.
@@ -111,3 +111,37 @@ Every change is shown first (who will be told, before → after) and applied onl
   - `plan_quote` sends the total on WhatsApp. Once the patient says "موافق", the assistant books the first session.
   - When a visit is marked done, the item's progress moves on and the next session is offered.
   - Each chair is booked together with the doctor, so two patients never share a chair.
+
+## Listening to the visit (012, `app/api/scribe`, `lib/scribe`)
+
+```
+consent ─► recording_start ─► every 20 s: a whole audio file ─► IndexedDB ─► POST /api/scribe/chunk
+                                                                             storage clinic-recordings/<clinic>/<rec>/<seq>
+                                                                             heard (SCRIBE_TRANSCRIBE_MODEL, with the patient's name,
+                                                                             the doctor's usual words and the last words) ─► recording_chunk
+Stop ─► POST /api/scribe/finish (streamed stages)
+          transcript  each piece diarised (SCRIBE_DIARIZE_MODEL), on the visit's clock; else the pieces' words
+          extract     the form as a strict JSON schema (lib/scribe/schema.ts): every value with a quote, segment ids,
+                      who said it and a confidence; the record, the teeth, the plan, the prescription, SOAP, the summary
+          verify      every quote looked up in the transcript after Arabic is normalised (lib/scribe/verify.ts);
+                      then an independent model (SCRIBE_VERIFY_MODEL) flags anything unsupported; flagged = emptied
+        ─► scribe_save (status review) ─► the doctor checks, ticks, signs ─► scribe_sign
+```
+
+- **Consent and access.** `recording_start` refuses without consent and outside the clinical team; storage follows the same rule.
+- **Signing** (`scribe_sign`) writes the encounter (signed, its `sources` the quotes and the recording) and only the ticked allergies, medicines and conditions (`save_record`, source `scribe`), the teeth (`set_teeth`) and the plan (`save_plan`). It runs once.
+- **Retention.** Each clinic keeps audio `settings.scribe.audio_days` (30). Every hour n8n calls `/api/scribe/retention`, which deletes the files with the service role and marks them (`recordings_to_purge`, `recordings_purged`). The transcript stays.
+- **Nothing is lost** if the network drops: pieces wait in the browser and are sent again in order; a reloaded page picks the recording up.
+
+## The doctor's assistant (`app/api/assistant`, `lib/assistant`)
+
+- **A turn** (`loop.ts`) streams from the OpenAI Responses API with function tools. Reading tools run at once with the member's own session, so row level security decides what they see. They reuse the dashboard's functions (`patient_search`, `patient_profile`, `today_board`, `calendar_range`, `dashboard_slots`, `alert_list`, `inbox_thread`, `assistant_stats`).
+- **Changes never run at once.** A write tool builds its preview from the same function (`dashboard_delay` with `preview`, `dashboard_block_time`, `catalog_change` with `p_apply=false`, …) and saves a card in `assistant_actions`. Confirm (`/api/assistant/confirm`) runs it through the same function (`staff_book`, `move_appointment`, `set_appointment_status`, `send_staff_message`, `set_teeth`, `save_plan`, `catalog_apply`) and keeps the result.
+- **By role.** A member who is not clinical gets no clinical tools; prices and time off are for owners, managers and doctors. On a visit's page two more tools fill the open form and the prescription in the browser; the doctor still signs.
+- **Its rules:** never diagnose or prescribe on its own; a prescription only from the doctor's words; say a card is waiting, never that a change is done.
+- Threads, messages and cards are the member's own rows; nobody else in the clinic sees them.
+
+## Pre-visit questions
+
+Each speciality preset has a few `pre_visit` questions. After a WhatsApp booking, `turn_context` lists the next visit's unanswered ones (`pre_visit_pending`), minus what the patient's file already has; the assistant asks them one at a time and saves each answer with the `pre_visit` action, under the question, on the appointment. Today's Now card and the visit workspace show them.
+

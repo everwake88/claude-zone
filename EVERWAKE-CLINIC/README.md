@@ -1,6 +1,6 @@
 # Everwake Clinic
 
-An AI front desk for doctors of any speciality, with full support for dentists. It has two parts.
+An AI front desk and an AI scribe for doctors of any speciality, with full support for dentists. It has three parts.
 
 - **A 24/7 WhatsApp assistant** that books patients. It:
   - understands Egyptian booking language ("يوم الأربع اللي بعد الجاي"، "بعد بكره"، "بعده"), voice notes, photos and PDFs;
@@ -13,30 +13,40 @@ An AI front desk for doctors of any speciality, with full support for dentists. 
   - dental charts and treatment plans;
   - the WhatsApp inbox;
   - services and prices, and every setting.
+- **The doctor's AI.** It:
+  - listens to the visit (with the patient's consent) and fills the doctor's own form, with the words behind every value; the doctor ticks what goes on the file and signs;
+  - prints the prescription and letters on the clinic's paper and sends the patient a summary on WhatsApp;
+  - answers the doctor by chat or voice, and prepares any change as a card to confirm;
+  - asks the patient the speciality's few questions on WhatsApp before the visit.
 
 Arabic and English throughout. Multi-tenant: one sign-in can belong to several clinics, and every clinic sees only its own data.
 
-> **Stage 1 (this release): the booking core.** Stage 2 adds the visit recorder and the doctor's AI assistant (chat and voice). Stage 3 adds online payment with Paymob, analytics and the extras. See [docs/ROADMAP.md](../docs/ROADMAP.md).
+> **Stage 1: the booking core. Stage 2 (this release): the doctor's AI**, and a calmer navy-and-gold dashboard. Stage 3 adds online payment with Paymob, analytics and the extras. See [docs/ROADMAP.md](../docs/ROADMAP.md).
 
 ## Layout
 
 ```
 database/          Postgres (Supabase), schema `clinic`: every rule is a SQL function
-  migrations/      001–011, 020 (29 speciality presets), 090 (Supabase storage + live updates)
+  migrations/      001–012 (012: the doctor's AI), 020 (29 speciality presets), 090 (Supabase storage + live updates)
   seed/            demo_clinic.sql: "عيادات النيل", a dentist and a paediatrician, two branches
   tools/           build_setup.sh (one-paste setup file), showcase_clinic.sql (a living demo day)
-  tests/           run.sh + 6 test files
+  tests/           run.sh + 7 test files
 engine/            the n8n workflows, generated from src/ and prompts/ (npm run build → dist/)
-dashboard/         Next.js 15 + Supabase: the clinic's dashboard and the patient's page
+dashboard/         Next.js 15 + Supabase: the clinic's dashboard, the visit workspace, the assistant, the patient's page
+  src/lib/scribe/  the form as a strict schema, the transcript, the evidence check, the recorder and its upload queue
+  src/lib/assistant/ the assistant's tools (read now, change on Confirm) and its loop
 docs/              SETUP (from nothing to the first booking) · ARCHITECTURE · ONBOARDING
 everwake_clinic_supabase_setup.sql   every migration in one file, for Supabase's SQL editor
 ```
 
-## What the clinic gets (stage 1)
+## What the clinic gets
 
 | | |
 |---|---|
-| **Today** | The session ribbon: each doctor's day as a line, every patient a block, a live "now" needle. A doctor's delay shows as a hatched band that pushes the blocks along. Below it: the next patient (allergies in red, what they said, their last visit and files), the waiting room with wait times, delay replies coming in, what the assistant booked, and the go-live checklist. |
+| **Today** | A greeting with the day in one sentence ("5 patients left · next at 7:30 · 20 min late"); who is with the doctor now, with Start visit; three rings (seen today, tomorrow confirmed, booked on WhatsApp); what needs someone and the waiting room; and the day timeline beside it: a card per patient, a "now" line, the delay as a hatched band. |
+| **Listen to the visit** | Consent, then one button. The visit is heard in 20-second pieces as it goes (kept in the browser until the server has them). On Stop it tells the doctor's words from the patient's, fills the speciality's form with a quote behind every value, checks every quote against the transcript and with a second, independent model, and leaves anything it cannot stand behind empty. New allergies, medicines, conditions, teeth and plan items wait for a tick. Sign, then print the prescription and letters, send the summary, book the follow-up. The audio is deleted after 30 days (per clinic); the words stay. |
+| **The assistant** | An orb in every page's corner (⌘J), by chat or by holding the mic. It reads the day, patients, chats and the numbers with the member's own access. A delay, a booking, a move, a message, a price, a chart or a plan becomes a card: Confirm runs it. On a visit it fills the open form and the prescription from what the doctor dictates. |
+| **Pre-visit questions** | After booking on WhatsApp, the assistant asks the speciality's few questions one at a time (a dentist: the last dental visit, blood thinners, pregnancy), never what is already on file. The answers show on the visit. |
 | **Calendar** | Week (a lane per doctor) or day (a column per doctor). Drag a booking to move it, and the patient is told on WhatsApp if you choose. There is also a list view for phones. |
 | **Patients** | Search by name, mobile or file number. The profile holds allergies, conditions, medicines, history and vitals. Visit notes are written on the speciality's form, as a draft until signed. Files sent on WhatsApp arrive already read and summarised. |
 | **Teeth & plans** | An FDI dental chart (adult and child): tap a tooth to set its condition, surfaces and planned work. Treatment plans list tooth, treatment and price, with a total, a discount, "send the quote on WhatsApp", and progress session by session. |
@@ -65,7 +75,7 @@ cd engine && npm install && npm run build && PGPASSWORD=postgres npm test
 ```
 
 ```bash
-cd dashboard && npm install && npm run typecheck && npm run i18n:check && npm run build
+cd dashboard && npm install && npm run typecheck && npm run i18n:check && npm test && npm run build
 ```
 
 ## Honest limits
@@ -79,3 +89,5 @@ cd dashboard && npm install && npm run typecheck && npm run i18n:check && npm ru
   - Only doctors and nurses (members marked "sees records") can read them.
   - Every opening of a record is logged.
 - **The assistant never diagnoses or prescribes.** Medical questions go to the doctor, and an emergency gets the clinic's emergency text first.
+- **The scribe drafts; the doctor signs.** Nothing reaches the record until the doctor signs, and only what they ticked. A prescription line is only what the doctor said. Listening needs the patient's consent every time and an `OPENAI_API_KEY`; without the key the doctor types the note.
+- **Speech models are not perfect,** above all with two people talking over each other or Egyptian Arabic mixed with English. That is why every value carries its quote and can be played back.
