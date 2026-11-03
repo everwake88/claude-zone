@@ -26,6 +26,8 @@
 //   EW_AGENT_EFFORT     the Agent's reasoning effort (default low behind the Brain, medium alone)
 //   EW_TRANSCRIBE_MODEL hears a voice note (default gpt-transcribe)
 //   EW_VISION_MODEL     reads a photo or a PDF (default gpt-5-mini); EW_VISION_EFFORT its reasoning (default low)
+//   EW_DASHBOARD_URL    the dashboard's address, for the hourly deletion of visit audio past its days
+//                       (default http://localhost:3000)
 //
 // n8n-ids.json (optional): { "main": "…", "booking": "…", "staff": "…" } — the ids
 // n8n gave the workflows, so the tool nodes and the Test Runner are linked after a re-import.
@@ -51,6 +53,7 @@ const AGENT_EFFORT = process.env.EW_AGENT_EFFORT || (USE_BRAIN ? 'low' : 'medium
 const TRANSCRIBE_MODEL = process.env.EW_TRANSCRIBE_MODEL || 'gpt-transcribe';
 const VISION_MODEL = process.env.EW_VISION_MODEL || 'gpt-5-mini';
 const VISION_EFFORT = process.env.EW_VISION_EFFORT ?? 'low';
+const DASHBOARD_URL = (process.env.EW_DASHBOARD_URL || 'http://localhost:3000').replace(/\/+$/, '');
 const PG = { postgres: { id: process.env.EW_PG_CRED_ID || 'EVERWAKE_CLINIC_DB', name: 'Everwake Clinic DB' } };
 const OPENAI = { openAiApi: { id: process.env.EW_OPENAI_CRED_ID || 'OPENAI', name: 'OpenAi account' } };
 const OUTBOX_AUTH = { httpHeaderAuth: { id: 'EVERWAKE_CLINIC_OUTBOX', name: 'Everwake Clinic Outbox Secret' } };
@@ -382,13 +385,20 @@ function buildOutbox() {
     '## Everwake Clinic · Outbox',
     'Everything the clinic sends that is not the assistant\'s own reply — reminders, "the doctor is running late", cancelled sessions with new times, the front desk\'s replies, aftercare, emergencies to the doctor\'s own number — is written to `clinic.outbox` first, so nothing is lost while WhatsApp or n8n is down.',
     'Runs **every minute** (housekeeping: reminders due, delay follow-ups, holds that lapsed, no-shows, idle takeovers) and **immediately** when the dashboard pings **POST /webhook/clinic-outbox** (header auth: *Everwake Clinic Outbox Secret* = the dashboard\'s N8N_OUTBOX_SECRET).',
-    'A failed send retries 3 times, 30 s apart, then shows as failed in the dashboard with the reason.'
-  ].join('\n'), [0, 0], 1400, 240, 5));
+    'A failed send retries 3 times, 30 s apart, then shows as failed in the dashboard with the reason.',
+    '**Every hour** it asks the dashboard to delete visit recordings whose audio is past the clinic\'s days (Settings → Listening to the visit; 30 by default). The transcript and the signed note stay.'
+  ].join('\n'), [0, 0], 1400, 260, 5));
   w.add({ name: 'Every Minute', type: 'n8n-nodes-base.scheduleTrigger', typeVersion: 1.2, position: [0, 340],
           parameters: { rule: { interval: [{ field: 'minutes', minutesInterval: 1 }] } } });
   w.add({ name: 'Ping From Dashboard', type: 'n8n-nodes-base.webhook', typeVersion: 2.1, position: [0, 560],
           parameters: { httpMethod: 'POST', path: 'clinic-outbox', authentication: 'headerAuth', options: {} }, credentials: OUTBOX_AUTH });
   w.add(pg('Housekeeping', 'select clinic.housekeeping() as r;', null, [220, 340]));
+  w.add({ name: 'Every Hour', type: 'n8n-nodes-base.scheduleTrigger', typeVersion: 1.2, position: [0, 800],
+          parameters: { rule: { interval: [{ field: 'hours', hoursInterval: 1 }] } } });
+  w.add({ name: 'Delete Old Visit Audio', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: [220, 800], credentials: OUTBOX_AUTH,
+          parameters: { method: 'POST', url: `${DASHBOARD_URL}/api/scribe/retention`, authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
+                        options: { response: { response: { neverError: true, responseFormat: 'json' } }, timeout: 60000 } },
+          onError: 'continueRegularOutput', alwaysOutputData: true });
   w.add(pg('Claim Batch', "select clinic.outbox_claim(25, 'n8n') as r;", null, [440, 460]));
   w.add(code('One Item Per Message', 'outbox/split_batch.js', [660, 460]));
   w.add({ name: 'Send Loop', type: 'n8n-nodes-base.splitInBatches', typeVersion: 3, position: [880, 460], parameters: { options: { reset: false } } });
@@ -401,6 +411,7 @@ function buildOutbox() {
   w.add(pg('Save Result', b64sql('outbox_result'), '={{ [ $json.b64_result ] }}', [1980, 500]));
   w.chain('Every Minute', 'Housekeeping', 'Claim Batch');
   w.link('Ping From Dashboard', 'Claim Batch');
+  w.link('Every Hour', 'Delete Old Visit Audio');
   w.chain('Claim Batch', 'One Item Per Message', 'Send Loop');
   w.link('Send Loop', 'Done', 0); w.link('Send Loop', 'Route: Text?', 1);
   w.link('Route: Text?', 'Evolution — Send Text', 0); w.link('Route: Text?', 'Route: Location?', 1);

@@ -237,3 +237,47 @@ test('a voice note and a lab report: understood before the turn, the report kept
   assert.match(doc.ai_summary, /Hb 10\.2/);
   assert.deepEqual(t.checked.violations, []);
 });
+
+test('after booking, the doctor\'s questions before the visit: one at a time, each answer kept on the visit', async () => {
+  const phone = '201099990000';
+  const day = await sat();
+  let t = await turn(db, evolutionPayload({ phone, pushName: 'Reem', text: 'عايزة احجز كشف اسنان يوم السبت بالليل' }), async () => ({
+    plan: { stage: 'choosing_time' }, tools: [{ action: 'find_slots', details: { service: 'كشف أسنان', date: day, band: 'evening' } }],
+    reply: (steps) => say(`المتاح السبت:\n${optionsText(steps)}\nأنهي ميعاد يناسبك؟`)
+  }));
+  assert.equal(t.steps[0].result.status, 'OPTIONS', JSON.stringify(t.steps[0].result));
+  t = await turn(db, evolutionPayload({ phone, text: 'الأول، ريم خالد 28 سنة' }), async () => ({
+    plan: { stage: 'confirming' },
+    tools: [{ action: 'update', details: { option: 1, full_name: 'ريم خالد', age: '28', sex: 'female', relation: 'self' } }, { action: 'summary' }],
+    reply: (steps) => say(`${steps[1].result.summary_text}\n\nأأكد الحجز؟`)
+  }));
+  t = await turn(db, evolutionPayload({ phone, text: 'اه اكدي' }), async () => ({
+    plan: { stage: 'booked' }, tools: [{ action: 'book' }], reply: say('اتحجزلك يا ريم ✅')
+  }));
+  const ref = t.steps[0].result.appointment.ref_no;
+
+  // the next message: the questions are in FACTS, the answer is saved under the question
+  t = await turn(db, evolutionPayload({ phone, text: 'شكرا' }), async (brief) => {
+    assert.ok(brief.facts_text.includes(`PRE-VISIT QUESTIONS for ${ref}`), brief.facts_text);
+    assert.match(brief.facts_text, /- last_dental: آخر مرة زرت دكتور أسنان كانت امتى؟/);
+    assert.match(brief.facts_text, /- blood_thinners: /);
+    assert.match(brief.facts_text, /- pregnancy: /);
+    return { plan: { stage: 'pre_visit' }, reply: say('العفو 🌿 عشان الدكتورة تكون عارفة قبل ما تيجي: آخر مرة زرتي دكتور أسنان كانت امتى؟') };
+  });
+  assert.deepEqual(t.checked.violations, []);
+  t = await turn(db, evolutionPayload({ phone, text: 'من سنة تقريبا' }), async (brief) => {
+    assert.match(brief.facts_text, /PRE-VISIT QUESTIONS/);
+    return { plan: { stage: 'pre_visit' }, tools: [{ action: 'pre_visit', details: { answers: { last_dental: 'من سنة تقريبا' } } }],
+             reply: (steps) => say(`تمام 🙏 ${steps[0].result.still_to_ask[0].ask_ar}`) };
+  });
+  assert.equal(t.steps[0].result.status, 'SAVED', JSON.stringify(t.steps[0].result));
+  assert.equal(t.steps[0].result.still_to_ask.length, 2);
+  assert.equal((await sql(db, `select pre_visit ->> 'آخر مرة زرت دكتور أسنان كانت امتى؟' as r from clinic.appointments where ref_no = $1`, [ref])).r, 'من سنة تقريبا');
+  t = await turn(db, evolutionPayload({ phone, text: 'لا مش باخد حاجة' }), async (brief) => {
+    assert.doesNotMatch(brief.facts_text, /- last_dental:/, 'an answered question is not asked again');
+    assert.match(brief.facts_text, /- blood_thinners: /);
+    return { plan: { stage: 'pre_visit' }, tools: [{ action: 'pre_visit', details: { answers: { blood_thinners: 'لا مش باخد حاجة' } } }],
+             reply: say('تمام، شكراً 🌿') };
+  });
+  assert.equal(t.steps[0].result.still_to_ask.length, 1);
+});

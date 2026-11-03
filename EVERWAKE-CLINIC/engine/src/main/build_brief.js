@@ -68,6 +68,12 @@ if (upcoming.length) {
       + (a.price_text ? ` · ${a.price_text}${a.is_follow_up ? ' (follow-up)' : ''}` : ''));
   }
 }
+// ---- what the doctor wants to know before the visit (asked after booking, one at a time) ---------
+const pre = obj(ctx.pre_visit_pending);
+if (arr(pre.questions).length) {
+  P(`PRE-VISIT QUESTIONS for ${pre.ref_no || 'their next visit'} — the doctor wants these before the visit. Ask only when the chat allows (the booking is done, nothing else is pending, never in an emergency), ONE short question per reply, and save each answer with pre_visit {answers: {key: "their words"}}:`);
+  for (const q of arr(pre.questions)) P(`  - ${q.key}: ${lang === 'en' ? str(q.ask_en) || str(q.ask_ar) : str(q.ask_ar)}`);
+}
 const past = arr(ctx.past_visits);
 if (past.length) P('PAST VISITS: ' + past.map(a => `${a.date} ${a.patient || ''} ${a.service || ''} with ${a.doctor} (${a.status})`).join(' · '));
 

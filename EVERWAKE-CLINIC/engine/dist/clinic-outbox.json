@@ -10,9 +10,9 @@
         0
       ],
       "parameters": {
-        "content": "## Everwake Clinic · Outbox\nEverything the clinic sends that is not the assistant's own reply — reminders, \"the doctor is running late\", cancelled sessions with new times, the front desk's replies, aftercare, emergencies to the doctor's own number — is written to `clinic.outbox` first, so nothing is lost while WhatsApp or n8n is down.\nRuns **every minute** (housekeeping: reminders due, delay follow-ups, holds that lapsed, no-shows, idle takeovers) and **immediately** when the dashboard pings **POST /webhook/clinic-outbox** (header auth: *Everwake Clinic Outbox Secret* = the dashboard's N8N_OUTBOX_SECRET).\nA failed send retries 3 times, 30 s apart, then shows as failed in the dashboard with the reason.",
+        "content": "## Everwake Clinic · Outbox\nEverything the clinic sends that is not the assistant's own reply — reminders, \"the doctor is running late\", cancelled sessions with new times, the front desk's replies, aftercare, emergencies to the doctor's own number — is written to `clinic.outbox` first, so nothing is lost while WhatsApp or n8n is down.\nRuns **every minute** (housekeeping: reminders due, delay follow-ups, holds that lapsed, no-shows, idle takeovers) and **immediately** when the dashboard pings **POST /webhook/clinic-outbox** (header auth: *Everwake Clinic Outbox Secret* = the dashboard's N8N_OUTBOX_SECRET).\nA failed send retries 3 times, 30 s apart, then shows as failed in the dashboard with the reason.\n**Every hour** it asks the dashboard to delete visit recordings whose audio is past the clinic's days (Settings → Listening to the visit; 30 by default). The transcript and the signed note stay.",
         "width": 1400,
-        "height": 240,
+        "height": 260,
         "color": 5
       },
       "id": "9f937949-6403-5ca2-a55f-709659fe7356"
@@ -80,6 +80,59 @@
         "options": {}
       },
       "id": "362d3035-4354-56f0-a701-9597e74a262f"
+    },
+    {
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        800
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "9d090ebc-7068-5004-a184-ffab6e5dc43b"
+    },
+    {
+      "name": "Delete Old Visit Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        220,
+        800
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EVERWAKE_CLINIC_OUTBOX",
+          "name": "Everwake Clinic Outbox Secret"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/scribe/retention",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "ddf44dd0-830f-514a-ad5a-985de2e5e923"
     },
     {
       "name": "Claim Batch",
@@ -391,6 +444,17 @@
         [
           {
             "node": "Claim Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Visit Audio",
             "type": "main",
             "index": 0
           }

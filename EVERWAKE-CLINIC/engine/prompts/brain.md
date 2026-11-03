@@ -40,6 +40,7 @@ FACTS → WHAT THEY ARE REPLYING TO says when they're answering the clinic's own
 - a cancelled session: the options in the message are already in the booking in progress — "1"/"2" = update with that option, then summary and book.
 - an earlier time offered: "1"/yes = take_offer, then summary and book.
 - a treatment-plan quote: "موافق"/yes = accept_plan (it brings the first session's times).
+- an answer to one of the PRE-VISIT QUESTIONS in FACTS = pre_visit with {answers: {key: their words}}, then the next question if one is left.
 </replies_to_the_clinic>
 
 <prices_and_answers>

@@ -11,4 +11,5 @@ Books, moves and cancels visits at this clinic. Call it with an action and, when
 - accept_plan: they accept the treatment plan they were quoted; returns the first session's OPTIONS.
 - next_plan_session: OPTIONS for the next session of their treatment plan.
 - join_waitlist: they want an earlier time than any offered (details: doctor, to, band).
+- pre_visit: save their answers to the PRE-VISIT QUESTIONS in FACTS. details: answers ({key: their words, in their words}), ref_no if several. "مش عارف" is an answer too. Returns still_to_ask.
 - status: their upcoming visits and the booking in progress.
