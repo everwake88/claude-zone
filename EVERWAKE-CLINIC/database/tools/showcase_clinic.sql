@@ -264,3 +264,119 @@ begin
   select t, p[15 + k], pc.contact_id, co.wa_id, d1, maadi, s_chk, v_today, v_today + 7, (array['evening', 'any', 'afternoon'])[k + 1], 'waiting', now() - make_interval(hours => k * 5 + 2)
     from generate_series(0, 2) k join clinic.patient_contacts pc on pc.patient_id = p[15 + k] join clinic.contacts co on co.id = pc.contact_id;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- The visit happening now with the dentist, listened to: the transcript
+-- (doctor and patient told apart), the form filled with a quote behind
+-- every value, two fields the check could not stand behind, and what is
+-- new for the file (an allergy, a medicine, a tooth, a plan) waiting for
+-- the doctor's ticks.
+-- ---------------------------------------------------------------------
+do $$
+declare
+  t uuid; a clinic.appointments%rowtype; rid bigint; segs jsonb; ex jsonb;
+begin
+  select id into t from clinic.tenants where slug = 'nile_clinics';
+  select * into a from clinic.appointments x where x.tenant_id = t and x.status = 'in_visit'
+     and x.doctor_id = (select id from clinic.doctors where tenant_id = t and code = 'D1') order by x.starts_at desc limit 1;
+  if not found then return; end if;
+  delete from clinic.recordings where appointment_id = a.id;
+  segs := '[
+    {"id":"s0_0","speaker":"doctor","start":0,"end":4.2,"text":"أهلاً، اتفضلي. إيه اللي تاعبك؟"},
+    {"id":"s0_1","speaker":"patient","start":4.4,"end":11,"text":"الضرس اللي تحت شمال بيوجعني من أسبوع، بالذات مع الساقع والحلو"},
+    {"id":"s0_2","speaker":"doctor","start":11.4,"end":15.8,"text":"الوجع بيفضل ولا بيروح أول ما الساقع يمشي؟"},
+    {"id":"s0_3","speaker":"patient","start":16,"end":19.6,"text":"بيروح بعد شوية، بس ساعات بيصحيني بالليل"},
+    {"id":"s1_0","speaker":"doctor","start":20.3,"end":23.5,"text":"في ورم أو سخونية؟"},
+    {"id":"s1_1","speaker":"patient","start":23.8,"end":26,"text":"لا مفيش ورم خالص"},
+    {"id":"s1_2","speaker":"doctor","start":26.4,"end":30.5,"text":"آخر مرة كشفتي أسنان كانت امتى؟"},
+    {"id":"s1_3","speaker":"patient","start":30.8,"end":33.2,"text":"من حوالي سنة"},
+    {"id":"s1_4","speaker":"doctor","start":33.5,"end":36.9,"text":"عندك حساسية من أي دوا؟"},
+    {"id":"s1_5","speaker":"patient","start":37.1,"end":39.8,"text":"عندي حساسية من السلفا، بتعملي هرش"},
+    {"id":"s2_0","speaker":"doctor","start":40.4,"end":44.1,"text":"وبتاخدي حاجة للوجع دلوقتي؟"},
+    {"id":"s2_1","speaker":"patient","start":44.3,"end":47.5,"text":"باخد بنادول لما يوجعني جامد"},
+    {"id":"s2_2","speaker":"doctor","start":48,"end":55.6,"text":"تمام. خلينا نشوف. النضافة متوسطة، وفي التهاب بسيط في اللثة حوالين الضروس اللي تحت"},
+    {"id":"s3_0","speaker":"doctor","start":60.2,"end":68.4,"text":"سبعة وتلاتين فيها تسوس عميق قريب من العصب، هنعمل أشعة صغيرة عليها"},
+    {"id":"s3_1","speaker":"doctor","start":68.8,"end":76.9,"text":"الأشعة بتقول إن التسوس واصل للعصب، فمحتاجين حشو عصب على جلستين وبعدين طربوش"},
+    {"id":"s4_0","speaker":"doctor","start":80.5,"end":86.2,"text":"النهارده هحطلك حشو مؤقت، وهكتبلك كلينداميسين ٣٠٠ كل ٨ ساعات لمدة ٥ أيام"},
+    {"id":"s4_1","speaker":"doctor","start":86.6,"end":92,"text":"وبنادول ٥٠٠ لو في وجع، ومتاكليش على الناحية دي، وبعدي عن الساقع والحلو"},
+    {"id":"s5_0","speaker":"doctor","start":100.3,"end":104.6,"text":"وتعالي بعد أسبوع نبدأ العصب"},
+    {"id":"s5_1","speaker":"patient","start":104.8,"end":107,"text":"تمام يا دكتورة، شكراً"}
+  ]';
+  insert into clinic.recordings (tenant_id, patient_id, appointment_id, doctor_id, consent_at, consent_text, status, chunks, duration_ms,
+                                 transcript, diarized, language, audio_delete_after, created_at)
+  values (t, a.patient_id, a.id, a.doctor_id, now() - interval '9 minutes', 'The patient agreed to the visit being recorded for the medical record.', 'review',
+          (select jsonb_agg(jsonb_build_object('seq', k, 'ms', case when k = 5 then 9000 else 20000 end, 'path', t::text || '/demo/' || lpad(k::text, 4, '0') || '.webm',
+                   'text', (select string_agg(s ->> 'text', ' ') from jsonb_array_elements(segs) s where split_part(s ->> 'id', '_', 1) = 's' || k)))
+             from generate_series(0, 5) k),
+          109000, jsonb_build_object('segments', segs), true, 'ar', now() + interval '30 days', now() - interval '9 minutes')
+  returning id into rid;
+  ex := '{
+    "fields": {
+      "complaint.chief_complaint": {"value": "ألم في الضرس السفلي الأيسر من أسبوع مع الساقع والحلو", "quote": "الضرس اللي تحت شمال بيوجعني من أسبوع، بالذات مع الساقع والحلو", "segment_ids": ["s0_1"], "confidence": 0.93, "speaker": "patient"},
+      "complaint.pain_site": {"value": "الضرس السفلي الأيسر (37)", "quote": "الضرس اللي تحت شمال", "segment_ids": ["s0_1"], "confidence": 0.82, "speaker": "patient"},
+      "complaint.pain_character": {"value": "متقطع", "quote": "بيروح بعد شوية", "segment_ids": ["s0_3"], "confidence": 0.74, "speaker": "patient"},
+      "complaint.triggers": {"value": ["ساقع", "حلو"], "quote": "بالذات مع الساقع والحلو", "segment_ids": ["s0_1"], "confidence": 0.95, "speaker": "patient"},
+      "complaint.duration": {"value": "أسبوع", "quote": "بيوجعني من أسبوع", "segment_ids": ["s0_1"], "confidence": 0.9, "speaker": "patient"},
+      "complaint.swelling": {"value": false, "quote": "لا مفيش ورم خالص", "segment_ids": ["s1_1"], "confidence": 0.96, "speaker": "patient"},
+      "dental_history.last_visit": {"value": "من حوالي سنة", "quote": "من حوالي سنة", "segment_ids": ["s1_3"], "confidence": 0.94, "speaker": "patient"},
+      "dental_history.bleeding_gums": {"value": null, "was": true, "unsupported": true, "why": "the quote is not in the transcript", "quote": "اللثة بتنزف وأنا بغسل سناني", "segment_ids": [], "confidence": 0.41, "speaker": "patient"},
+      "dental_history.brushing": {"value": null, "was": "مرة يومياً", "unsupported": true, "why": "no quote", "quote": null, "segment_ids": [], "confidence": 0.3, "speaker": null},
+      "medical.allergies": {"value": "حساسية من السلفا (هرش)", "quote": "عندي حساسية من السلفا، بتعملي هرش", "segment_ids": ["s1_5"], "confidence": 0.95, "speaker": "patient"},
+      "medical.medications": {"value": "بنادول عند اللزوم", "quote": "باخد بنادول لما يوجعني جامد", "segment_ids": ["s2_1"], "confidence": 0.9, "speaker": "patient"},
+      "exam.hygiene": {"value": "متوسطة", "quote": "النضافة متوسطة", "segment_ids": ["s2_2"], "confidence": 0.9, "speaker": "doctor"},
+      "exam.gingiva": {"value": "التهاب بسيط في اللثة حوالين الضروس السفلية", "quote": "في التهاب بسيط في اللثة حوالين الضروس اللي تحت", "segment_ids": ["s2_2"], "confidence": 0.88, "speaker": "doctor"},
+      "plan.xrays": {"value": "أشعة صغيرة على 37: التسوس واصل للعصب", "quote": "الأشعة بتقول إن التسوس واصل للعصب", "segment_ids": ["s3_1"], "confidence": 0.9, "speaker": "doctor"},
+      "plan.diagnosis": {"value": "تسوس عميق في 37 واصل للعصب", "quote": "سبعة وتلاتين فيها تسوس عميق قريب من العصب", "segment_ids": ["s3_0"], "confidence": 0.9, "speaker": "doctor"},
+      "plan.done_today": {"value": "حشو مؤقت", "quote": "النهارده هحطلك حشو مؤقت", "segment_ids": ["s4_0"], "confidence": 0.95, "speaker": "doctor"},
+      "plan.advice": {"value": "متاكلش على الناحية دي، وتبعد عن الساقع والحلو", "quote": "ومتاكليش على الناحية دي، وبعدي عن الساقع والحلو", "segment_ids": ["s4_1"], "confidence": 0.92, "speaker": "doctor"},
+      "plan.follow_up": {"value": "بعد أسبوع لبدء حشو العصب", "quote": "وتعالي بعد أسبوع نبدأ العصب", "segment_ids": ["s5_0"], "confidence": 0.93, "speaker": "doctor"}
+    },
+    "chief_complaint": {"value": "ألم في الضرس السفلي الأيسر مع الساقع والحلو", "quote": "الضرس اللي تحت شمال بيوجعني من أسبوع، بالذات مع الساقع والحلو", "segment_ids": ["s0_1"], "confidence": 0.92, "speaker": "patient"},
+    "assessment": {"value": "تسوس عميق في 37 واصل للعصب", "quote": "الأشعة بتقول إن التسوس واصل للعصب", "segment_ids": ["s3_1"], "confidence": 0.9, "speaker": "doctor"},
+    "plan": {"value": "حشو عصب على جلستين ثم طربوش؛ حشو مؤقت النهارده", "quote": "محتاجين حشو عصب على جلستين وبعدين طربوش", "segment_ids": ["s3_1"], "confidence": 0.91, "speaker": "doctor"},
+    "follow_up_date": {"value": null, "quote": "وتعالي بعد أسبوع نبدأ العصب", "segment_ids": ["s5_0"], "confidence": 0.88, "speaker": "doctor"},
+    "record": {
+      "allergies": [{"substance": "سلفا", "reaction": "هرش", "quote": "عندي حساسية من السلفا، بتعملي هرش", "segment_ids": ["s1_5"], "confidence": 0.95, "speaker": "patient"}],
+      "medications": [{"name": "بنادول", "dose": null, "frequency": "عند اللزوم", "duration": null, "quote": "باخد بنادول لما يوجعني جامد", "segment_ids": ["s2_1"], "confidence": 0.9, "speaker": "patient"}],
+      "conditions": []
+    },
+    "prescription": [
+      {"name": "Clindamycin (كلينداميسين)", "dose": "300 مجم", "frequency": "كل 8 ساعات", "duration": "5 أيام", "notes": null, "quote": "كلينداميسين ٣٠٠ كل ٨ ساعات لمدة ٥ أيام", "segment_ids": ["s4_0"], "confidence": 0.94, "speaker": "doctor"},
+      {"name": "Paracetamol (بنادول)", "dose": "500 مجم", "frequency": "عند اللزوم", "duration": null, "notes": null, "quote": "وبنادول ٥٠٠ لو في وجع", "segment_ids": ["s4_1"], "confidence": 0.9, "speaker": "doctor"}
+    ],
+    "teeth": [{"tooth": 37, "condition": "caries", "planned": "حشو عصب ثم طربوش", "surfaces": ["O"], "quote": "سبعة وتلاتين فيها تسوس عميق قريب من العصب", "segment_ids": ["s3_0"], "confidence": 0.9, "speaker": "doctor"}],
+    "plan_items": [
+      {"tooth": 37, "label": "حشو عصب", "sessions": 2, "quote": "محتاجين حشو عصب على جلستين", "segment_ids": ["s3_1"], "confidence": 0.9, "speaker": "doctor"},
+      {"tooth": 37, "label": "طربوش", "sessions": 1, "quote": "وبعدين طربوش", "segment_ids": ["s3_1"], "confidence": 0.85, "speaker": "doctor"}
+    ],
+    "speakers": [{"label": "0:A", "role": "doctor"}, {"label": "0:B", "role": "patient"}],
+    "soap": {
+      "subjective": "ألم في الضرس السفلي الأيسر من أسبوع، يزيد مع الساقع والحلو ويروح بعد شوية، وأحياناً يصحيها بالليل. لا يوجد ورم. آخر كشف من سنة. حساسية من السلفا (هرش). تأخذ بنادول عند اللزوم.",
+      "objective": "نظافة الفم متوسطة. التهاب بسيط في اللثة حول الضروس السفلية. 37: تسوس عميق؛ الأشعة الصغيرة تُظهر وصوله للعصب.",
+      "assessment": "تسوس عميق في 37 واصل للعصب.",
+      "plan": "حشو مؤقت اليوم. كلينداميسين 300 مجم كل 8 ساعات 5 أيام، بنادول 500 عند اللزوم. حشو عصب على جلستين ثم طربوش. متابعة بعد أسبوع."
+    },
+    "summary_ar": "أهلاً 🌿 ده ملخص زيارتك النهارده:\n• الضرس اللي تحت شمال (37) فيه تسوس واصل للعصب.\n• اتحطلك حشو مؤقت، والعلاج حشو عصب على جلستين وبعدين طربوش.\n• الأدوية: كلينداميسين 300 كل 8 ساعات لمدة 5 أيام، وبنادول 500 لو في وجع.\n• متاكليش على الناحية دي، وابعدي عن الساقع والحلو.\n• ميعادك الجاي بعد أسبوع نبدأ العصب.\nألف سلامة عليكي."
+  }';
+  -- the follow-up the doctor said: a week from today
+  ex := jsonb_set(ex, '{follow_up_date,value}', to_jsonb((a.session_date + 7)::text));
+  -- the words follow the patient: the doctor speaks to a man as a man
+  if (select sex from clinic.patients where id = a.patient_id) = 'male' then
+    select replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(x, 'اتفضلي', 'اتفضل'), 'كشفتي', 'كشفت'), 'وبتاخدي', 'وبتاخد'),
+             'ومتاكليش', 'ومتاكلش'), 'وبعدي عن', 'وابعد عن'), 'وتعالي', 'وتعال'), 'وابعدي', 'وابعد'), 'عليكي', 'عليك'), 'يصحيها', 'يصحيه'), 'تأخذ', 'يأخذ')
+      into segs from (select segs::text as x) z;
+    select replace(replace(replace(replace(replace(replace(replace(replace(x, 'ومتاكليش', 'ومتاكلش'), 'وبعدي عن', 'وابعد عن'), 'وتعالي', 'وتعال'),
+             'وابعدي', 'وابعد'), 'عليكي', 'عليك'), 'يصحيها', 'يصحيه'), 'تأخذ', 'يأخذ'), 'متاكلش على', 'متاكلش على')
+      into ex from (select ex::text as x) z;
+    update clinic.recordings set transcript = jsonb_build_object('segments', segs),
+           chunks = (select jsonb_agg(c || jsonb_build_object('text', (select string_agg(s ->> 'text', ' ') from jsonb_array_elements(segs) s
+                                                                    where split_part(s ->> 'id', '_', 1) = 's' || (c ->> 'seq')))) from jsonb_array_elements(chunks) c)
+     where id = rid;
+  end if;
+  insert into clinic.scribe_runs (tenant_id, recording_id, models, extraction, verification, outputs, created_at)
+  values (t, rid, '{"transcribe": "gpt-transcribe", "diarize": "gpt-4o-transcribe-diarize", "extract": "gpt-5.6-luna", "verify": "gpt-5-mini"}', ex,
+          '{"supported": ["complaint.chief_complaint", "complaint.pain_site", "complaint.pain_character", "complaint.triggers", "complaint.duration", "complaint.swelling", "dental_history.last_visit", "medical.allergies", "medical.medications", "exam.hygiene", "exam.gingiva", "plan.xrays", "plan.diagnosis", "plan.done_today", "plan.advice", "plan.follow_up"],
+            "unsupported": [{"field": "dental_history.bleeding_gums", "why": "the quote is not in the transcript"}, {"field": "dental_history.brushing", "why": "no quote"}],
+            "flags": [], "dropped": [], "model_check": "done"}',
+          jsonb_build_object('soap', ex -> 'soap', 'summary_ar', ex -> 'summary_ar', 'prescription', ex -> 'prescription'), now() - interval '1 minute');
+end $$;

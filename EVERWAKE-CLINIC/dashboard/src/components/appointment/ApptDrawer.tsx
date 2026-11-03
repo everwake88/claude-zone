@@ -1,5 +1,5 @@
 'use client';
-import { AlertTriangle, CalendarClock, Check, FileText, MessageCircle, Phone, UserX, X as XIcon } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, FileText, MessageCircle, Mic, Phone, UserX, X as XIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { docName, placeName, useClinic } from '@/lib/clinic-data';
@@ -29,7 +29,7 @@ const STEPS: ApptStatus[] = ['booked', 'confirmed', 'arrived', 'in_visit', 'done
 // One appointment: who, when, why, and the one next step for the desk (confirmed → arrived → with
 // the doctor → done), plus moving it, a no-show or cancelling it. Today and the calendar both open it.
 export function ApptDrawer({ appt, onClose, onChanged }: { appt: ApptCard | null; onClose: () => void; onChanged?: () => void }) {
-  const { tenant, base } = useTenant();
+  const { tenant, base, can } = useTenant();
   const { t, lang } = useLang();
   const { doctors, locations } = useClinic();
   const { busy, run } = useAction();
@@ -98,7 +98,10 @@ export function ApptDrawer({ appt, onClose, onChanged }: { appt: ApptCard | null
           <Button busy={busy} disabled={!slot} onClick={move}>{t('Move it')}</Button>
         </> : live ? <>
           {a.status === 'booked' && <Button variant="outline" busy={busy} onClick={() => step('confirmed', t('Marked as confirmed.'))}><Check className="size-4" aria-hidden />{t('Confirmed by phone')}</Button>}
-          {next && <Button busy={busy} onClick={() => step(next.status, next.said)}>{next.label}</Button>}
+          {can.clinical && ['arrived', 'in_visit'].includes(a.status) && a.patient_id && (
+            <Link href={`${base}/visit/${a.id}`} className="press inline-flex h-10 items-center gap-1.5 rounded-full bg-gold px-4 text-sm font-semibold text-navy hover:bg-gold-bright"><Mic className="size-4" aria-hidden />{t(a.status === 'in_visit' ? 'Open the visit' : 'Start visit')}</Link>
+          )}
+          {next && <Button variant={can.clinical && ['arrived', 'in_visit'].includes(a.status) ? 'outline' : 'primary'} busy={busy} onClick={() => step(next.status, next.said)}>{next.label}</Button>}
         </> : (a.status === 'done' || a.status === 'no_show') ? <Button variant="outline" busy={busy} onClick={() => set(a.status === 'done' ? 'in_visit' : 'booked', t('Undone.'))}>{t('Undo')}</Button> : undefined}>
         {moving ? (
           <div className="space-y-4">

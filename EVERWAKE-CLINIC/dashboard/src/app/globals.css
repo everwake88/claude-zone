@@ -149,3 +149,10 @@ a { text-underline-offset: 3px; }
   .press:active { transform: none; }
   .lift:hover { transform: none; }
 }
+
+/* the clinic's paper: only the sheet prints while a letter or a prescription is printed */
+.print-sheet { display: none; }
+@media print {
+  body.printing > *:not(.print-sheet) { display: none !important; }
+  body.printing .print-sheet { display: block !important; }
+}

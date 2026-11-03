@@ -7285,6 +7285,19 @@ begin
   update clinic.recordings set status = 'failed', error = left(p_error, 500) where id = p_rec and status <> 'signed';
 end $$;
 
+-- start over: the recording is set aside (its audio still goes after its days); never once signed
+create or replace function clinic.recording_discard(p_rec bigint)
+returns jsonb language plpgsql security definer set search_path = clinic, pg_temp as $$
+declare r clinic.recordings%rowtype;
+begin
+  select * into r from clinic.recordings where id = p_rec for update;
+  if not found then raise exception 'recording not found'; end if;
+  perform clinic.require_clinical(r.tenant_id);
+  if r.status = 'signed' then return jsonb_build_object('ok', false, 'error', 'ALREADY_SIGNED'); end if;
+  update clinic.recordings set status = 'discarded' where id = r.id;
+  return jsonb_build_object('ok', true);
+end $$;
+
 -- everything the visit workspace needs for one appointment
 create or replace function clinic.visit_context(p_appt bigint)
 returns jsonb language plpgsql security definer set search_path = clinic, pg_temp as $$
@@ -7299,7 +7312,7 @@ begin
     from clinic.form_templates f where f.tenant_id = a.tenant_id
    order by (f.specialty = v_spec) desc, f.created_at limit 1;
   return jsonb_build_object(
-    'appointment', clinic.appt_card(a, true),
+    'appointment', clinic.appt_card(a, true) || jsonb_build_object('pre_visit', a.pre_visit),
     'doctor', jsonb_build_object('id', a.doctor_id, 'name', clinic.doctor_label(a.doctor_id, 'ar'), 'name_en', clinic.doctor_label(a.doctor_id, 'en'), 'specialty', v_spec),
     'template', v_tpl,
     'patient', (select to_jsonb(p) - 'tenant_id' || jsonb_build_object('age', clinic.age_text(p.birth_date, 'ar'), 'age_en', clinic.age_text(p.birth_date, 'en'))
@@ -7313,7 +7326,8 @@ begin
     'run', (select to_jsonb(s) - 'tenant_id' from clinic.scribe_runs s join clinic.recordings r on r.id = s.recording_id
              where r.appointment_id = a.id and r.status <> 'discarded' order by s.id desc limit 1),
     'encounter', (select to_jsonb(e) from clinic.encounters e where e.appointment_id = a.id order by e.id desc limit 1),
-    'terms', clinic.doctor_terms(a.tenant_id, a.doctor_id));
+    'terms', clinic.doctor_terms(a.tenant_id, a.doctor_id),
+    'audio_days', coalesce((select (clinic.merged_settings(t.settings) -> 'scribe' ->> 'audio_days')::int from clinic.tenants t where t.id = a.tenant_id), 30));
 end $$;
 
 -- the words this doctor says often (medicines, diagnoses), so the transcription spells them right
@@ -7488,7 +7502,7 @@ grant select, insert, update on clinic.assistant_threads, clinic.assistant_messa
 grant all on clinic.recordings, clinic.scribe_runs, clinic.assistant_threads, clinic.assistant_messages, clinic.assistant_actions to service_role;
 grant execute on function
   clinic.recording_start(bigint, jsonb), clinic.recording_chunk(bigint, jsonb), clinic.recording_transcript(bigint, jsonb),
-  clinic.scribe_save(bigint, jsonb), clinic.recording_failed(bigint, text), clinic.visit_context(bigint), clinic.doctor_terms(uuid, uuid),
+  clinic.scribe_save(bigint, jsonb), clinic.recording_failed(bigint, text), clinic.recording_discard(bigint), clinic.visit_context(bigint), clinic.doctor_terms(uuid, uuid),
   clinic.scribe_sign(bigint, jsonb), clinic.visit_summary_send(bigint, text), clinic.assistant_stats(uuid, date, date),
   clinic.pre_visit_pending(bigint)
   to authenticated;

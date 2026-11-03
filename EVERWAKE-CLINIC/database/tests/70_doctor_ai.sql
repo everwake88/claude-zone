@@ -63,6 +63,7 @@ begin
   ctx := clinic.visit_context(aid);
   assert ctx -> 'recording' ->> 'id' = rid::text and ctx -> 'run' -> 'extraction' -> 'fields' ? 'complaint.chief_complaint', 'the workspace sees the run';
   assert ctx -> 'template' ? 'schema', 'and the speciality form';
+  assert ctx -> 'appointment' ? 'pre_visit', 'and what the patient answered before the visit';
 
   r := clinic.scribe_sign(rid, jsonb_build_object(
          'chief_complaint', 'ألم ضرس', 'data', '{"complaint": {"chief_complaint": "ألم في الضرس السفلي الأيسر"}}'::jsonb,
@@ -79,6 +80,7 @@ begin
   assert (select count(*) from clinic.treatment_plan_items i join clinic.treatment_plans p on p.id = i.plan_id where p.patient_id = pid) = 1, 'and the plan';
   r := clinic.scribe_sign(rid, '{}');
   assert r ->> 'error' = 'ALREADY_SIGNED', 'signed once';
+  assert clinic.recording_discard(rid) ->> 'error' = 'ALREADY_SIGNED', 'a signed recording is never set aside';
   assert (select count(*) from clinic.recordings where id = rid) = 1, 'the doctor sees the recording';
 
   -- the assistant's rows are the user's own
