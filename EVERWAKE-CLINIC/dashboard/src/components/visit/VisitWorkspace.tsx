@@ -127,6 +127,28 @@ export function VisitWorkspace({ id }: { id: number }) {
     return () => window.removeEventListener('beforeunload', warn);
   }, [signed]);
 
+  // the assistant fills the open visit from what the doctor says (the doctor still signs)
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ type: string; payload: Record<string, unknown> }>).detail;
+      if (!d || signed || !ctx) return;
+      const known = new Set((ctx.template?.schema.sections || []).flatMap(s => s.fields.map(f => `${s.key}.${f.key}`)));
+      if (d.type === 'fill_visit_fields') {
+        const p = d.payload;
+        const fields = (Array.isArray(p.fields) ? p.fields : []) as { key: string; value: unknown }[];
+        setValues(v => { const out = { ...v }; for (const f of fields) if (known.has(f.key)) out[f.key] = f.value; return out; });
+        setNote(n => ({ cc: typeof p.chief_complaint === 'string' ? p.chief_complaint : n.cc, assessment: typeof p.assessment === 'string' ? p.assessment : n.assessment,
+                        plan: typeof p.plan === 'string' ? p.plan : n.plan, follow: typeof p.follow_up === 'string' ? p.follow_up : n.follow }));
+      } else if (d.type === 'draft_prescription') {
+        setRx(r => [...r.filter(l => l.name), ...rxOf(d.payload.lines)]);
+      } else return;
+      dirty.current = true;
+      setFlash(f => f + 1);
+    };
+    window.addEventListener('everwake:visit', on);
+    return () => window.removeEventListener('everwake:visit', on);
+  }, [ctx, signed]);
+
   const fresh = useMemo(() => run ? newForRecord(run.extraction, { allergies: ctx!.record.allergies, medications: ctx!.record.medications, conditions: ctx!.record.conditions })
     : { allergies: [], medications: [], conditions: [] }, [run, ctx]);
   const heard = Object.values(fills).filter(f => !f.unsupported).length;

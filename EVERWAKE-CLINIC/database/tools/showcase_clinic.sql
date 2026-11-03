@@ -380,3 +380,39 @@ begin
             "flags": [], "dropped": [], "model_check": "done"}',
           jsonb_build_object('soap', ex -> 'soap', 'summary_ar', ex -> 'summary_ar', 'prescription', ex -> 'prescription'), now() - interval '1 minute');
 end $$;
+
+-- ---------------------------------------------------------------------
+-- The dentist's last conversation with the assistant: who is next, then
+-- "I'll be 20 minutes late" — the card waiting for her Confirm.
+-- ---------------------------------------------------------------------
+do $$
+declare t uuid; u uuid; th bigint; act bigint; nxt record;
+begin
+  select id into t from clinic.tenants where slug = 'nile_clinics';
+  select user_id into u from clinic.tenant_members where tenant_id = t and role = 'doctor' and doctor_id = (select id from clinic.doctors where tenant_id = t and code = 'D1') limit 1;
+  if u is null then return; end if;
+  delete from clinic.assistant_threads where tenant_id = t and user_id = u;
+  select a.id, p.full_name, a.patient_id, to_char(coalesce(a.est_at, a.starts_at) at time zone (select timezone from clinic.tenants where id = t), 'HH24:MI') as hm
+    into nxt from clinic.appointments a join clinic.patients p on p.id = a.patient_id
+   where a.tenant_id = t and a.session_date = clinic.local_today(t) and a.status in ('arrived', 'confirmed', 'booked') and a.doctor_id = (select id from clinic.doctors where tenant_id = t and code = 'D1')
+   order by a.starts_at limit 1;
+  insert into clinic.assistant_threads (tenant_id, user_id, title, updated_at) values (t, u, 'مين جاي بعد كده؟', now() - interval '2 minutes') returning id into th;
+  insert into clinic.assistant_actions (tenant_id, thread_id, user_id, tool, params, preview, summary, created_at)
+  values (t, th, u, 'announce_delay', jsonb_build_object('doctor_id', (select id from clinic.doctors where tenant_id = t and code = 'D1'), 'minutes', 20, 'reason', null),
+          jsonb_build_object('minutes', 20, 'count', 4, 'items', jsonb_build_array(
+            jsonb_build_object('patient', coalesce(nxt.full_name, 'منة الله طارق'), 'from', '20:00', 'to', '20:20', 'whatsapp', true),
+            jsonb_build_object('patient', 'محمد السيد', 'from', '20:30', 'to', '20:50', 'whatsapp', true),
+            jsonb_build_object('patient', 'ياسمين فؤاد', 'from', '21:00', 'to', '21:20', 'whatsapp', true),
+            jsonb_build_object('patient', 'عمر خالد', 'from', '21:30', 'to', '21:50', 'whatsapp', false))),
+          'تأخير 20 دقيقة — 4 مرضى هيتبلغوا بالميعاد الجديد', now() - interval '1 minute') returning id into act;
+  insert into clinic.assistant_messages (tenant_id, thread_id, user_id, role, content, parts, created_at) values
+    (t, th, u, 'user', 'مين جاي بعد كده؟', '[]', now() - interval '3 minutes'),
+    (t, th, u, 'assistant', coalesce('بعد المريض اللي معاكي: ' || nxt.full_name || ' الساعة ' || nxt.hm || '، وهو في الانتظار دلوقتي. وبعده 3 مواعيد لحد آخر الجلسة.', 'مفيش حد تاني النهارده.'),
+     jsonb_build_array(jsonb_build_object('type', 'tool', 'name', 'today', 'label', 'بيبص على اليوم', 'ok', true,
+       'chips', case when nxt.patient_id is null then '[]'::jsonb else jsonb_build_array(jsonb_build_object('kind', 'patient', 'id', nxt.patient_id, 'label', nxt.full_name)) end)),
+     now() - interval '3 minutes'),
+    (t, th, u, 'user', 'هتأخر 20 دقيقة، بلغهم', '[]', now() - interval '2 minutes'),
+    (t, th, u, 'assistant', 'جهزتلك الكارت: 4 مرضى هيتبلغوا بالميعاد الجديد، واحد منهم مالوش واتساب فهتكلموه. أكّدي عليه وأنا أبعت.',
+     jsonb_build_array(jsonb_build_object('type', 'action', 'name', 'announce_delay', 'label', 'تأخير', 'action_id', act, 'summary', 'تأخير 20 دقيقة — 4 مرضى هيتبلغوا بالميعاد الجديد')),
+     now() - interval '1 minute');
+end $$;
