@@ -94,11 +94,14 @@ if (!plan || typeof plan !== 'object') {
 
 const safe = (s) => String(s == null ? '' : s).replace(/\{/g, '(').replace(/\}/g, ')');
 planText = safe(planText);
+// the steady part first (the restaurant, its menu, the chat so far) so the provider's cache covers it;
+// this turn's facts, the plan and the latest message last (same content as before, only reordered)
 const agentPrompt = [
-  b.facts_text, '', b.business_text, '',
+  b.business_text, '',
   '================ MENU ================', b.menu_text, '',
-  ...(planText ? ['================ ' + planText.split('\n')[0] + ' ================', planText.split('\n').slice(1).join('\n'), ''] : []),
   '================ THE CHAT SO FAR (oldest first) ================', b.history_text || '(this is the first message)', '',
+  b.facts_text, '',
+  ...(planText ? ['================ ' + planText.split('\n')[0] + ' ================', planText.split('\n').slice(1).join('\n'), ''] : []),
   '================ THE CUSTOMER\'S LATEST MESSAGE ================', b.latest_text
 ].join('\n');
 

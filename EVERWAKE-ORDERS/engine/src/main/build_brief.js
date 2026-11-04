@@ -482,10 +482,15 @@ const latest = safe(customerText || (answersNew.length
   ? '(no new message from them — the team has just answered your question, in FACTS)' : '(no text)'));
 const factsText = safe(facts), businessText = safe(business), menuSafe = safe(menuText);
 const historyText = safe(historyLines.join('\n'));
+// what changes least comes first: the restaurant and its menu (the same for every customer until the
+// restaurant edits them), then the chat (it only grows at its end), then this turn's facts and message.
+// The model provider bills a start it has seen recently at a tenth of the price, so the long, steady
+// part is paid in full once and cheaply after that; the content is the same, only its order.
 const brief = [
-  factsText, '', businessText, '', '================ MENU ================', menuSafe, '',
+  businessText, '', '================ MENU ================', menuSafe, '',
   '================ THE CHAT SO FAR (oldest first) ================',
-  historyText || '(this is the first message)',
+  historyText || '(this is the first message)', '',
+  factsText,
   '', '================ THE CUSTOMER\'S LATEST MESSAGE ================', latest
 ].join('\n');
 
