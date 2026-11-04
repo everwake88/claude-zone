@@ -4,8 +4,9 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from './lib/env';
 import { LANG_COOKIE } from './lib/lang-cookie';
 
 // customers' pages and the outside callers need no sign-in, so they skip the session work entirely:
-// payment pages and Paymob's notices, ordering from a QR code, the restaurant's own system (an API key)
-const OPEN = ['/login', '/auth', '/api/health', '/p/', '/api/pay/', '/q/', '/api/q/', '/api/v1/'];
+// payment pages and Paymob's notices, ordering from a QR code, the restaurant's own system (an API key),
+// the engine's AI calls on their way to OpenAI (the AI meter)
+const OPEN = ['/login', '/auth', '/api/health', '/p/', '/api/pay/', '/q/', '/api/q/', '/api/v1/', '/api/ai/'];
 
 // Keeps the Supabase session fresh and sends anyone who is not signed in to
 // /login. Drivers' pages have their own sign-in.

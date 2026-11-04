@@ -48,7 +48,7 @@ export async function runCode(file, { input = {}, nodes = {}, runIndex = 0 } = {
   const $input = { first: () => ({ json: input }), all: () => [{ json: input }], item: { json: input } };
   const $ = (name) => {
     if (!(name in nodes)) throw new Error(`Referenced node "${name}" is unexecuted`);
-    return { first: () => ({ json: nodes[name] }), all: () => [{ json: nodes[name] }], item: { json: nodes[name] } };
+    return { first: () => ({ json: nodes[name] }), all: () => [{ json: nodes[name] }], item: { json: nodes[name] }, isExecuted: true };
   };
   const out = await new AsyncFunction('$input', '$', '$runIndex', 'Buffer', src)($input, $, runIndex, Buffer);
   return (out || []).map(i => i.json);
@@ -147,10 +147,27 @@ export async function turn(db, payload, script, opts = {}) {
     nodes['Resolve Location'] = resolved;
     nodes['Save Pin + Zone'] = await callB64(db, 'save_pin', resolved.b64_pin);
   }
-  const ctx = await sql(db, 'select everwake.turn_context($1::uuid, $2::text) as r', [r.tenant_id, r.wa_id]);
-  nodes['Load Turn Context'] = ctx;
-  const brief = (await runCode('main/build_brief.js', { input: ctx, nodes }))[0];
-  nodes['Build Brief'] = brief;
+  // the turn's context, its brief, and the way it takes: a ❤️, a detail read by code, or the AI (018)
+  const prepare = async () => {
+    const ctx = await sql(db, 'select everwake.turn_context($1::uuid, $2::text) as r', [r.tenant_id, r.wa_id]);
+    nodes['Load Turn Context'] = ctx;
+    nodes['Build Brief'] = (await runCode('main/build_brief.js', { input: ctx, nodes }))[0];
+    nodes['Load AI Settings'] = await sql(db, 'select everwake.ai_settings($1::uuid) as r', [r.tenant_id]);
+    nodes['Route Without AI'] = (await runCode('main/route_without_ai.js', { input: nodes['Load AI Settings'], nodes }))[0];
+    return nodes['Route Without AI'];
+  };
+  let routed = await prepare();
+  let byCode = null;
+  if (routed.no_ai === 'details') {
+    nodes['Save Details (code)'] = { response: JSON.stringify(await saveDetails(db, r, routed.details_by_code)) };
+    const rep = (await runCode('main/details_by_code_reply.js', { input: nodes['Save Details (code)'], nodes }))[0];
+    nodes['Details By Code — Reply'] = rep;
+    if (rep.ai_again) routed = await prepare(); else byCode = rep;
+  }
+  const brief = nodes['Build Brief'];
+  if (byCode || routed.no_ai === 'react') {
+    return finish(db, r, nodes, byCode || routed, { route: 'agent', no_ai: byCode ? 'details' : 'react', intake: r, brief, steps: [], opts });
+  }
 
   const s = await script(brief, r);
   const plan = (await runCode('main/attach_plan.js', { input: { text: JSON.stringify(s.plan || {}) }, nodes }))[0];
@@ -176,6 +193,12 @@ export async function turn(db, payload, script, opts = {}) {
   let checked = (await runCode('main/check_reply.js', { input: readBack, nodes }))[0];
   nodes['Check Reply'] = checked;
   if (checked.needs_rewrite) checked = (await runCode('main/repair_reply.js', { input: checked, nodes }))[0];
+  return finish(db, r, nodes, checked, { route: 'agent', intake: r, brief, plan, steps, s });
+}
+
+// the turn's own record and its messages, however it was answered
+async function finish(db, r, nodes, checked, out) {
+  const s = out.s || {};
   const persistPayload = (await runCode('main/build_persist_payload.js', { input: checked, nodes }))[0];
   nodes['Build Persist Payload'] = persistPayload;
   if (s.beforePersist) await s.beforePersist();
@@ -195,5 +218,5 @@ export async function turn(db, payload, script, opts = {}) {
     const rec = (await runCode('main/record_reply_send.js', { input: { body: { key: { id: 'OUT' + Math.random().toString(36).slice(2, 10) } } }, nodes }))[0];
     await callB64(db, 'log_outbound', rec.b64_log);
   }
-  return { route: 'agent', intake: r, brief, plan, steps, checked, persisted: persisted.r, outbound, ticket, nodes };
+  return { ...out, s: undefined, checked, persisted: persisted.r, outbound, ticket, nodes };
 }

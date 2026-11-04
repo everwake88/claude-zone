@@ -354,7 +354,9 @@ return [{
       handoff: { needed: handoff.needed === true || String(handoff.needed) === 'true', reason: str(handoff.reason) },
       ask_team: askTeam,
       language: str(decision.language) || null,
-      memory_note: str(decision.memory_note)
+      memory_note: str(decision.memory_note),
+      // the details this reply asks for: the customer's answer can then be read by code (Route Without AI)
+      asks_for: arr(decision.asks_for).map(str).filter(f => ['name', 'address', 'phone', 'payment', 'delivery_or_pickup', 'address_ok'].includes(f))
     },
     tools_used: toolsUsed,
     tool_problems: toolProblems,

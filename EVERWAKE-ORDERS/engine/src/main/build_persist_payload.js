@@ -28,6 +28,12 @@ const note = str(dec.memory_note);
 if (note) statePatch.memory_notes = arr(state.memory_notes).concat([note.slice(0, 220)]).slice(-12);
 const handoff = obj(dec.handoff);
 if (handoff.needed) statePatch.handoff = { needed: true, reason: str(handoff.reason), at: nowIso };
+// the detail this reply asked for, so code can read the answer (a ❤️ leaves it as it was)
+if (d.no_ai === 'details') statePatch.details_awaiting = { fields: arr(d.details_awaiting), at: nowIso, by: 'code' };
+else if (d.no_ai !== 'react') {
+  const asks = arr(dec.asks_for).map(str);
+  statePatch.details_awaiting = asks.length && !d.order_placed_no ? { fields: asks, at: nowIso, by: 'ai' } : null;
+}
 
 const ledgerPatch = { last_reply_at: nowIso };
 const menuKey = d.branch_after || 'all';
@@ -46,7 +52,7 @@ const logRow = {
   cart_action: arr(d.tools_used).filter(t => t === 'manage_cart').length ? 'tool_call' : 'none',
   qa_passed: !arr(d.violations).length,
   repair_used: d.repair_used === true,
-  llm_calls: (d.brain && d.brain.used ? 1 : 0) + 1 + arr(d.tools_used).length + (d.repair_used ? 1 : 0),
+  llm_calls: d.no_ai === 'react' || d.no_ai === 'details' ? 0 : (d.brain && d.brain.used ? 1 : 0) + 1 + arr(d.tools_used).length + (d.repair_used ? 1 : 0),
   duration_total_ms: durationTotal,
   duration_llm_ms: d.agent_started_at ? Date.now() - new Date(d.brain_started_at || d.agent_started_at).getTime() : 0,
   prompt_tokens: Number(tokens.promptTokens || 0),
@@ -55,6 +61,7 @@ const logRow = {
   output: {
     messages: arr(dec.reply_messages),
     brain: d.brain || null,
+    no_ai: d.no_ai === 'react' || d.no_ai === 'details' ? d.no_ai : null,
     tools_used: arr(d.tools_used),
     tool_problems: arr(d.tool_problems).slice(0, 10),
     tool_calls: arr(d.tool_calls).slice(0, 10),

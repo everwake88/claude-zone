@@ -18,7 +18,7 @@ return [{
       tenant_id: item.tenant_id, wa_id: item.wa_id, run_id: item.run_id, sender: 'agent',
       kind: item.kind, body: item.kind === 'text' ? item.text : item.log_text,
       media_url: item.media_url || null, media_mime: item.mime || null,
-      external_id: id, ok, error: err, meta: { caption: item.caption || undefined }
+      external_id: id, ok, error: err, meta: { caption: item.caption || undefined, reaction_to: item.kind === 'reaction' ? item.message_external_id : undefined }
     })
   }
 }];

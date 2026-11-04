@@ -37,6 +37,12 @@ for (const ph of arr(mediaRow.item_photos)) {
              caption: `*${ph.name}*${ph.price != null ? ` — ${fmt(ph.price)}${sym}${unit}` : ''}`,
              log_text: `[photo: ${ph.name}]`, delay_ms: 400 });
 }
+// a ❤️ on the customer's message instead of a reply (Route Without AI)
+if (str(dec.reaction)) {
+  const norm = $('Normalize Inbound').first().json;
+  out.push({ ...base, kind: 'reaction', reaction: str(dec.reaction), log_text: str(dec.reaction),
+             remote_jid: replyTo.includes('@') ? replyTo : `${replyTo}@s.whatsapp.net`, message_external_id: str(norm.external_id), delay_ms: 0 });
+}
 for (const text of arr(dec.reply_messages).filter(Boolean).slice(0, 2)) {
   out.push({ ...base, kind: 'text', text, log_text: text,
              // Evolution's own typing simulation blocks for delay_ms, so keep it short

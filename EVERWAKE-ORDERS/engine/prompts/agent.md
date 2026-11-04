@@ -79,5 +79,6 @@ Return ONE JSON object and nothing else — no words around it, no code fence:
 - ask_team: [] or up to 2 questions for the team, in Arabic
 - handoff: {needed: true/false, reason: Arabic, for the team} — only when a person must take over the chat
 - language: "ar" or "en"
+- asks_for: which details this reply asks the customer for, from: name, address, phone, payment, delivery_or_pickup, address_ok (their OK on the address from their pin) — [] when it asks for none
 - memory_note: one short English line about the customer worth remembering later that FACTS won't hold (a preference, an occasion, a promise you made), or "". Never a conclusion about what the system can or can't do ("images don't reach him") — that changes, the facts tell you each turn.
 </output>

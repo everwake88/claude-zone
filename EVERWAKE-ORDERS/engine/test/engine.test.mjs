@@ -407,10 +407,18 @@ test('a table booking: asked in two natural steps, a summary, sent to the branch
   const rid = (await sql(db, `select id as r from everwake.reservations where ref_no = $1`, [ref])).r;
   await sql(db, `select everwake.set_reservation_status($1, 'confirmed') as r`, [rid]);
   assert.ok((await sql(db, `select count(*)::int as r from everwake.outbox where wa_id = $1 and purpose = 'order_status' and body like 'تم تأكيد حجزك ✅%'`, [phone])).r === 1);
-  t = await turn(db, evolutionPayload({ phone, text: 'تمام شكراً' }), async (brief) => {
+  // "thanks" when nothing is waiting: a ❤️ on their message, no AI
+  t = await turn(db, evolutionPayload({ phone, text: 'تمام شكراً' }), async () => { throw new Error('no AI for a thank-you'); });
+  assert.equal(t.no_ai, 'react');
+  assert.equal(t.outbound.length, 1);
+  assert.equal(t.outbound[0].kind, 'reaction');
+  assert.equal(t.outbound[0].reaction, '❤️');
+  // a question still reaches the AI, which knows the booking is confirmed
+  t = await turn(db, evolutionPayload({ phone, text: 'الحجز الساعة كام؟' }), async (brief) => {
     assert.match(brief.facts_text, /CONFIRMED by the branch team/);
-    return { plan: { stage: 'reservation' }, reply: quiet('العفو! حجزك متأكد، مستنيينك بكرة 🎉') };
+    return { plan: { stage: 'reservation' }, reply: quiet('حجزك متأكد بكرة، مستنيينك 🎉') };
   });
+  assert.equal(t.no_ai, undefined);
   assert.deepEqual(t.checked.violations, []);
   await db.query(`update everwake.branches set reservations = 'off', reservation_note_ar = null where tenant_id = $1`, [tenant]);
 });
@@ -1220,4 +1228,66 @@ test('loyalty: an offer for every Nth order applies on that order only', async (
   assert.equal(at(10), 0);
   assert.equal(at(19), 50, 'their 20th');
   globalThis.toMin = toMinGlobal;
+});
+
+
+test('no AI where none is needed: a ❤️ for "👍", details asked and read by code, and the AI whenever unsure', async () => {
+  const phone = '201033334444';
+  const ai = async () => { throw new Error('this turn should not reach the AI'); };
+  // a pin and a dish in the cart (the AI), whose reply asks for the address
+  let t = await turn(db, evolutionPayload({ phone, pushName: 'Hala', location: ZAMALEK_PIN }), async () => ({
+    plan: { stage: 'discovery' }, reply: quiet('أهلاً! فرع الزمالك هيوصلك. تحبي تطلبي إيه؟')
+  }), { geo: { street: 'شارع حسن صبري', district: 'الزمالك' } });
+  t = await turn(db, evolutionPayload({ phone, text: 'فرخة كاملة حارة وبس كده' }), async () => ({
+    plan: { stage: 'giving_details' },
+    tools: [{ tool: 'manage_cart', action: 'add', items: [{ menu_id: 'M003', quantity: 1, choices: [{ selected: ['فرخة كاملة', 'حار'] }] }] },
+            { tool: 'save_customer_details', details: { delivery_method: 'توصيل' } }],
+    reply: quiet('تمام! فرخة كاملة حارة 480ج. ابعتيلي رقم العمارة والدور والشقة؟', { asks_for: ['address'] })
+  }));
+  assert.equal((await sql(db, `select state -> 'details_awaiting' -> 'fields' as r from everwake.conversations where wa_id = $1`, [phone])).r[0], 'address');
+
+  // the address as people write it: read and saved by code, which asks the next thing
+  t = await turn(db, evolutionPayload({ phone, text: 'عمارة 12 الدور 3 شقة 7' }), ai);
+  assert.equal(t.no_ai, 'details');
+  const det = (await sql(db, `select state -> 'customer' as r from everwake.conversations where wa_id = $1`, [phone])).r;
+  assert.equal(det.address_building, '12'); assert.equal(det.address_floor, '3'); assert.equal(det.address_apartment, '7');
+  assert.equal(t.outbound.length, 1);
+  assert.equal(t.outbound[0].kind, 'text');
+  const askedNext = (await sql(db, `select state -> 'details_awaiting' -> 'fields' ->> 0 as r from everwake.conversations where wa_id = $1`, [phone])).r;
+  assert.ok(['address_ok', 'name', 'phone', 'payment'].includes(askedNext), askedNext);
+
+  // a question instead of the answer: the AI
+  t = await turn(db, evolutionPayload({ phone, text: 'التوصيل بياخد قد ايه؟' }), async () => ({
+    plan: { stage: 'giving_details' }, reply: quiet('حوالي 45 دقيقة. اسم حضرتك إيه؟', { asks_for: ['name'] })
+  }));
+  assert.equal(t.no_ai, undefined);
+
+  // the name: code; "لا" is never taken for a name
+  t = await turn(db, evolutionPayload({ phone, text: 'لا' }), async () => ({ plan: {}, reply: quiet('تمام، الاسم إيه؟', { asks_for: ['name'] }) }));
+  assert.equal(t.no_ai, undefined, '"لا" goes to the AI');
+  t = await turn(db, evolutionPayload({ phone, text: 'هالة محمود' }), ai);
+  assert.equal(t.no_ai, 'details');
+  assert.equal((await sql(db, `select state -> 'customer' ->> 'full_name' as r from everwake.conversations where wa_id = $1`, [phone])).r, 'هالة محمود');
+
+  // "👍" with a dish in the cart: not a ❤️ (something may still be waiting) — the AI, or code if it read a detail
+  t = await turn(db, evolutionPayload({ phone, text: '👍' }), async () => ({ plan: {}, reply: quiet('تمام! هتدفعي إزاي؟', { asks_for: ['payment'] }) }));
+  assert.notEqual(t.no_ai, 'react');
+
+  // payment by code; when nothing is missing the AI shows the summary, with the details up to date
+  let sawAll = false;
+  t = await turn(db, evolutionPayload({ phone, text: 'كاش' }), async (brief) => {
+    sawAll = /payment_method = cash/.test(brief.facts_text);
+    return { plan: { stage: 'reviewing' }, tools: [{ tool: 'manage_cart', action: 'summary' }],
+             reply: quiet('ملخص طلبك: فرخة مشوية كاملة 260ج… أأكد؟', { showed_order_summary: true }) };
+  });
+  const pay = (await sql(db, `select state -> 'customer' ->> 'payment_method' as r from everwake.conversations where wa_id = $1`, [phone])).r;
+  assert.equal(pay, 'cash');
+  if (t.no_ai === 'details') assert.ok(t.outbound.length === 1, 'code asked the next detail');
+  else assert.ok(sawAll, 'the AI saw the payment saved by code');
+
+  // switched off on the developer page: every turn is the AI's again
+  await db.query(`update everwake.ai_config set details_by_code = false, react_no_reply = false where scope = 'global'`);
+  t = await turn(db, evolutionPayload({ phone: '201033335555', text: '👍' }), async () => ({ plan: {}, reply: quiet('أهلاً! تحب تطلب إيه؟') }));
+  assert.equal(t.no_ai, undefined);
+  await db.query(`update everwake.ai_config set details_by_code = true, react_no_reply = true where scope = 'global'`);
 });

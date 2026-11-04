@@ -25,6 +25,9 @@
 //   EW_BRAIN            'off' drops the planning Brain: the Agent then reads the whole situation and
 //                       thinks for itself (default on: the Brain thinks, the Agent writes)
 //   EW_AGENT_EFFORT     the Agent's reasoning effort (default low behind the Brain, medium alone)
+//   EW_AI_METER         where the AI calls go on their way to OpenAI, so their real cost is recorded
+//                       (default https://everwake-orders.vercel.app/api/ai; 'off' calls OpenAI directly)
+//   EW_BRAIN_EFFORT     the Brain's reasoning effort (default medium; the developer page can change it per restaurant)
 //   EW_TRANSCRIBE_MODEL hears a customer's voice note (default gpt-transcribe)
 //   EW_VISION_MODEL     looks at a customer's photo (default gpt-5-mini); EW_VISION_EFFORT its reasoning (default low, '' for none)
 //   (no Rewrite model: a reply that breaks a hard rail has only the offending lines dropped)
@@ -51,6 +54,14 @@ const wfRef = (workflowName) => {
 const MODEL = process.env.EW_MODEL || 'gpt-5.6-luna';
 const USE_BRAIN = process.env.EW_BRAIN !== 'off';
 const AGENT_EFFORT = process.env.EW_AGENT_EFFORT || (USE_BRAIN ? 'low' : 'medium');
+const BRAIN_EFFORT = process.env.EW_BRAIN_EFFORT || 'medium';
+const METER = (process.env.EW_AI_METER ?? 'https://everwake-orders.vercel.app/api/ai').replace(/\/+$/, '');
+const METERED = METER && METER !== 'off';
+// a call's address on the meter: whose it is (restaurant, message, turn), which step, what the customer sent
+const NI = "$('Normalize Inbound').first().json";
+const KIND = `(${NI}.is_test ? 'test' : ((${NI}.media || {}).kind === 'image' ? 'image' : ((${NI}.media || {}).kind ? 'voice' : 'text')))`;
+const meterBase = (step) => `'${METER}/t/' + $('Intake').first().json.r.tenant_id + '/' + ($('Intake').first().json.r.message_id || 'x') + '/' + encodeURIComponent(${NI}.run_id || 'x') + '/${step}/' + ${KIND} + '/v1'`;
+const openaiUrl = (step, path) => METERED ? `={{ ${meterBase(step)} + '/${path}' }}` : `https://api.openai.com/v1/${path}`;
 const TRANSCRIBE_MODEL = process.env.EW_TRANSCRIBE_MODEL || 'gpt-transcribe';
 const VISION_MODEL = process.env.EW_VISION_MODEL || 'gpt-5-mini';
 const VISION_EFFORT = process.env.EW_VISION_EFFORT ?? 'low';
@@ -127,10 +138,11 @@ const evo = (name, path, body, pos, { timeout = 20000, retry = true } = {}) => (
   },
   ...(retry ? { retryOnFail: true, maxTries: 2, waitBetweenTries: 1500 } : {}),
   onError: 'continueRegularOutput', alwaysOutputData: true });
-const model = (name, maxTokens, effort, timeout, pos) => ({
+const model = (name, maxTokens, effort, timeout, pos, step) => ({
   name, type: '@n8n/n8n-nodes-langchain.lmChatOpenAi', typeVersion: 1.3, position: pos, credentials: OPENAI,
   parameters: { model: { __rl: true, value: MODEL, mode: 'list', cachedResultName: MODEL }, builtInTools: {},
-                options: { maxTokens, reasoningEffort: effort, timeout, maxRetries: 1 } } });
+                options: { maxTokens, reasoningEffort: effort, timeout, maxRetries: 1,
+                           ...(METERED && step ? { baseURL: `={{ ${meterBase(step)} }}` } : {}) } } });
 const chain = (name, textExpr, system, pos) => ({
   name, type: '@n8n/n8n-nodes-langchain.chainLlm', typeVersion: 1.5, position: pos, onError: 'continueRegularOutput',
   parameters: { promptType: 'define', text: textExpr, messages: { messageValues: [{ message: system }] } } });
@@ -165,7 +177,7 @@ function buildMain() {
   w.add(sticky('Sticky — Overview', [
     '## EVERWAKE — one WhatsApp ordering engine for every restaurant',
     'The Seagull pipeline, multi-restaurant. **Intake** finds the restaurant from the Evolution instance (and its webhook token), the customer from any identity (number or private id), and routes the message: **agent** · **human** (a person took over — the inbox shows it) · **paused** (the agent is OFF: one warm apology, remembered for "we\'re back") · **not live** (still onboarding: only test numbers) · **from the phone** (logged so the agent sees what staff wrote).',
-    (USE_BRAIN ? '**Build Brief** turns the restaurant\'s rows into FACTS only. **Brain** (high reasoning) plans; **Agent** runs the tools and writes; ' : '**Build Brief** turns the restaurant\'s rows into FACTS only. **Agent** reads the whole situation, thinks, runs the tools and writes; ') + '**Check Reply** enforces hard rails; a line that breaks one is dropped (**Repair Reply**, no model). Pictures (menu pages, dish photos) go before the text.',
+    (USE_BRAIN ? '**Build Brief** turns the restaurant\'s rows into FACTS only. **Brain** (' + BRAIN_EFFORT + ' reasoning) plans; **Agent** runs the tools and writes; ' : '**Build Brief** turns the restaurant\'s rows into FACTS only. **Agent** reads the whole situation, thinks, runs the tools and writes; ') + '**Check Reply** enforces hard rails; a line that breaks one is dropped (**Repair Reply**, no model). Pictures (menu pages, dish photos) go before the text.',
     'Webhook: **POST /webhook/everwake-evo?token=<channel webhook token>** — set it on every Evolution instance (Settings → WhatsApp in the dashboard shows the exact URL).'
   ].join('\n'), [-2400, 120], 2400, 330));
   w.add(sticky('Sticky — Setup', [
@@ -227,7 +239,7 @@ function buildMain() {
                         options: { fileName: `={{ ${P}.file_name }}`, mimeType: `={{ ${P}.mime }}` } },
           onError: 'continueRegularOutput', alwaysOutputData: true });
   w.add({ name: 'Transcribe Voice Note (OpenAI)', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: [-100, -120], credentials: OPENAI,
-          parameters: { method: 'POST', url: 'https://api.openai.com/v1/audio/transcriptions',
+          parameters: { method: 'POST', url: openaiUrl('transcribe', 'audio/transcriptions'),
                         authentication: 'predefinedCredentialType', nodeCredentialType: 'openAiApi',
                         sendBody: true, contentType: 'multipart-form-data',
                         bodyParameters: { parameters: [
@@ -237,7 +249,7 @@ function buildMain() {
                         options: { timeout: 60000, response: { response: { neverError: true, responseFormat: 'json' } } } },
           retryOnFail: true, maxTries: 2, waitBetweenTries: 1500, onError: 'continueRegularOutput', alwaysOutputData: true });
   w.add({ name: 'Look At Photo (OpenAI)', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: [-100, 120], credentials: OPENAI,
-          parameters: { method: 'POST', url: 'https://api.openai.com/v1/chat/completions',
+          parameters: { method: 'POST', url: openaiUrl('vision', 'chat/completions'),
                         authentication: 'predefinedCredentialType', nodeCredentialType: 'openAiApi',
                         sendBody: true, specifyBody: 'json', jsonBody: '={{ JSON.stringify($json.vision_body) }}',
                         options: { timeout: 60000, response: { response: { neverError: true, responseFormat: 'json' } } } },
@@ -278,15 +290,34 @@ function buildMain() {
 
   w.add(pg('Load Turn Context', 'select everwake.turn_context($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [620, 460]));
   w.add(code('Build Brief', 'main/build_brief.js', [840, 460]));
+  // before any AI: a ❤️ for a message that needs no reply, or the asked-for detail read by code (018)
+  w.add(pg('Load AI Settings', 'select everwake.ai_settings($1::uuid) as r;', `={{ [ ${I}.tenant_id ] }}`, [840, 640]));
+  w.add(code('Route Without AI', 'main/route_without_ai.js', [840, 820]));
+  w.add({ name: 'Route: Which Way?', type: 'n8n-nodes-base.switch', typeVersion: 3.2, position: [1040, 820],
+          parameters: { rules: { values: ['ai', 'react', 'details'].map(k => ({ outputKey: k, renameOutput: true,
+            conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+                          conditions: [{ id: uuidOf('which-way-' + k), leftValue: '={{ $json.no_ai }}', rightValue: k,
+                                         operator: { type: 'string', operation: 'equals' } }], combinator: 'and' } })) },
+                        looseTypeValidation: true, options: { fallbackOutput: 0 } } });
+  w.add({ name: 'Save Details (code)', type: 'n8n-nodes-base.executeWorkflow', typeVersion: 1.2, position: [1260, 1000],
+          parameters: { workflowId: wfRef('Everwake — Tool: save_customer_details'),
+                        workflowInputs: { mappingMode: 'defineBelow', value: {
+                          tenant_id: `={{ ${I}.tenant_id }}`, wa_id: `={{ ${I}.wa_id }}`, details: '={{ $json.details_by_code }}' },
+                          matchingColumns: [], schema: toolInputSchema(['tenant_id', 'wa_id', 'details']),
+                          attemptToConvertTypes: false, convertFieldsToString: false },
+                        options: { waitForSubWorkflow: true } },
+          onError: 'continueRegularOutput', alwaysOutputData: true });
+  w.add(code('Details By Code — Reply', 'main/details_by_code_reply.js', [1480, 1000]));
+  w.add(iff('Route: AI After All?', '$json.ai_again === true', [1700, 1000]));
   if (USE_BRAIN) {
     w.add(chain('Brain', '={{ $json.brief }}', prompt('brain.md'), [1060, 460]));
-    w.add(model('Brain Model', 16000, 'high', 90000, [1060, 700]));
+    w.add(model('Brain Model', 16000, BRAIN_EFFORT, 90000, [1060, 700], 'brain'));
   }
   w.add(code('Attach Plan', 'main/attach_plan.js', [1300, 460]));
   w.add({ name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent', typeVersion: 3.1, position: [1520, 460], onError: 'continueRegularOutput',
           parameters: { promptType: 'define', text: '={{ $json.agent_prompt }}', hasOutputParser: false,
                         options: { systemMessage: prompt('agent.md'), maxIterations: 10, returnIntermediateSteps: true, enableStreaming: false } } });
-  w.add(model('Agent Model', 6000, AGENT_EFFORT, 90000, [1400, 720]));
+  w.add(model('Agent Model', 6000, AGENT_EFFORT, 90000, [1400, 720], 'agent'));
   // no strict output parser: one formatting slip threw a good reply away ("Model output doesn't fit
   // required format"); Check Reply reads the JSON and repairs the usual slips itself
   w.add(tool('manage_cart', 'Everwake — Tool: manage_cart', prompt('tool_manage_cart.md'), {
@@ -322,6 +353,9 @@ function buildMain() {
   w.add(iff('Route: Test Chat?', TEST, [4240, 560]));
   w.add(code('Pretend Send (test)', 'main/pretend_send.js', [4460, 680]));
   w.add(iff('Route: Text?', "$json.kind === 'text'", [4240, 400]));
+  w.add(iff('Route: Reaction?', "$json.kind === 'reaction'", [4350, 560]));
+  w.add(evo('Evolution — Send Reaction', 'message/sendReaction',
+            '{ key: { remoteJid: $json.remote_jid, fromMe: false, id: $json.message_external_id }, reaction: $json.reaction }', [4460, 640]));
   w.add(evo('Evolution — Send Text', 'message/sendText', '{ number: $json.reply_to, text: $json.text, delay: $json.delay_ms, linkPreview: false }', [4460, 320]));
   w.add(evo('Evolution — Send Media', 'message/sendMedia',
             "{ number: $json.reply_to, mediatype: $json.kind === 'document' ? 'document' : 'image', mimetype: $json.mime, media: $json.media_url, fileName: $json.file_name, caption: $json.caption || undefined, delay: $json.delay_ms }",
@@ -363,11 +397,18 @@ function buildMain() {
   w.chain('Reverse Geocode (Google)', 'Route: Geocode OK?');
   w.link('Route: Geocode OK?', 'Resolve Location', 0); w.link('Route: Geocode OK?', 'Reverse Geocode (OSM)', 1);
   w.chain('Reverse Geocode (OSM)', 'Resolve Location', 'Save Pin + Zone', 'Load Turn Context');
+  w.chain('Load Turn Context', 'Build Brief', 'Load AI Settings', 'Route Without AI', 'Route: Which Way?');
+  w.link('Route: Which Way?', USE_BRAIN ? 'Brain' : 'Attach Plan', 0);
+  w.link('Route: Which Way?', 'Build Persist Payload', 1);
+  w.link('Route: Which Way?', 'Save Details (code)', 2);
+  w.chain('Save Details (code)', 'Details By Code — Reply', 'Route: AI After All?');
+  // details saved but something needs judgement, or nothing is missing: the AI, with everything up to date
+  w.link('Route: AI After All?', 'Load Turn Context', 0); w.link('Route: AI After All?', 'Build Persist Payload', 1);
   if (USE_BRAIN) {
-    w.chain('Load Turn Context', 'Build Brief', 'Brain', 'Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Repair?');
+    w.chain('Brain', 'Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Repair?');
     w.link('Brain Model', 'Brain', 0, 'ai_languageModel');
   } else {
-    w.chain('Load Turn Context', 'Build Brief', 'Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Repair?');
+    w.chain('Attach Plan', 'Agent', 'Read Back State', 'Check Reply', 'Route: Needs Repair?');
   }
   w.link('Agent Model', 'Agent', 0, 'ai_languageModel');
   w.link('manage_cart', 'Agent', 0, 'ai_tool');
@@ -380,7 +421,9 @@ function buildMain() {
   w.link('Outbound Loop', 'Turn Complete', 0); w.link('Outbound Loop', 'Route: Test Chat?', 1);
   w.link('Route: Test Chat?', 'Pretend Send (test)', 0); w.link('Route: Test Chat?', 'Route: Text?', 1);
   w.chain('Pretend Send (test)', 'Record Send');
-  w.link('Route: Text?', 'Evolution — Send Text', 0); w.link('Route: Text?', 'Evolution — Send Media', 1);
+  w.link('Route: Text?', 'Evolution — Send Text', 0); w.link('Route: Text?', 'Route: Reaction?', 1);
+  w.link('Route: Reaction?', 'Evolution — Send Reaction', 0); w.link('Route: Reaction?', 'Evolution — Send Media', 1);
+  w.link('Evolution — Send Reaction', 'Record Send');
   w.link('Evolution — Send Text', 'Record Send'); w.link('Evolution — Send Media', 'Record Send');
   w.chain('Record Send', 'Log Outbound', 'Outbound Loop');
   w.link('Route: Order Placed?', 'Load Order Ticket', 0);
