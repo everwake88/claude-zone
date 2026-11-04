@@ -1,9 +1,9 @@
 import {
-  BarChart3, Bike, CalendarDays, ChefHat, Flame, LayoutDashboard, Map, Megaphone, MessageCircle, Percent, Settings, ShoppingBag, Store, Users
+  BarChart3, Bike, CalendarDays, ChefHat, Flame, LayoutDashboard, Map, Megaphone, MessageCircle, Percent, Receipt, Settings, ShoppingBag, Store, Users
 } from 'lucide-react';
 
 // grouped so a new owner sees what is daily work, what is setting up, and what grows the business
-export type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; badge?: 'orders' | 'inbox' | 'bookings' };
+export type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; badge?: 'orders' | 'inbox' | 'bookings'; editors?: boolean };
 export const NAV: { group: string | null; items: NavItem[] }[] = [
   { group: null, items: [{ href: '', label: 'Overview', icon: LayoutDashboard }] },
   { group: 'Every day', items: [
@@ -21,5 +21,5 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
   { group: 'Grow', items: [
     { href: '/growth', label: 'Get customers', icon: Megaphone },
     { href: '/analytics', label: 'Analytics', icon: BarChart3 }] },
-  { group: null, items: [{ href: '/settings', label: 'Settings', icon: Settings }] }
+  { group: null, items: [{ href: '/billing', label: 'Bills', icon: Receipt, editors: true }, { href: '/settings', label: 'Settings', icon: Settings }] }
 ];

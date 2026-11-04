@@ -36,21 +36,34 @@ Housekeeping runs every minute from the Outbox workflow:
 
 ## What a conversation costs
 
-Price the plans from real numbers, not guesses:
+The developer page (`/dev`, platform admins only) shows the real numbers:
+every AI call is recorded by the dashboard's AI meter with its tokens and
+priced from **Prices**. Look there first; the same data in SQL:
 
 ```sql
--- model tokens per placed order, last 30 days
-select t.name_en,
-       sum(e.prompt_tokens + e.completion_tokens) / nullif(count(distinct o.id), 0) as tokens_per_order,
-       count(distinct o.id) as orders
-from everwake.agent_events e
-join everwake.tenants t on t.id = e.tenant_id
-left join everwake.orders o on o.tenant_id = e.tenant_id and o.placed_at > now() - interval '30 days' and o.status <> 'draft'
-where e.created_at > now() - interval '30 days'
-group by t.name_en;
+-- AI cost per order, last 30 days (EGP at the rate set on the developer page)
+select jsonb_pretty(everwake.dev_costs(now() - interval '30 days', now(), null) -> 'per_order');
+
+-- calls where the cache did not work (no cached tokens on a long prompt)
+select created_at, step, model, input_tokens, cached_tokens from everwake.ai_usage
+where step in ('brain', 'agent') and input_tokens > 2000 and cached_tokens = 0
+order by created_at desc limit 50;
 ```
 
-The system prompts are identical across restaurants and come first in every call, so the model provider's prompt caching applies to all of them.
+Levers, all on the developer page → **Restaurants**, for every restaurant or one:
+- **Models and effort**: the Brain at `medium` (default) or `low`, the Agent at `low`. Changing the model needs no rebuild; the meter puts it on the request.
+- **❤️ for messages that need no reply** and **details by code**: on by default; switch off to send those messages to the AI again.
+- **New model**: add its prices under **Prices** before using it, or its calls show as unpriced.
+
+Needs `SUPABASE_SERVICE_ROLE_KEY` on the dashboard (the meter writes with it).
+The meter's calls last as long as the model takes; on Vercel the route allows
+300 seconds, which needs fluid compute (on by default for new projects).
+
+## Bills
+
+Each restaurant's **Bills** page shows the month and downloads it as Excel.
+Set each restaurant's percent, whether the delivery fee and VAT count, and the
+date the bill starts, on the developer page → **Restaurants**.
 
 ## Scaling
 

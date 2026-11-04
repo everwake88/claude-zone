@@ -9,13 +9,14 @@ interface Ctx {
   brand: Brand;
   setBrand: (b: Brand) => void;
   can: { edit: boolean; owner: boolean };
+  isAdmin: boolean;                              // one of Everwake's developers (platform admin)
   base: string;                                  // "/r/<slug>"
 }
 const TenantCtx = createContext<Ctx | null>(null);
 
 // the brand (logo, colour) comes from the server with the page, so nothing pops in after it opens;
 // Settings → Brand updates it here when it is saved
-export function TenantProvider({ tenant, tenants, initialBrand, children }: { tenant: TenantSummary; tenants: TenantSummary[]; initialBrand?: Brand; children: ReactNode }) {
+export function TenantProvider({ tenant, tenants, initialBrand, isAdmin = false, children }: { tenant: TenantSummary; tenants: TenantSummary[]; initialBrand?: Brand; isAdmin?: boolean; children: ReactNode }) {
   const [agentEnabled, setAgentEnabled] = useState(tenant.agent_enabled);
   const [brand, setBrand] = useState<Brand>(initialBrand || {});
   const role: Role = tenant.role;
@@ -26,6 +27,7 @@ export function TenantProvider({ tenant, tenants, initialBrand, children }: { te
     brand,
     setBrand,
     can: { edit: role === 'owner' || role === 'manager', owner: role === 'owner' },
+    isAdmin,
     base: `/r/${tenant.slug}`
   };
   return <TenantCtx.Provider value={value}>{children}</TenantCtx.Provider>;

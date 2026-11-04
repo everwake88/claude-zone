@@ -1,5 +1,5 @@
 'use client';
-import { Bell, BookOpen, ChevronDown, Flame, LayoutDashboard, LogOut, Menu as MenuIcon, MessageCircle, Search, ShoppingBag, X } from 'lucide-react';
+import { Bell, BookOpen, ChevronDown, Code2, Flame, LayoutDashboard, LogOut, Menu as MenuIcon, MessageCircle, Search, ShoppingBag, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -17,7 +17,7 @@ import { NAV } from './nav';
 import { ThemePicker } from './ThemePicker';
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { tenant, tenants, base, brand } = useTenant();
+  const { tenant, tenants, base, brand, can, isAdmin } = useTenant();
   const path = usePathname();
   const router = useRouter();
   const toast = useToast();
@@ -95,7 +95,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {NAV.map((g, gi) => (
         <div key={gi} className={cx(gi > 0 && 'mt-3', g.group === null && gi > 0 && 'border-t border-white/10 pt-3')}>
           {g.group && <p className="px-3 pb-1.5 text-xs font-medium text-on-navy-muted/70">{t(g.group)}</p>}
-          {g.items.filter(x => x.badge !== 'bookings' || bookings.on).map(({ href, label, icon: Icon, badge }) => {
+          {g.items.filter(x => (x.badge !== 'bookings' || bookings.on) && (!x.editors || can.edit)).map(({ href, label, icon: Icon, badge }) => {
             const n = count(badge), on = active(href);
             return (
               // fetched whole in the background, so a click opens the page at once (React would otherwise hold
@@ -160,6 +160,12 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
         {nav}
         <div className="mt-auto space-y-0.5 px-3 pb-4 pt-6">
+          {/* only for Everwake's developers: what the AI costs, the bills' percent, the AI settings */}
+          {isAdmin && (
+            <Link href="/dev" className="flex items-center gap-3 rounded-[var(--ui-radius-inner)] px-3 py-2 text-sm text-on-navy-muted hover:bg-white/[.08] hover:text-white">
+              <Code2 className="size-4" aria-hidden /> Developer
+            </Link>
+          )}
           <a href="https://www.everwake.tech/" target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-[var(--ui-radius-inner)] px-3 py-2 text-xs text-on-navy-muted hover:text-white">
             <BookOpen className="size-4" aria-hidden /> Everwake Orders
           </a>

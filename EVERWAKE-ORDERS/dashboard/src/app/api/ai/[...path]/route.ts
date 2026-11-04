@@ -15,7 +15,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const UPSTREAM = 'https://api.openai.com/v1/';
+// EW_AI_UPSTREAM: only for testing the meter against a stand-in
+const UPSTREAM = process.env.EW_AI_UPSTREAM || 'https://api.openai.com/v1/';
 const ALLOWED = /^(chat\/completions|responses|audio\/transcriptions|models)$/;
 const STEPS = new Set(['brain', 'agent', 'transcribe', 'vision', 'other']);
 const KINDS = new Set(['text', 'voice', 'image', 'test']);

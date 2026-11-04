@@ -50,7 +50,8 @@ You need:
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon / publishable key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → service_role key (server only, never `NEXT_PUBLIC_`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → service_role key (server only, never `NEXT_PUBLIC_`). The AI meter writes its records with it |
+| `EW_AI_KEY_SHA256` | Optional: the sha256 of each OpenAI key the AI meter may pass on (comma separated). Without it, any key is passed on (it is the caller's own key either way) |
 | `OPENAI_API_KEY` | For the AI menu import |
 | `MENU_AI_MODEL` | Optional; defaults to `gpt-5.6-luna`, the model the agent uses. It must read PDFs and photos |
 | `N8N_BASE_URL` | Your n8n's public address, e.g. `https://n8n.example.com` |
@@ -85,7 +86,9 @@ Sign up on the dashboard with your own e-mail, then in Supabase's SQL editor:
 insert into everwake.platform_admins (user_id, email)
 select id, email from auth.users where email = 'you@everwake.tech';
 ```
-You now see every restaurant in the switcher.
+You now see every restaurant in the switcher, and **Developer** (`/dev`) in the
+sidebar: the AI costs, the AI settings and each restaurant's bill rule. Nobody
+else sees it.
 
 ## 3. The engine (n8n)
 
@@ -121,6 +124,8 @@ The workflows are generated. To change the engine:
 3. Re-import the changed workflow.
 
 `EW_MODEL`, `EW_PG_CRED_ID` and `EW_OPENAI_CRED_ID` set the model and credential ids at build time.
+`EW_BRAIN_EFFORT` (default `medium`) and `EW_AGENT_EFFORT` (default `low`) set how hard each step thinks; the developer page overrides them per restaurant.
+`EW_AI_METER` is the dashboard's AI meter (default `https://everwake-orders.vercel.app/api/ai`); `off` calls OpenAI directly, without cost records.
 `engine/n8n-ids.json` holds the ids n8n gave Main and the three tools (`{ "main": "…", "cart": "…", "details": "…", "reservation": "…" }`, from each workflow's address). With it, a re-imported Main keeps its tools linked: without it the tool nodes say `SET_AFTER_IMPORT` again and the agent can't touch the cart.
 
 ## 4. Each WhatsApp number (Evolution)

@@ -50,14 +50,22 @@ The Seagull pipeline, unchanged in shape:
 4. **Location** — a pin is reverse-geocoded (Google, then OpenStreetMap). `everwake.save_pin` then matches it against the delivery zones (polygons or circles, plain SQL, no PostGIS). It picks the zone, its fee, its minimum and its branch, and sets the branch when none is chosen yet.
 5. **Turn context** (`everwake.turn_context`) — the state, the cart, the customer's last three orders and saved addresses, the last 20 messages (customer, agent, team, automatic), the menu snapshot.
 6. **Build Brief** — FACTS only, built from *this restaurant's* rows: time, branch status (open / closed / busy / not taking orders), the delivery area, the cart with offers, items waiting on a choice, details still missing, whether the summary still matches, returning-customer memory, offers running now, and the restaurant's own answers to common questions.
-7. Two models. The **Brain** (high reasoning, no tools) reads the turn and plans the move: what is going on, what the reply must achieve, the tool actions, what the customer already heard and what to avoid. The **Agent** (low reasoning) runs the tools and writes the reply in her own words. **Check Reply** checks hard truth only: every number must be a real price, total or detail on file; no false "order placed"; no internal codes; only the restaurant's links; no photo promised that isn't sent. A line that breaks one is dropped (**Repair Reply**); no model rewrites her words.
+6b. **Route Without AI** (`main/route_without_ai.js`, 018). Some messages need no model at all, and code answers them:
+   - `react`: "تمام", "شكراً", 👍, an emoji or a sticker, with an empty cart, nothing pending, no question from the agent waiting and a calm moment. The customer gets a ❤️ on their message (Evolution `sendReaction`), and no text.
+   - `details`: the agent (its `asks_for` line) or the code itself asked for a customer detail less than 30 minutes ago, and the answer reads clearly as that detail: a name, a phone number, "the same number", a payment method, delivery or pickup, a "yes" to the saved address, an address with its building, floor and flat. It is saved through `save_customer_details` (the same checks as the AI's), and code asks the next missing detail in a short, plain sentence (`details_by_code_reply.js`). Anything else (a question, a change to the order, an address outside the zones, a refused detail, the last detail before the summary) goes back to the AI on the same turn.
+   - `ai`: everything else.
+   Both shortcuts can be switched off for a restaurant on the developer page.
+7. Two models. The **Brain** (medium reasoning by default, no tools) reads the turn and plans the move: what is going on, what the reply must achieve, the tool actions, what the customer already heard and what to avoid. The **Agent** (low reasoning) runs the tools and writes the reply in her own words. **Check Reply** checks hard truth only: every number must be a real price, total or detail on file; no false "order placed"; no internal codes; only the restaurant's links; no photo promised that isn't sent. A line that breaks one is dropped (**Repair Reply**); no model rewrites her words. Every call to OpenAI, these two and the voice notes and photos, goes through the dashboard's AI meter (below).
 8. **Persist** — memory, handoff flag, questions for the team, telemetry, unlock. If a person took over while the model was thinking, nothing is sent.
    - **Asking the team** (`team_questions`, 014). When only the restaurant knows something — whether something off the menu can be made, half cash and half online, a charge the branch sets — the agent puts one clear question (two at most) in `ask_team`. It tells the customer it is checking with the branch and carries on with the rest. The inbox shows the question with **Yes**, **No** and a box to type (a note can go with Yes / No). The answer goes into the agent's FACTS as NEW; the dashboard wakes it (`team_answer` above), and the reply that passes it on marks it told. A question still waiting is never asked again or guessed. `handoff` stays for a person taking over the chat: a complaint, someone asking for a person, something gone wrong.
 9. **Send** — menu pages and dish photos first, then the text. Every message is logged, so the inbox shows exactly what the customer saw.
 10. **Order placed** — a ticket goes to the branch's WhatsApp, and the order board rings.
 
 The system prompts are the same for every restaurant: only the knowledge in
-the message changes. This also keeps the model's prompt caching effective.
+the message changes. Each call is laid out steady part first (the prompt, the
+restaurant, its menu, the chat so far), then what changed this turn (FACTS, the
+plan, the latest message), and the meter gives each restaurant and step its own
+`prompt_cache_key`, so OpenAI's prompt cache covers most of what is read.
 
 ## The tools
 
@@ -179,6 +187,53 @@ server calls the database with the service role:
 - Indexes on orders, messages, customers and chats by restaurant and time keep
   these quick as the history grows.
 
+## What the AI costs, and the bills (018)
+
+**The AI meter** (`dashboard/src/app/api/ai/[...path]/route.ts`). The engine
+does not call OpenAI directly: its model nodes have their base URL set to
+
+    <dashboard>/api/ai/t/<tenant>/<message id>/<run id>/<step>/<kind>/v1/
+
+where step is brain, agent, transcribe or vision, and kind is text, voice,
+image or test. The meter sends the request on to OpenAI as it came, with the
+caller's own key, after applying the restaurant's AI settings (`ai_settings`:
+the Brain's and the Agent's model and effort) and its cache key. The answer goes
+straight back (streamed answers too). After it, the meter writes one row to
+`ai_usage`: input, cached input, output and thinking tokens, or a voice note's
+seconds. A trigger prices the row from `ai_prices` (the longest model-name
+prefix wins, so dated model names match). The meter never slows a reply, and
+a record it fails to write never breaks one. `EW_AI_METER=off` at build time
+calls OpenAI directly again (no records). `EW_AI_KEY_SHA256` on the dashboard
+limits the meter to Everwake's own key.
+
+**Turns and orders** (`ai_turns`). The calls of one message are a turn. A turn
+counts towards the customer's next order placed within 12 hours (the chat
+that led to it), otherwise their order of the last 24 hours (where is my
+order, a change), otherwise no order. Test chats never count towards an order.
+
+**The developer page** (`/dev`). Only for platform admins: the page checks
+`is_platform_admin()` on the server, and `ai_usage`, `ai_config` and
+`ai_prices` can be read by nobody else (row-level security), so restaurants
+never see any of it. Its tabs:
+- **AI costs**: spend for a period, cost per order (lowest, average, highest), per message, the cached share, by day, by step and by kind, each restaurant, and each order with its messages.
+- **Messages**: every message, opening into each call's tokens.
+- **Restaurants**: the global AI settings and each restaurant's own (models, efforts, the ❤️ and details-by-code switches, the dollar rate), and each restaurant's bill rule.
+- **Prices**: the price list per model.
+
+**Bills** (`tenant_billing`, `bill_statement`, the restaurant's **Bills** page).
+Each restaurant pays Everwake a percent (`fee_percent`, 2% by default) of the
+orders that came through Everwake:
+- **WhatsApp orders**: the food after discounts, plus the delivery fee and VAT when they are ticked for that restaurant (off by default).
+- **QR orders**: the total exactly as the customer saw it at the QR checkout.
+- Not counted: orders the team typed in, drafts, and cancelled or rejected orders.
+
+`fee = round(base × percent / 100, 2)` per order, and the restaurant's share
+is the order total minus the fee. Only platform admins set the rule; owners
+and managers read it and their statement. **Download Excel**
+(`/api/billing/export`) gives the month as a sheet (right to left in Arabic)
+with every order (customer, phone, address, items, branch, total, the amount
+the percent is on, the fee, their share) and a summary sheet.
+
 ## Speed
 
 - The middleware checks the session's token against the project's public
@@ -199,6 +254,7 @@ server calls the database with the service role:
 | `anon` | Nothing at all |
 
 Roles in a restaurant:
+- **Platform admin** (`platform_admins`, Everwake's developers): owner of every restaurant, plus the developer page (AI costs, AI settings, prices, bill rules).
 - **Owner**: everything.
 - **Manager**: everything but the team.
 - **Staff**: orders, the inbox, stock and busy switches, the agent switch.
@@ -225,3 +281,4 @@ Sensitive actions go through `SECURITY DEFINER` functions that check the role fi
 | Paying | `payment_accounts` (each restaurant's Paymob keys; the two secrets encrypted in Supabase Vault, only their ids here), `payments` (each link: pending → paid / expired / replaced / refunded); `orders.payment_status` |
 | Switch | `agent_pauses`, `pause_contacts` |
 | Engine | `menu_snapshot`, `agent_events`, `audit_log` |
+| AI and bills | `ai_usage` (one row per AI call, priced), `ai_prices`, `ai_config` (global and per restaurant), `tenant_billing` (the percent and what it is on) |
