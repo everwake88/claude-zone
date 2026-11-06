@@ -51,7 +51,8 @@ order by created_at desc limit 50;
 ```
 
 Levers, all on the developer page → **Restaurants**, for every restaurant or one:
-- **Models and effort**: the Brain at `medium` (default) or `low`, the Agent at `low`. Changing the model needs no rebuild; n8n reads it on every turn.
+- **Models and effort**: both the Brain and the Agent at `low` by default; `medium` for a restaurant whose chats need more care. The **AI costs** tab splits the cost by how hard each step thinks, to compare.
+- **Wait before replying**: 5 s by default (2–10). Longer bundles quick messages into one reply (fewer AI calls), at the cost of a slightly later answer. Changing the model needs no rebuild; n8n reads it on every turn.
 - **❤️ for messages that need no reply** and **details by code**: on by default; switch off to send those messages to the AI again.
 - **New model**: add its prices under **Prices** before using it, or its calls show as unpriced.
 

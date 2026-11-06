@@ -31,7 +31,8 @@ test('a new customer: pin → zone → cart with offers → details → summary 
   assert.match(t.brief.facts_text, /RETURNING CUSTOMER: no/);
   assert.match(t.brief.facts_text, /You are: نور \(Nour\) from مشويات النيل/);
   assert.match(t.brief.business_text, /ANSWERS THE RESTAURANT GAVE[\s\S]*العزومات/);
-  assert.match(t.brief.menu_text, /M003 فرخة مشوية .*260ج/);
+  assert.match(t.brief.menu_text, /M003 فرخة مشوية .*— 260\b/);
+  assert.match(t.brief.menu_text, /^Prices are in ج/, 'the currency, once at the top');
   assert.deepEqual(t.checked.violations, []);
   assert.equal(t.outbound.length, 1);
   assert.equal(t.outbound[0].reply_to, phone);
@@ -536,7 +537,7 @@ test('branches that differ: Maadi\'s own menu and choice prices, no seating ther
   t = await turn(db, evolutionPayload({ phone, text: 'طب الزمالك فيه كارت؟ خليها الزمالك بالكارت… لا لا خليها المعادي' }), async (brief) => {
     assert.match(brief.facts_text, /BRANCH: المعادي .*NO seating — delivery and pickup only/);
     assert.match(brief.facts_text, /PAYMENT METHODS YOU MAY PROMISE at المعادي: cash \(/);
-    assert.match(brief.menu_text, /فرخة كاملة \+230ج/);
+    assert.match(brief.menu_text, /فرخة كاملة \+230\b/);
     assert.ok(!/M004|M005|M011/.test(brief.menu_text.split('### not on this branch')[0]), 'only Maadi\'s dishes in its menu');
     assert.match(brief.menu_text, /only at other branches:\n.*ساندوتش كفتة \(الزمالك\)/);
     assert.ok(!/شيشة/.test(brief.menu_text), 'a dine-in only dish is never offered where there is no seating');
@@ -1322,7 +1323,7 @@ test('n8n calls OpenAI itself: one request per round, the start cached, every ca
   assert.equal(JSON.parse(out[1].output).status, 'SAVED', out[1].output);
   // the Brain: its own request
   const br = t.nodes['Brain Request'].body;
-  assert.equal(br.model, 'gpt-6-luna'); assert.equal(br.reasoning.effort, 'medium'); assert.match(br.prompt_cache_key, /-brain$/);
+  assert.equal(br.model, 'gpt-6-luna'); assert.equal(br.reasoning.effort, 'low'); assert.match(br.prompt_cache_key, /-brain$/);
   assert.equal(br.input, t.brief.brief);
 
   // the result the turn reads, as before
@@ -1340,6 +1341,8 @@ test('n8n calls OpenAI itself: one request per round, the start cached, every ca
   // each agent round: (12001 − 11904) × 0.10 + 11904 × 0.01 + 180 × 0.50, per million = 0.00021874
   assert.ok(rows.slice(1).every(r => Number(r.cost_usd) === 0.00021874 && r.priced && r.kind === 'text' && r.wa_id === phone));
   assert.equal(rows[0].reasoning_tokens, 1987);
+  const eff = (await db.query(`select step, effort from everwake.ai_usage where run_id = $1 order by id`, [t.nodes['Normalize Inbound'].run_id])).rows;
+  assert.ok(eff.every(r => r.effort === 'low'), 'both steps at low, recorded on each call: ' + JSON.stringify(eff));
   const total = rows.reduce((a, r) => a + Number(r.cost_usd), 0);
   assert.equal(Math.round(total * 1e8), Math.round((0.0013731 + 3 * 0.00021874) * 1e8));
   const log = (await db.query(`select llm_calls, prompt_tokens, completion_tokens from everwake.agent_events where wa_id = $1 order by id desc limit 1`, [phone])).rows[0];
@@ -1414,4 +1417,65 @@ test('a voice note\'s and a photo\'s calls are recorded with the turn', async ()
   nodes['Prepare Media'] = { ...nodes['Prepare Media'], ok: false };
   m = (await runCode('main/media_understood.js', { input: {}, nodes }))[0];
   assert.deepEqual(m.ai_calls, []);
+});
+
+// an 83-dish menu like a chicken restaurant's: many dishes share the same sizes, sauces and sides
+function bigMenu(sym = 'ج') {
+  const sets = [
+    'الحجم (مطلوب): ربع +0ج / نص +60ج / كاملة +170ج · الصوص (اختياري، لحد 2): ثومية / باربكيو +10ج / رانش +10ج / حار',
+    'الخبز (مطلوب): عيش بلدي / عيش سوري +5ج · الإضافات (اختياري، أكتر من اختيار): جبنة +15ج / هالبينو +10ج / بيض +12ج',
+    'الحجم (مطلوب): صغير / وسط +15ج / كبير +30ج'
+  ];
+  const out = [];
+  let n = 1;
+  for (const cat of ['فراخ مشوية', 'فراخ مقلية', 'ساندوتشات', 'وجبات', 'أطباق جانبية', 'مشروبات']) {
+    out.push('### ' + cat);
+    for (let i = 0; i < 14 && n <= 83; i++, n++) {
+      const code = 'M' + String(n).padStart(3, '0');
+      out.push(`- ${code} صنف رقم ${n} (Dish ${n}) — ${100 + n * 5}${sym}${n % 7 === 0 ? ' ★' : ''}${n % 5 === 0 ? ' 📷' : ''}`);
+      if (n % 3 === 0) out.push('  وصف قصير للصنف فيه مكونات وطريقة التحضير');
+      if (cat !== 'مشروبات') out.push('  اختيارات: ' + (n % 9 === 0 ? `الطبقة (مطلوب): عادي / سبايسي +${n}${sym}` : sets[n % 3]));
+    }
+    out.push('');
+  }
+  return out.join('\n');
+}
+const compactMenuFn = () => new Function(readFileSync(new URL('../src/shared/menu_compact.js', import.meta.url), 'utf8') + '\nreturn compactMenu;')();
+
+test('the menu written compactly keeps every dish, price and choice, in fewer words', () => {
+  const compactMenu = compactMenuFn();
+  const full = bigMenu();
+  const small = compactMenu(full, 'ج');
+  // read it back: the shared sets put back on their dishes, the currency back after each price
+  const legend = Object.fromEntries([...small.matchAll(/^(#\d+) = (.+)$/gm)].map(m => [m[1], m[2]]));
+  assert.ok(Object.keys(legend).length >= 3, 'the shared choice sets are written once');
+  const body = small.slice(small.indexOf('\n\n') + 2).replace(/^Prices[^\n]*\n/, '');
+  const expanded = body.split('\n').filter(l => !/^#\d+ = /.test(l) && !/^CHOICE SETS/.test(l))
+    .map(l => l.replace(/^  اختيارات: (#\d+)$/, (_, id) => '  اختيارات: ' + legend[id])).join('\n')
+    .replace(/(\d)(?=[\s/·)]|$)/gm, '$1ج').replace(/^(- M\d+ .*?— \d+)ج/gm, '$1ج');
+  const norm = (t) => t.replace(/(\d)ج/g, '$1').replace(/\s+/g, ' ').trim();
+  assert.equal(norm(expanded), norm(full), 'the same menu, read back');
+  for (const code of full.match(/M\d{3}/g)) assert.ok(small.includes(code), code);
+  assert.match(small, /^Prices are in ج/);
+  const saved = 1 - small.length / full.length;
+  assert.ok(saved > 0.3, `about a third shorter at least (saved ${Math.round(saved * 100)}%)`);
+  // a menu with nothing shared and no currency stays as it was
+  assert.equal(compactMenu('- M001 طبق — 50', ''), '- M001 طبق — 50');
+});
+
+test('the wait before replying comes from the restaurant\'s settings, 2–10 s', async () => {
+  const main = JSON.parse(readFileSync(new URL('../dist/everwake-main.json', import.meta.url), 'utf8'));
+  const node = main.nodes.find(n => n.name === 'Debounce Wait');
+  assert.equal(node.parameters.unit, 'seconds');
+  const expr = String(node.parameters.amount).replace(/^=\{\{\s*|\s*\}\}$/g, '');
+  const at = (r) => new Function('$', `return ${expr};`)(() => ({ first: () => ({ json: { r } }) }));
+  assert.equal(at({ wait_seconds: 5 }), 5);
+  assert.equal(at({ wait_seconds: 8 }), 8);
+  assert.equal(at({ wait_seconds: 30 }), 10);
+  assert.equal(at({}), 5);
+  assert.equal(at(null), 5);
+  const order = main.connections['Route: To The Agent?'].main[0].map(c => c.node);
+  assert.deepEqual(order, ['Load AI Settings'], 'the settings are read before the wait');
+  const t0 = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  assert.equal((await sql(db, 'select everwake.ai_settings($1::uuid) as r', [t0])).r.wait_seconds, 5);
 });

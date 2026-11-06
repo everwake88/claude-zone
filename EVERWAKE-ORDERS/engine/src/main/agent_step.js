@@ -16,7 +16,8 @@ const TOOLS = ['manage_cart', 'save_customer_details', 'manage_reservation'];
 const req = $('Agent Request').first().json;
 const loop = obj(req.agent_loop);
 const answer = openaiAnswer($input.first().json);
-const calls = arr(loop.calls).concat([aiCall('agent', 'responses', obj(req.body).model, answer, req.call_started_at)]);
+const calls = arr(loop.calls).concat([{ ...aiCall('agent', 'responses', obj(req.body).model, answer, req.call_started_at),
+                                         effort: obj(obj(req.body).reasoning).effort || null }]);
 const round = num(loop.round) + 1;
 const output = arr(answer.body.output);
 const fcs = output.filter(o => obj(o).type === 'function_call');

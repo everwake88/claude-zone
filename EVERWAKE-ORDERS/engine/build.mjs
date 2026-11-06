@@ -26,7 +26,7 @@
 //   EW_BRAIN            'off' drops the planning Brain: the Agent then reads the whole situation and
 //                       thinks for itself (default on: the Brain thinks, the Agent writes)
 //   EW_AGENT_EFFORT     the Agent's reasoning effort (default low behind the Brain, medium alone)
-//   EW_BRAIN_EFFORT     the Brain's reasoning effort (default medium; the developer page can change it per restaurant)
+//   EW_BRAIN_EFFORT     the Brain's reasoning effort (default low; the developer page can change it per restaurant)
 //   EW_TRANSCRIBE_MODEL hears a customer's voice note (default gpt-transcribe)
 //   EW_VISION_MODEL     looks at a customer's photo (default gpt-5-mini); EW_VISION_EFFORT its reasoning (default low, '' for none)
 //   (no Rewrite model: a reply that breaks a hard rail has only the offending lines dropped)
@@ -53,7 +53,7 @@ const wfRef = (workflowName) => {
 const MODEL = process.env.EW_MODEL || 'gpt-6-luna';
 const USE_BRAIN = process.env.EW_BRAIN !== 'off';
 const AGENT_EFFORT = process.env.EW_AGENT_EFFORT || (USE_BRAIN ? 'low' : 'medium');
-const BRAIN_EFFORT = process.env.EW_BRAIN_EFFORT || 'medium';
+const BRAIN_EFFORT = process.env.EW_BRAIN_EFFORT || 'low';
 // n8n calls OpenAI itself (the OpenAI credential on plain HTTP Request nodes), so every answer's
 // exact usage is in hand and saved with the turn (everwake.record_ai_usage); nothing in between
 const OPENAI_URL = 'https://api.openai.com/v1/';
@@ -150,7 +150,7 @@ const iff = (name, expr, pos) => ({
     looseTypeValidation: true, options: {}
   } });
 const noop = (name, pos) => ({ name, type: 'n8n-nodes-base.noOp', typeVersion: 1, position: pos, parameters: {} });
-const wait = (name, seconds, pos) => ({ name, type: 'n8n-nodes-base.wait', typeVersion: 1.1, position: pos, parameters: { amount: seconds } });
+const wait = (name, seconds, pos) => ({ name, type: 'n8n-nodes-base.wait', typeVersion: 1.1, position: pos, parameters: { resume: 'timeInterval', amount: seconds, unit: 'seconds' } });
 const evo = (name, path, body, pos, { timeout = 20000, retry = true } = {}) => ({
   name, type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: pos,
   parameters: {
@@ -239,6 +239,8 @@ function buildMain() {
   const presence = w.nodes.find(n => n.name === 'Send Typing Presence');
   presence.parameters.url = `={{ ${I}.channel.base_url }}/chat/sendPresence/{{ ${I}.channel.instance }}`;
   presence.parameters.headerParameters.parameters[0].value = `={{ ${I}.channel.api_key }}`;
+  // the restaurant's AI settings (models, effort, the wait, the shortcuts), read once per message
+  w.add(pg('Load AI Settings', 'select everwake.ai_settings($1::uuid) as r;', `={{ [ ${I}.tenant_id ] }}`, [-1450, 560]));
   w.add(iff('Route: Real Customer?', `!${TEST}`, [-1400, 360]));
 
   // a photo or a voice note: fetched and understood before the turn (the agent waits for it, 015)
@@ -281,7 +283,8 @@ function buildMain() {
            [560, 0], { alwaysOutputData: true, onError: 'continueRegularOutput' }));
   w.add(sticky('Sticky — Media', '### Photos and voice notes\nFetched from WhatsApp and understood before the agent answers: a voice note is transcribed (**' + TRANSCRIBE_MODEL + '**), a photo described (**' + VISION_MODEL + '**). The agent reads it in place of "[voice note]" / "[photo]"; a quick text after it waits for it (a minute at most).',
                [-1320, -300], 1700, 160, 5));
-  w.add(wait('Debounce Wait 2s', 2, [-1100, 460]));
+  // how long to wait for more messages before answering: the restaurant's setting (5 s by default, 2–10 s)
+  w.add(wait('Debounce Wait', `={{ Math.min(10, Math.max(2, Number(($('Load AI Settings').first().json.r || {}).wait_seconds) || 5)) }}`, [-1100, 460]));
   w.add(pg('Claim Debounce Window', 'select everwake.claim_window($1::uuid, $2::text, $3::text, $4::bigint) as r;',
            `={{ [ ${I}.tenant_id, ${I}.wa_id, $('Normalize Inbound').first().json.run_id, String(${I}.buffer_id) ] }}`,
            [-900, 460], { alwaysOutputData: true }));
@@ -314,7 +317,6 @@ function buildMain() {
   w.add(pg('Load Turn Context', 'select everwake.turn_context($1::uuid, $2::text) as r;', `={{ [ ${I}.tenant_id, ${I}.wa_id ] }}`, [620, 460]));
   w.add(code('Build Brief', 'main/build_brief.js', [840, 460]));
   // before any AI: a ❤️ for a message that needs no reply, or the asked-for detail read by code (018)
-  w.add(pg('Load AI Settings', 'select everwake.ai_settings($1::uuid) as r;', `={{ [ ${I}.tenant_id ] }}`, [840, 640]));
   w.add(code('Route Without AI', 'main/route_without_ai.js', [840, 820]));
   w.add({ name: 'Route: Which Way?', type: 'n8n-nodes-base.switch', typeVersion: 3.2, position: [1040, 820],
           parameters: { rules: { values: ['ai', 'react', 'details'].map(k => ({ outputKey: k, renameOutput: true,
@@ -401,21 +403,22 @@ function buildMain() {
   w.link('Test Runner Call', 'Normalize Inbound');
   w.link('Route: Actionable?', 'Intake', 0); w.link('Route: Actionable?', 'Exit: Ignored', 1);
   w.chain('Intake', 'Route: To The Agent?');
-  w.link('Route: To The Agent?', 'Route: Real Customer?', 0);
-  w.link('Route: Real Customer?', 'Send Typing Presence', 0); w.link('Route: Real Customer?', 'Debounce Wait 2s', 1); w.link('Route: To The Agent?', 'Route: Apologise (Agent OFF)?', 1);
+  w.link('Route: To The Agent?', 'Load AI Settings', 0);
+  w.chain('Load AI Settings', 'Route: Real Customer?');
+  w.link('Route: Real Customer?', 'Send Typing Presence', 0); w.link('Route: Real Customer?', 'Debounce Wait', 1); w.link('Route: To The Agent?', 'Route: Apologise (Agent OFF)?', 1);
   w.link('Route: Apologise (Agent OFF)?', 'Prepare Apology', 0); w.link('Route: Apologise (Agent OFF)?', 'Route: Typed On The Phone?', 1);
   w.chain('Prepare Apology', 'Evolution — Send Apology', 'Record Apology', 'Log Apology');
   w.link('Route: Typed On The Phone?', 'Wait For Own Echo 5s', 0); w.link('Route: Typed On The Phone?', 'Exit: Not For The Agent', 1);
   w.chain('Wait For Own Echo 5s', 'Log Phone Reply');
   w.chain('Send Typing Presence', 'Route: Photo Or Voice Note?');
-  w.link('Route: Photo Or Voice Note?', 'Route: Fetch The File?', 0); w.link('Route: Photo Or Voice Note?', 'Debounce Wait 2s', 1);
+  w.link('Route: Photo Or Voice Note?', 'Route: Fetch The File?', 0); w.link('Route: Photo Or Voice Note?', 'Debounce Wait', 1);
   w.link('Route: Fetch The File?', 'Fetch Media (Evolution)', 0); w.link('Route: Fetch The File?', 'Prepare Media', 1);
   w.chain('Fetch Media (Evolution)', 'Prepare Media', 'Route: Voice Note?');
   w.link('Route: Voice Note?', 'Voice Note To File', 0); w.link('Route: Voice Note?', 'Route: Photo?', 1);
   w.chain('Voice Note To File', 'Transcribe Voice Note (OpenAI)', 'Media Understood');
   w.link('Route: Photo?', 'Look At Photo (OpenAI)', 0); w.link('Route: Photo?', 'Media Understood', 1);
-  w.chain('Look At Photo (OpenAI)', 'Media Understood', 'Save What It Said', 'Record Media Usage', 'Debounce Wait 2s');
-  w.chain('Debounce Wait 2s', 'Claim Debounce Window', 'Route: Won The Window?');
+  w.chain('Look At Photo (OpenAI)', 'Media Understood', 'Save What It Said', 'Record Media Usage', 'Debounce Wait');
+  w.chain('Debounce Wait', 'Claim Debounce Window', 'Route: Won The Window?');
   w.link('Route: Won The Window?', 'Route: Has Location?', 0); w.link('Route: Won The Window?', 'Route: Retry Or Exit?', 1);
   w.link('Route: Retry Or Exit?', 'Retry Backoff 3s', 0); w.link('Route: Retry Or Exit?', 'Exit: Superseded', 1);
   w.chain('Retry Backoff 3s', 'Claim Debounce Window');
@@ -423,7 +426,7 @@ function buildMain() {
   w.chain('Reverse Geocode (Google)', 'Route: Geocode OK?');
   w.link('Route: Geocode OK?', 'Resolve Location', 0); w.link('Route: Geocode OK?', 'Reverse Geocode (OSM)', 1);
   w.chain('Reverse Geocode (OSM)', 'Resolve Location', 'Save Pin + Zone', 'Load Turn Context');
-  w.chain('Load Turn Context', 'Build Brief', 'Load AI Settings', 'Route Without AI', 'Route: Which Way?');
+  w.chain('Load Turn Context', 'Build Brief', 'Route Without AI', 'Route: Which Way?');
   w.link('Route: Which Way?', USE_BRAIN ? 'Brain Request' : 'Attach Plan', 0);
   w.link('Route: Which Way?', 'Build Persist Payload', 1);
   w.link('Route: Which Way?', 'Save Details (code)', 2);

@@ -21,12 +21,13 @@ interface Costs {
   per_order: { avg_usd: number | null; min_usd: number | null; max_usd: number | null; avg_messages: number | null };
   by_step: { step: string; calls: number; cost_usd: number; input: number; cached: number; output: number; thinking: number }[];
   by_kind: { kind: string; messages: number; cost_usd: number }[];
+  by_effort?: { step: string; effort: string; calls: number; cost_usd: number; avg_usd: number | null; thinking: number }[];
   by_day: { day: string; cost_usd: number; messages: number }[];
   by_tenant: { tenant_id: string; name: string; slug: string; messages: number; cost_usd: number; orders: number; avg_order_usd: number | null; min_order_usd: number | null; max_order_usd: number | null; cache_share: number | null }[];
   orders_list: { order_id: number; order_no: string; tenant: string; slug: string; placed_at: string; total: number; messages: number; cost_usd: number; to_order_usd: number | null; after_usd: number | null; cache_share: number | null; conversation_id: number | null }[];
 }
 interface Msg { run_id: string; at: string; tenant: string; slug: string; customer: string | null; kind: string; calls: number; input: number; cached: number; output: number; thinking: number; cost_usd: number; part: string; order_no: string | null; steps: Step[]; message: string | null }
-interface AiCfg { brain_model?: string | null; brain_effort?: string | null; agent_model?: string | null; agent_effort?: string | null; details_by_code?: boolean | null; react_no_reply?: boolean | null; usd_egp?: number | null }
+interface AiCfg { brain_model?: string | null; brain_effort?: string | null; agent_model?: string | null; agent_effort?: string | null; details_by_code?: boolean | null; react_no_reply?: boolean | null; usd_egp?: number | null; wait_seconds?: number | null }
 interface DevTenant { id: string; slug: string; name: string; status: string; bill: { fee_percent: number; include_delivery_fee: boolean; include_vat: boolean; starts_on: string | null }; ai: AiCfg; ai_own: AiCfg | null }
 interface Price { model: string; input_per_m: number; cached_per_m: number; output_per_m: number; audio_per_minute: number | null }
 
@@ -139,6 +140,13 @@ function CostsView({ c, egp, usd }: { c: Costs; egp: (v: number | null | undefin
         </Card>
       </div>
 
+      {!!c.by_effort?.length && (
+        <Card title="By how hard each step thinks">
+          <Table head={['Step', 'Thinks', 'Calls', 'Cost', 'Per call', 'Thinking tokens per call']}
+            rows={c.by_effort.map(e => [e.step, e.effort, n0(e.calls), egp(e.cost_usd), egp(e.avg_usd, 4), n0(e.calls ? e.thinking / e.calls : 0)])} />
+        </Card>
+      )}
+
       <Card title="By kind of message">
         <div className="flex flex-wrap gap-3">
           {c.by_kind.map(k => (
@@ -234,11 +242,13 @@ function AiFields({ value, onChange, global }: { value: AiCfg; onChange: (v: AiC
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <label className="text-xs text-muted">Planning model<Input className="mt-1" placeholder={global ? 'gpt-6-luna (as built)' : 'as for everyone'} value={value.brain_model || ''} onChange={e => onChange({ brain_model: e.target.value || null })} /></label>
-      <label className="text-xs text-muted">Planning thinks<Select className="mt-1" value={value.brain_effort || ''} onChange={e => onChange({ brain_effort: e.target.value || null })}>{opt(EFF, global ? 'medium (default)' : 'as for everyone')}</Select></label>
+      <label className="text-xs text-muted">Planning thinks<Select className="mt-1" value={value.brain_effort || ''} onChange={e => onChange({ brain_effort: e.target.value || null })}>{opt(EFF, global ? 'low (default)' : 'as for everyone')}</Select></label>
       <label className="text-xs text-muted">Reply model<Input className="mt-1" placeholder={global ? 'gpt-6-luna (as built)' : 'as for everyone'} value={value.agent_model || ''} onChange={e => onChange({ agent_model: e.target.value || null })} /></label>
       <label className="text-xs text-muted">Reply thinks<Select className="mt-1" value={value.agent_effort || ''} onChange={e => onChange({ agent_effort: e.target.value || null })}>{opt(EFF, global ? 'low (default)' : 'as for everyone')}</Select></label>
       <label className="text-xs text-muted">Details asked by code<Select className="mt-1" value={tri(value.details_by_code)} onChange={e => onChange({ details_by_code: fromTri(e.target.value) })}>{opt(['', 'on', 'off'], global ? 'off' : 'as for everyone')}</Select></label>
       <label className="text-xs text-muted">❤️ for messages that need no reply<Select className="mt-1" value={tri(value.react_no_reply)} onChange={e => onChange({ react_no_reply: fromTri(e.target.value) })}>{opt(['', 'on', 'off'], global ? 'off' : 'as for everyone')}</Select></label>
+      <label className="text-xs text-muted">Wait before replying (seconds)<Input className="mt-1" type="number" min="2" max="10" step="1" placeholder={global ? '5 (default)' : 'as for everyone'}
+        value={value.wait_seconds ?? ''} onChange={e => onChange({ wait_seconds: e.target.value === '' ? null : Math.min(10, Math.max(2, Math.round(Number(e.target.value)))) })} /></label>
       {global && <label className="text-xs text-muted">EGP per dollar<Input className="mt-1" type="number" step="0.01" value={value.usd_egp ?? ''} onChange={e => onChange({ usd_egp: e.target.value === '' ? null : Number(e.target.value) })} /></label>}
     </div>
   );
@@ -255,6 +265,7 @@ function RestaurantRow({ t, reload }: { t: DevTenant; reload: () => Promise<void
     const a = own ? await sb().from('ai_config').upsert({ scope: t.id, brain_model: ai.brain_model || null, brain_effort: ai.brain_effort || null,
                                                           agent_model: ai.agent_model || null, agent_effort: ai.agent_effort || null,
                                                           details_by_code: ai.details_by_code ?? null, react_no_reply: ai.react_no_reply ?? null,
+                                                          wait_seconds: ai.wait_seconds ?? null,
                                                           updated_at: new Date().toISOString() })
                   : await sb().from('ai_config').delete().eq('scope', t.id);
     if (a.error) throw new Error(a.error.message);
@@ -273,7 +284,7 @@ function RestaurantRow({ t, reload }: { t: DevTenant; reload: () => Promise<void
           <p className="text-xs text-muted"><Sparkles className="me-1 inline size-3.5" />WhatsApp orders: the food after discounts{bill.include_delivery_fee ? ' + delivery' : ''}{bill.include_vat ? ' + VAT' : ''}. QR orders: their total.</p>
         </div>
         <AiFields value={ai} onChange={v => setAi({ ...ai, ...v })} />
-        <p className="text-xs text-muted">In use now: planning {t.ai.brain_model || 'gpt-6-luna'} · {t.ai.brain_effort} · reply {t.ai.agent_model || 'gpt-6-luna'} · {t.ai.agent_effort} · details by code {t.ai.details_by_code ? 'on' : 'off'} · ❤️ {t.ai.react_no_reply ? 'on' : 'off'}</p>
+        <p className="text-xs text-muted">In use now: planning {t.ai.brain_model || 'gpt-6-luna'} · {t.ai.brain_effort} · reply {t.ai.agent_model || 'gpt-6-luna'} · {t.ai.agent_effort} · details by code {t.ai.details_by_code ? 'on' : 'off'} · ❤️ {t.ai.react_no_reply ? 'on' : 'off'} · waits {t.ai.wait_seconds ?? 5} s</p>
       </div>
     </Card>
   );

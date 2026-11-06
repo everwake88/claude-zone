@@ -98,4 +98,5 @@ Return ONE JSON object and nothing else — no code fences, no text around it. V
 "language" — "ar" or "en".
 "customer" — "man" or "woman": a woman only when her own words or name show it (Ahmad, Omar = a man).
 "next" — how to follow up depending on their answer.
+Leave out any field that would be empty, false, [] or "" (a missing field means exactly that); write only what this turn needs.
 </output>

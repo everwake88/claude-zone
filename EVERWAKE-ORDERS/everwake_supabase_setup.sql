@@ -7977,22 +7977,28 @@ create table if not exists everwake.ai_config (
   details_by_code boolean,                      -- the customer's details asked and read by code, the AI only when unsure
   react_no_reply  boolean,                      -- ❤️ on "👍", stickers, "شكرا" when nothing is pending
   usd_egp         numeric(10, 4),               -- for showing costs in EGP (global only)
+  wait_seconds    int check (wait_seconds between 2 and 10),   -- how long to wait for more messages before replying
   updated_at      timestamptz not null default now(),
   updated_by      uuid
 );
 insert into everwake.ai_config (scope, brain_effort, agent_effort, details_by_code, react_no_reply, usd_egp)
-values ('global', 'medium', 'low', true, true, 50)
+values ('global', 'low', 'low', true, true, 50)
 on conflict (scope) do nothing;
+alter table everwake.ai_config add column if not exists wait_seconds int check (wait_seconds between 2 and 10);
+-- 2026-11-06: both steps think at low, and the reply waits 5 s for more messages (a value set on the developer page stays)
+update everwake.ai_config set brain_effort = 'low' where scope = 'global' and brain_effort = 'medium';
+update everwake.ai_config set wait_seconds = 5 where scope = 'global' and wait_seconds is null;
 
 -- one restaurant's settings: its own over the global ones
 create or replace function everwake.ai_settings(p_tenant uuid)
 returns jsonb language sql stable security definer set search_path = everwake, pg_temp as $$
   select jsonb_build_object(
-    'brain_model', coalesce(t.brain_model, g.brain_model), 'brain_effort', coalesce(t.brain_effort, g.brain_effort, 'medium'),
+    'brain_model', coalesce(t.brain_model, g.brain_model), 'brain_effort', coalesce(t.brain_effort, g.brain_effort, 'low'),
     'agent_model', coalesce(t.agent_model, g.agent_model), 'agent_effort', coalesce(t.agent_effort, g.agent_effort, 'low'),
     'details_by_code', coalesce(t.details_by_code, g.details_by_code, false),
     'react_no_reply', coalesce(t.react_no_reply, g.react_no_reply, false),
-    'usd_egp', coalesce(g.usd_egp, 50))
+    'usd_egp', coalesce(g.usd_egp, 50),
+    'wait_seconds', least(10, greatest(2, coalesce(t.wait_seconds, g.wait_seconds, 5))))
     from (select 1) x
     left join everwake.ai_config g on g.scope = 'global'
     left join everwake.ai_config t on t.scope = p_tenant::text
@@ -8010,6 +8016,7 @@ create table if not exists everwake.ai_usage (
   step             text not null,               -- brain | agent | transcribe | vision | other
   kind             text not null default 'text' check (kind in ('text', 'voice', 'image', 'test')),
   model            text,
+  effort           text,                        -- how hard it was asked to think (brain, agent)
   endpoint         text,
   input_tokens     int not null default 0,      -- all of them, cached included
   cached_tokens    int not null default 0,
@@ -8026,6 +8033,7 @@ create table if not exists everwake.ai_usage (
   duration_ms      int,
   created_at       timestamptz not null default now()
 );
+alter table everwake.ai_usage add column if not exists effort text;
 alter table everwake.ai_usage add column if not exists price_in_per_m numeric(12, 4),
   add column if not exists price_cached_per_m numeric(12, 4), add column if not exists price_out_per_m numeric(12, 4),
   add column if not exists price_audio_per_minute numeric(12, 4);
@@ -8068,12 +8076,14 @@ returns int language plpgsql security definer set search_path = everwake, pg_tem
 declare n int;
 begin
   if p_tenant is null or jsonb_typeof(p_calls) is distinct from 'array' then return 0; end if;
-  insert into everwake.ai_usage (tenant_id, run_id, message_id, step, kind, model, endpoint, input_tokens, cached_tokens,
+  insert into everwake.ai_usage (tenant_id, run_id, message_id, step, kind, model, effort, endpoint, input_tokens, cached_tokens,
                                  output_tokens, reasoning_tokens, audio_seconds, http_status, duration_ms)
   select p_tenant, left(p_run_id, 120), p_message_id,
          case when c->>'step' in ('brain', 'agent', 'transcribe', 'vision') then c->>'step' else 'other' end,
          case when p_kind in ('text', 'voice', 'image', 'test') then p_kind else 'text' end,
-         left(c->>'model', 80), left(c->>'endpoint', 40),
+         left(c->>'model', 80),
+         case when c->>'effort' in ('minimal', 'low', 'medium', 'high') then c->>'effort' end,
+         left(c->>'endpoint', 40),
          greatest(coalesce((c->>'input')::numeric, 0), 0)::int, greatest(coalesce((c->>'cached')::numeric, 0), 0)::int,
          greatest(coalesce((c->>'output')::numeric, 0), 0)::int, greatest(coalesce((c->>'thinking')::numeric, 0), 0)::int,
          nullif(c->>'seconds', '')::numeric, nullif(c->>'status', '')::numeric::int, nullif(c->>'ms', '')::numeric::int
@@ -8183,6 +8193,10 @@ begin
     'by_step', coalesce((select jsonb_agg(jsonb_build_object('step', step, 'calls', n, 'cost_usd', c, 'input', i, 'cached', ca, 'output', o, 'thinking', r) order by c desc)
                            from (select step, count(*) n, sum(coalesce(cost_usd, 0)) c, sum(input_tokens) i, sum(cached_tokens) ca,
                                         sum(output_tokens) o, sum(reasoning_tokens) r from calls group by 1) x), '[]'::jsonb),
+    'by_effort', coalesce((select jsonb_agg(jsonb_build_object('step', step, 'effort', effort, 'calls', n, 'cost_usd', c,
+                                                              'avg_usd', c / nullif(n, 0), 'thinking', r) order by step, effort)
+                             from (select step, coalesce(effort, '—') effort, count(*) n, sum(coalesce(cost_usd, 0)) c, sum(reasoning_tokens) r
+                                     from calls where step in ('brain', 'agent') group by 1, 2) x), '[]'::jsonb),
     'by_kind', coalesce((select jsonb_agg(jsonb_build_object('kind', kind, 'messages', n, 'cost_usd', c) order by c desc)
                            from (select kind, count(*) n, sum(cost_usd) c from turns group by 1) x), '[]'::jsonb),
     'by_day', coalesce((select jsonb_agg(jsonb_build_object('day', d, 'cost_usd', c, 'messages', n) order by d)

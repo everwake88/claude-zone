@@ -13,6 +13,7 @@
 // comes from that restaurant's rows. Only the knowledge changes.
 // =====================================================================
 // @include shared/basics.js
+// @include shared/menu_compact.js
 // @include shared/clock.js
 // @include shared/offers.js
 
@@ -390,7 +391,7 @@ const facts = [
   `ORDER TYPE: ${mode === 'delivery' ? 'delivery' : (mode === 'pickup' ? 'pickup from the branch' : 'not chosen yet — delivery or pickup')}`,
   `DELIVERY AREA: ${areaLine}`,
   '',
-  'LOCATION:', ...locationLines.map(l => '  ' + l),
+  ...(locationLines.length === 1 && locationLines[0] === 'none shared' ? ['LOCATION: none shared'] : ['LOCATION:', ...locationLines.map(l => '  ' + l)]),
   '',
   'CART (the only truth — not the chat):',
   cartLines.length ? cartLines.join('\n') : '- (empty)',
@@ -400,8 +401,8 @@ const facts = [
   cartItems.some(i => i.extra_charge) ? `  a preparation charge the branch has not published is still to be added for: ${cartItems.filter(i => i.extra_charge).map(i => i.display_name || i.item_name).join('، ')}` : '',
   stale.length ? `  ⚠ NO LONGER AVAILABLE (switched off by the restaurant since it went in the cart): ${stale.join('، ')} — tell the customer, offer an alternative, and update the cart` : '',
   '',
-  'ITEMS WAITING ON A REQUIRED CHOICE (not in the cart until answered):',
-  pendingLines.length ? pendingLines.join('\n') : '- (none)',
+  pendingLines.length ? 'ITEMS WAITING ON A REQUIRED CHOICE (not in the cart until answered):\n' + pendingLines.join('\n')
+    : 'ITEMS WAITING ON A REQUIRED CHOICE: none',
   '',
   'DETAILS ON FILE FOR THIS ORDER (never ask for these again):',
   detailLines.length ? detailLines.join('\n') : '- (none yet)',
@@ -418,7 +419,7 @@ const facts = [
   `OFFERS RUNNING NOW:\n${offerLines.length ? offerLines.join('\n') : '- none'}`,
   `MENU PICTURES: ${menuPics}`,
   `DISH PHOTOS: ${photoCodes.length ? `dishes marked 📷 in the MENU have a photo you can send (send_item_photos)${photosSent.length ? '; already sent: ' + photosSent.join(', ') : ''}` : 'none uploaded'}`,
-  `RULED OUT BY THE CUSTOMER (food_prefs): ${str(details.food_prefs) || 'nothing — everything is open'}`,
+  `RULED OUT BY THE CUSTOMER (food_prefs): ${str(details.food_prefs) || 'nothing'}`,
   payFact,
   '',
   ...bookingLines,
@@ -467,6 +468,7 @@ const business = [
 // ---- MENU ------------------------------------------------------------------------------------------------------
 // a choice with a preparation charge the branch sets: a marker for the host, not words to read out
 let menuText = str(ctx.menu_digest).replace(/\s*\(\+رسوم تسوية يحددها الفرع\)/g, ' †');
+menuText = compactMenu(menuText, SYM);
 if (menuText.includes('†')) menuText = '† = a preparation charge the branch sets. Never mention it while they choose; only in the summary, briefly, if they picked it.\n\n' + menuText;
 if (branchId) {
   const here = menuItems;

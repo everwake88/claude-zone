@@ -69,8 +69,8 @@ begin
 
   -- the engine records its own calls, exactly as OpenAI reported them
   assert everwake.record_ai_usage(t, mid, 'run-e', 'voice', '[
-    {"step":"brain","model":"gpt-6-luna","endpoint":"responses","input":10240,"cached":8960,"output":2311,"thinking":1987,"status":200,"ms":5120},
-    {"step":"agent","model":"gpt-6-luna","endpoint":"responses","input":12001,"cached":11904,"output":180,"thinking":64,"status":200,"ms":2210},
+    {"step":"brain","model":"gpt-6-luna","effort":"low","endpoint":"responses","input":10240,"cached":8960,"output":2311,"thinking":1987,"status":200,"ms":5120},
+    {"step":"agent","model":"gpt-6-luna","effort":"sideways","endpoint":"responses","input":12001,"cached":11904,"output":180,"thinking":64,"status":200,"ms":2210},
     {"step":"transcribe","model":"gpt-transcribe","endpoint":"audio/transcriptions","seconds":12.5,"status":200},
     {"step":"nonsense","model":"gpt-6-luna","input":"12","output":3},
     "not a call"]') = 4;
@@ -82,6 +82,19 @@ begin
   assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'transcribe') = 0.00125, '12.5 s of voice';
   assert (select kind from everwake.ai_usage where run_id = 'run-e' and step = 'agent') = 'voice';
   assert (select reasoning_tokens from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 1987;
+  assert (select effort from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 'low', 'the effort it ran at';
+  assert (select effort from everwake.ai_usage where run_id = 'run-e' and step = 'agent') is null, 'an unknown effort is not stored';
+  -- the settings: both steps at low, a 5 s wait, a restaurant's own wait within 2–10 s
+  v := everwake.ai_settings(t);
+  assert v ->> 'brain_effort' = 'low' and v ->> 'agent_effort' = 'low' and (v ->> 'wait_seconds')::int = 5, v::text;
+  insert into everwake.ai_config (scope, wait_seconds) values (t::text, 8) on conflict (scope) do update set wait_seconds = 8;
+  assert (everwake.ai_settings(t) ->> 'wait_seconds')::int = 8;
+  begin
+    update everwake.ai_config set wait_seconds = 30 where scope = t::text;
+    assert false, 'a wait of 30 s was taken';
+  exception when check_violation then null;
+  end;
+  delete from everwake.ai_config where scope = t::text;
   assert (select price_out_per_m from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 0.50, 'the price is kept with the call';
   assert (select step from everwake.ai_usage where run_id = 'run-e' and input_tokens = 12) = 'other';
   -- a later price change leaves the recorded costs as they were
@@ -107,6 +120,8 @@ begin
   select count(*) into n from everwake.ai_usage;
   assert n >= 6, 'the developer reads the usage table';
   assert jsonb_array_length(everwake.dev_tenants()) >= 1;
+  assert exists (select 1 from jsonb_array_elements(everwake.dev_costs(now() - interval '2 hours', now()) -> 'by_effort') e
+                  where e ->> 'step' = 'brain' and e ->> 'effort' = 'low'), 'the cost split by effort';
 end $$;
 
 -- the restaurant's owner: the bill yes, the costs never

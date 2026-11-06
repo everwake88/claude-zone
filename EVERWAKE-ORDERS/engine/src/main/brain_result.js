@@ -9,7 +9,7 @@
 
 const req = $('Brain Request').first().json;
 const answer = openaiAnswer($input.first().json);
-const call = aiCall('brain', 'responses', req.body.model, answer, req.brain_started_at);
+const call = { ...aiCall('brain', 'responses', req.body.model, answer, req.brain_started_at), effort: obj(req.body.reasoning).effort || null };
 const text = answer.error ? '' : outputText(answer.body);
 
 return [{ json: { text, ...(answer.error ? { error: { message: answer.error } } : {}), ai_call: call } }];

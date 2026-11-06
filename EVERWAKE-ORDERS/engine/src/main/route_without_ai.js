@@ -14,7 +14,7 @@
 // @include shared/basics.js
 
 const b = $('Build Brief').first().json;
-const ai = row($input.first().json);                  // ai_settings(tenant)
+const ai = row($('Load AI Settings').first().json);   // ai_settings(tenant), read before the wait
 const ctx = row($('Load Turn Context').first().json);
 const norm = $('Normalize Inbound').first().json;
 const state = obj(ctx.state);

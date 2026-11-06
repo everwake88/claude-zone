@@ -145,6 +145,7 @@ export async function turn(db, payload, script, opts = {}) {
   const r = intake.r;
   if (r.route !== 'agent') return { route: r.route, intake: r, norm, nodes };
 
+  nodes['Load AI Settings'] = await sql(db, 'select everwake.ai_settings($1::uuid) as r', [r.tenant_id]);
   const claim = await sql(db, 'select everwake.claim_window($1::uuid, $2::text, $3::text, $4::bigint) as r',
                           [r.tenant_id, r.wa_id, norm.run_id, String(r.buffer_id)]);
   nodes['Claim Debounce Window'] = claim;
@@ -163,8 +164,7 @@ export async function turn(db, payload, script, opts = {}) {
     const ctx = await sql(db, 'select everwake.turn_context($1::uuid, $2::text) as r', [r.tenant_id, r.wa_id]);
     nodes['Load Turn Context'] = ctx;
     nodes['Build Brief'] = (await runCode('main/build_brief.js', { input: ctx, nodes }))[0];
-    nodes['Load AI Settings'] = await sql(db, 'select everwake.ai_settings($1::uuid) as r', [r.tenant_id]);
-    nodes['Route Without AI'] = (await runCode('main/route_without_ai.js', { input: nodes['Load AI Settings'], nodes }))[0];
+    nodes['Route Without AI'] = (await runCode('main/route_without_ai.js', { input: nodes['Build Brief'], nodes }))[0];
     return nodes['Route Without AI'];
   };
   let routed = await prepare();
