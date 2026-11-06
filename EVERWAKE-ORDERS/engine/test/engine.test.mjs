@@ -1563,6 +1563,9 @@ test('the planning step switched off: one AI call per message, the reply step de
     assert.equal(t.nodes['Brain Request'], undefined, 'no planning call');
     assert.equal(t.nodes['Attach Plan'].plan_text, '', 'no plan in the reply step\'s message');
     assert.equal(t.recorded, 1, 'one AI call recorded');
+    const dev = t.bodies[0].input[0].content[0].text;
+    assert.match(dev, /<details_and_placing>/, 'the writer\'s own instructions hold the whole judgement');
+    assert.doesNotMatch(dev, /\bplan\b|PLAN/i, 'nothing about a plan it never gets');
     assert.equal(t.checked.decision.reply_messages[0], 'أيوه عندنا كفتة مشوية 😋');
     const main = JSON.parse(readFileSync(new URL('../dist/everwake-main.json', import.meta.url), 'utf8'));
     assert.deepEqual(main.connections['Route: Plan First?'].main.map(o => o.map(c => c.node)), [['Brain Request'], ['Attach Plan']]);

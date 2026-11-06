@@ -23,8 +23,10 @@ const effort = !FIXED && EFFORTS.includes(ai.agent_effort) ? ai.agent_effort : '
 const loop = j.agent_loop ? obj(j.agent_loop) : {
   round: 0,
   started_at: new Date().toISOString(),
+  // no planning step this turn (the writer-only Main, or planning switched off on the developer page):
+  // the writer's own instructions hold the whole judgement (agent_solo.md); with a plan, agent.md
   input: (() => { const a = $('Attach Plan').first().json;
-                  return cachedInput("__AGENT_PROMPT__", a.steady_text, a.chat_blocks, a.agent_rest); })(),
+                  return cachedInput(str(a.plan_text) ? "__AGENT_PROMPT__" : "__AGENT_SOLO_PROMPT__", a.steady_text, a.chat_blocks, a.agent_rest); })(),
   steps: [],
   calls: []
 };

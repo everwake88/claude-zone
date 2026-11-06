@@ -103,6 +103,7 @@ export function fill(code) {
     .replace(/__AGENT_EFFORT_FIXED__/g, USE_BRAIN ? 'no' : 'yes')
     .replace(/"__BRAIN_PROMPT__"/g, () => JSON.stringify(prompt('brain.md')))
     .replace(/"__AGENT_PROMPT__"/g, () => JSON.stringify(prompt('agent.md')))
+    .replace(/"__AGENT_SOLO_PROMPT__"/g, () => JSON.stringify(prompt('agent_solo.md')))
     .replace(/"__AGENT_TOOLS__"/g, () => JSON.stringify(AGENT_TOOLS));
 }
 const src = (p) => fill(expand(readFileSync(join(ROOT, 'src', p), 'utf8'))).trim() + '\n';
