@@ -1570,3 +1570,23 @@ test('the planning step switched off: one AI call per message, the reply step de
     await db.query(`delete from everwake.ai_config where scope = $1`, [t0]);
   }
 });
+
+test('an address with a villa: its number is the building, and no floor or flat is asked', async () => {
+  const phone = '201077770012';
+  const ai = async () => ({ plan: {}, reply: quiet('تمام!') });
+  let t = await turn(db, evolutionPayload({ phone, location: ZAMALEK_PIN }), async () => ({ plan: {}, reply: quiet('أهلاً! تحب تطلب إيه؟') }),
+                     { geo: { street: 'شارع حسن صبري', district: 'الزمالك' } });
+  t = await turn(db, evolutionPayload({ phone, text: 'فرخة كاملة حارة' }), async () => ({
+    plan: {}, tools: [{ tool: 'manage_cart', action: 'add', items: [{ menu_id: 'M003', quantity: 1, choices: [{ selected: ['فرخة كاملة', 'حار'] }] }] },
+                      { tool: 'save_customer_details', details: { delivery_method: 'توصيل' } }],
+    reply: quiet('تمام! ابعتلي اسم الشارع ورقم العمارة والدور والشقة', { asks_for: ['address'] })
+  }));
+  t = await turn(db, evolutionPayload({ phone, text: 'التجمع الخامس، شارع التسعين الجنوبي، فيلا 14' }), ai);
+  assert.equal(t.no_ai, 'details');
+  const det = (await sql(db, `select state -> 'customer' as r from everwake.conversations where wa_id = $1`, [phone])).r;
+  assert.equal(det.address_building, 'فيلا 14');
+  assert.match([det.address_street, det.address_landmark].join(' '), /شارع التسعين الجنوبي/, 'the rest of what they wrote is kept (beside the pin, as the landmark)');
+  const askedNext = (await sql(db, `select state -> 'details_awaiting' -> 'fields' ->> 0 as r from everwake.conversations where wa_id = $1`, [phone])).r;
+  assert.notEqual(askedNext, 'address', 'nothing more is asked about the address');
+  assert.doesNotMatch(t.outbound[0].text, /العمارة|الدور|الشقة/);
+});

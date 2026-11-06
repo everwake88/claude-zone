@@ -98,10 +98,13 @@ if (want.includes('address_ok') && YES.test(text)) details.address_confirmed = '
 if (want.includes('address') && !YES.test(text)) {
   // an address as people write it: the building, the floor and the apartment read out; the rest is the street
   const a = plain;
-  const building = /(?:عمارة|عماره|عمارت|برج|مبنى|بيت|بلوك|ع\.?)\s*(?:رقم\s*)?(\d{1,5}[أ-ي]?)/.exec(a);
+  // a villa's number is its building number; "فيلا" stays with it, so no floor or flat is asked (HOUSE_RE)
+  const villa = /(فيلا|فيلّا|ڤيلا|فيله|villa)\s*(?:رقم\s*)?(\d{1,5}[أ-ي]?)/i.exec(a);
+  const building = villa ? [villa[0], villa[1] + ' ' + villa[2]]
+    : /(?:عمارة|عماره|عمارت|برج|مبنى|بيت|بلوك|ع\.?)\s*(?:رقم\s*)?(\d{1,5}[أ-ي]?)/.exec(a);
   const floor = /(?:الدور|دور|الطابق|طابق|د\.?)\s*(\d{1,3}|الأرضي|الارضي|أرضي|ارضي|الأول|الاول|التاني|الثاني|التالت|الثالث|الرابع|الخامس|السادس|السابع|التامن|الثامن|التاسع|العاشر|الأخير|الاخير)/.exec(a);
   const apt = /(?:شقة|شقه|ش\.)\s*(?:رقم\s*)?(\d{1,5}[أ-ي]?)/.exec(a);
-  const looksLikeAddress = /\d/.test(a) || /شارع|ش\s|ميدان|عمارة|عماره|برج|الدور|شقة|شقه|جنب|قدام|بجوار|خلف|street|st\.|building|floor|apt/i.test(a);
+  const looksLikeAddress = /\d/.test(a) || /شارع|ش\s|ميدان|عمارة|عماره|برج|فيلا|الدور|شقة|شقه|جنب|قدام|بجوار|خلف|street|st\.|building|villa|floor|apt/i.test(a);
   if (looksLikeAddress && a.length >= 4) {
     if (building) details.address_building = building[1];
     if (floor) details.address_floor = floor[1];
