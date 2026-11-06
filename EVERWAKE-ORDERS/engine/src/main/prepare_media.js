@@ -19,6 +19,9 @@ const ext = { 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audi
 // the customer's own words with it (a caption), or the marker the agent would otherwise see
 const marker = str(norm.customer_message);
 const caption = /^\[(photo|voice note)\]$/.test(marker) ? '' : marker;
+// the photo model: the restaurant's AI setting (the developer page), else the one the workflow was built with
+let visionModel = '__VISION_MODEL__';
+try { visionModel = str(row($('Load AI Settings').first().json).vision_model) || visionModel; } catch (e) { /* not loaded: the build's */ }
 
 const VISION = `A customer sent this picture to a restaurant on WhatsApp. In one to three short English sentences, say what it shows that matters for helping them:
 - food or a dish: what it looks like (name the dish only when it is plainly recognisable);
@@ -44,9 +47,9 @@ return [{
     message_id: intake.message_id,
     transcribe_model: '__TRANSCRIBE_MODEL__',
     transcribe_prompt: 'A WhatsApp voice note to a restaurant in Egypt, usually in Egyptian Arabic: ordering food, dishes, prices, addresses, delivery.',
-    vision_model: '__VISION_MODEL__',
+    vision_model: visionModel,
     vision_body: media.kind === 'image' && file64 ? {
-      model: '__VISION_MODEL__',
+      model: visionModel,
       messages: [
         { role: 'system', content: VISION },
         { role: 'user', content: [

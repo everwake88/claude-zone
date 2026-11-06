@@ -1336,15 +1336,17 @@ test('n8n calls OpenAI itself: one request per round, the start cached, every ca
                                   from everwake.ai_usage where run_id = $1 order by id`, [t.nodes['Normalize Inbound'].run_id])).rows;
   assert.deepEqual(rows.map(r => r.step), ['brain', 'agent', 'agent', 'agent']);
   assert.equal(rows[0].model, 'gpt-6-luna-2026-10-01', 'the model as OpenAI reports it');
-  // brain: (10240 − 8960) × 0.10 + 8960 × 0.01 + 2311 × 0.50, per million = 0.0013731
-  assert.equal(Number(rows[0].cost_usd), 0.0013731);
-  // each agent round: (12001 − 11904) × 0.10 + 11904 × 0.01 + 180 × 0.50, per million = 0.00021874
-  assert.ok(rows.slice(1).every(r => Number(r.cost_usd) === 0.00021874 && r.priced && r.kind === 'text' && r.wa_id === phone));
+  // brain: 256 uncached × 0.10 + 8960 cached × 0.01 + 1024 written × 0.125 + 2311 out × 0.50, per million = 0.0013987
+  assert.equal(Number(rows[0].cost_usd), 0.0013987);
+  // each agent round: 1 uncached × 0.10 + 11904 cached × 0.01 + 96 written × 0.125 + 180 out × 0.50, per million = 0.00022114
+  assert.ok(rows.slice(1).every(r => Number(r.cost_usd) === 0.00022114 && r.priced && r.kind === 'text' && r.wa_id === phone),
+            JSON.stringify(rows.map(r => r.cost_usd)));
   assert.equal(rows[0].reasoning_tokens, 1987);
   const eff = (await db.query(`select step, effort from everwake.ai_usage where run_id = $1 order by id`, [t.nodes['Normalize Inbound'].run_id])).rows;
   assert.ok(eff.every(r => r.effort === 'low'), 'both steps at low, recorded on each call: ' + JSON.stringify(eff));
   const total = rows.reduce((a, r) => a + Number(r.cost_usd), 0);
-  assert.equal(Math.round(total * 1e8), Math.round((0.0013731 + 3 * 0.00021874) * 1e8));
+  assert.equal(Math.round(total * 1e8), Math.round((0.0013987 + 3 * 0.00022114) * 1e8));
+  assert.equal((await db.query(`select sum(cache_write_tokens)::int n from everwake.ai_usage where run_id = $1`, [t.nodes['Normalize Inbound'].run_id])).rows[0].n, 1024 + 3 * 96);
   const log = (await db.query(`select llm_calls, prompt_tokens, completion_tokens from everwake.agent_events where wa_id = $1 order by id desc limit 1`, [phone])).rows[0];
   assert.equal(log.llm_calls, 4);
   assert.equal(log.prompt_tokens, 10240 + 3 * 12001);
@@ -1404,6 +1406,10 @@ test('a voice note\'s and a photo\'s calls are recorded with the turn', async ()
                                      buffer_id: 1, message_id: null, marker: '[voice note]' } };
   let m = (await runCode('main/media_understood.js', { input: { text: 'عايز فرخة', usage: { type: 'duration', seconds: 7 } }, nodes }))[0];
   assert.equal(m.ai_calls[0].step, 'transcribe'); assert.equal(m.ai_calls[0].seconds, 7); assert.ok(m.ai_calls[0].ms >= 900);
+  // OpenAI gives tokens only: the length WhatsApp gave is used, so the per-minute price applies
+  m = (await runCode('main/media_understood.js', { input: { text: 'عايز فرخة', usage: { type: 'tokens', input_tokens: 300, output_tokens: 40 } },
+                                                    nodes: { 'Prepare Media': { ...nodes['Prepare Media'], seconds: 12 } } }))[0];
+  assert.equal(m.ai_calls[0].seconds, 12);
   nodes['Prepare Media'] = { ...nodes['Prepare Media'], kind: 'image', vision_model: 'gpt-5-mini', caption: '' };
   m = (await runCode('main/media_understood.js', { input: { model: 'gpt-5-mini-2025-08-07', choices: [{ message: { content: 'صورة منيو' } }],
                                                             usage: { prompt_tokens: 1200, completion_tokens: 90, completion_tokens_details: { reasoning_tokens: 40 } } }, nodes }))[0];
@@ -1478,4 +1484,15 @@ test('the wait before replying comes from the restaurant\'s settings, 2–10 s',
   assert.deepEqual(order, ['Load AI Settings'], 'the settings are read before the wait');
   const t0 = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
   assert.equal((await sql(db, 'select everwake.ai_settings($1::uuid) as r', [t0])).r.wait_seconds, 5);
+});
+
+test('photos are read by the model set on the developer page, else gpt-6-luna', async () => {
+  const norm = { media: { kind: 'image', mime: 'image/jpeg' }, media_b64: 'x'.repeat(200), customer_message: '[photo]' };
+  const base = { 'Normalize Inbound': norm, Intake: { r: { buffer_id: 1, message_id: null } } };
+  let p = (await runCode('main/prepare_media.js', { input: {}, nodes: { ...base, 'Load AI Settings': { r: { vision_model: null } } } }))[0];
+  assert.equal(p.vision_model, 'gpt-6-luna'); assert.equal(p.vision_body.model, 'gpt-6-luna');
+  p = (await runCode('main/prepare_media.js', { input: {}, nodes: { ...base, 'Load AI Settings': { r: { vision_model: 'gpt-5.6-terra' } } } }))[0];
+  assert.equal(p.vision_body.model, 'gpt-5.6-terra');
+  p = (await runCode('main/prepare_media.js', { input: {}, nodes: base }))[0];
+  assert.equal(p.vision_model, 'gpt-6-luna', 'no settings loaded: the build\'s');
 });

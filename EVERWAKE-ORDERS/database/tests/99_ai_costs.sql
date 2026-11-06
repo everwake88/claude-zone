@@ -28,7 +28,7 @@ begin
          (t, 'run-v', '201400777001', 'transcribe', 'voice', 'gpt-transcribe', 0, 0, now() - interval '45 minutes'),
          (t, 'run-x', '201400777999', 'agent', 'test', 'some-model-without-a-price', 100, 10, now() - interval '1 minute');
   update everwake.ai_usage set audio_seconds = 30 where run_id = 'run-v';
-  assert (select cost_usd from everwake.ai_usage where run_id = 'run-v') = 0.003, 'half a minute of voice at 0.006 a minute';
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-v') = 0.00225, 'half a minute of voice at 0.0045 a minute';
   assert (select priced from everwake.ai_usage where run_id = 'run-x') = false, 'a model with no price is marked, not guessed';
 
   -- the order those turns led to, placed between them
@@ -69,17 +69,27 @@ begin
 
   -- the engine records its own calls, exactly as OpenAI reported them
   assert everwake.record_ai_usage(t, mid, 'run-e', 'voice', '[
-    {"step":"brain","model":"gpt-6-luna","effort":"low","endpoint":"responses","input":10240,"cached":8960,"output":2311,"thinking":1987,"status":200,"ms":5120},
+    {"step":"brain","model":"gpt-6-luna","effort":"low","endpoint":"responses","input":10240,"cached":8960,"written":1024,"output":2311,"thinking":1987,"status":200,"ms":5120},
     {"step":"agent","model":"gpt-6-luna","effort":"sideways","endpoint":"responses","input":12001,"cached":11904,"output":180,"thinking":64,"status":200,"ms":2210},
     {"step":"transcribe","model":"gpt-transcribe","endpoint":"audio/transcriptions","seconds":12.5,"status":200},
     {"step":"nonsense","model":"gpt-6-luna","input":"12","output":3},
     "not a call"]') = 4;
-  -- brain: (1280 × 0.10 + 8960 × 0.01 + 2311 × 0.50) / 1M = 0.0013731
-  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 0.0013731,
+  -- brain: (256 uncached × 0.10 + 8960 cached × 0.01 + 1024 written × 0.125 + 2311 × 0.50) / 1M = 0.0013987
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 0.0013987,
          (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'brain')::text;
   -- agent: (97 × 0.10 + 11904 × 0.01 + 180 × 0.50) / 1M = 0.00021874
   assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'agent') = 0.00021874;
-  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'transcribe') = 0.00125, '12.5 s of voice';
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'transcribe') = 0.0009375, '12.5 s of voice at 0.0045 a minute';
+  assert (select cache_write_tokens from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 1024;
+  assert (select price_cache_write_per_m from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 0.125;
+  -- a voice note with tokens reported too is still priced by the minute; a model without a write price bills writes as input
+  assert everwake.record_ai_usage(t, null, 'run-w', 'voice', '[{"step":"transcribe","model":"gpt-transcribe","input":400,"output":60,"seconds":20},
+                                                              {"step":"vision","model":"gpt-5-mini","input":2000,"cached":0,"written":1000,"output":100}]') = 2;
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-w' and step = 'transcribe') = 0.0015, '20 s at 0.0045 a minute';
+  -- (1000 × 0.25 + 1000 written × 0.25 + 100 × 2.00) / 1M = 0.0007
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-w' and step = 'vision') = 0.0007;
+  assert (select audio_per_minute from everwake.ai_prices where model = 'gpt-transcribe') = 0.0045;
+  assert (select input_per_m from everwake.ai_prices where model = 'gpt-4o-transcribe') = 2.50;
   assert (select kind from everwake.ai_usage where run_id = 'run-e' and step = 'agent') = 'voice';
   assert (select reasoning_tokens from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 1987;
   assert (select effort from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 'low', 'the effort it ran at';
@@ -99,7 +109,7 @@ begin
   assert (select step from everwake.ai_usage where run_id = 'run-e' and input_tokens = 12) = 'other';
   -- a later price change leaves the recorded costs as they were
   update everwake.ai_prices set output_per_m = 0.60 where model = 'gpt-6-luna';
-  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 0.0013731;
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 0.0013987;
   update everwake.ai_prices set output_per_m = 0.50 where model = 'gpt-6-luna';
   assert everwake.record_ai_usage(t, null, 'run-f', 'text', '{}') = 0, 'not a list: nothing written';
 end $$;

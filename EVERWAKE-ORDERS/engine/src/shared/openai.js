@@ -25,10 +25,12 @@ function openaiAnswer(res) {
 function usageOf(body) {
   const u = obj(obj(body).usage);
   const n = (v) => (typeof v === 'number' && isFinite(v) ? Math.max(0, Math.round(v)) : 0);
-  if (u.type === 'duration') return { input: 0, cached: 0, output: 0, thinking: 0, seconds: Number(u.seconds) || 0 };
+  if (u.type === 'duration') return { input: 0, cached: 0, written: 0, output: 0, thinking: 0, seconds: Number(u.seconds) || 0 };
   return {
     input: n(u.input_tokens ?? u.prompt_tokens),
     cached: n(obj(u.input_tokens_details ?? u.prompt_tokens_details).cached_tokens),
+    // written to the prompt cache this call (GPT-5.6 and later bill these at the cache-write price)
+    written: n(obj(u.input_tokens_details ?? u.prompt_tokens_details).cache_write_tokens),
     output: n(u.output_tokens ?? u.completion_tokens),
     thinking: n(obj(u.output_tokens_details ?? u.completion_tokens_details).reasoning_tokens),
     seconds: null
@@ -41,7 +43,7 @@ function aiCall(step, endpoint, model, answer, startedAt) {
   const started = startedAt ? new Date(startedAt).getTime() : NaN;
   return {
     step, endpoint, model: str(answer.body.model || model) || null,
-    input: u.input, cached: u.cached, output: u.output, thinking: u.thinking,
+    input: u.input, cached: u.cached, written: u.written, output: u.output, thinking: u.thinking,
     ...(u.seconds != null ? { seconds: u.seconds } : {}),
     status: answer.status, ms: isFinite(started) ? Math.max(0, Date.now() - started) : null,
     ...(answer.error ? { error: answer.error } : {})

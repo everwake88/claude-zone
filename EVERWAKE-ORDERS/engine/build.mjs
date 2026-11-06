@@ -28,7 +28,7 @@
 //   EW_AGENT_EFFORT     the Agent's reasoning effort (default low behind the Brain, medium alone)
 //   EW_BRAIN_EFFORT     the Brain's reasoning effort (default low; the developer page can change it per restaurant)
 //   EW_TRANSCRIBE_MODEL hears a customer's voice note (default gpt-transcribe)
-//   EW_VISION_MODEL     looks at a customer's photo (default gpt-5-mini); EW_VISION_EFFORT its reasoning (default low, '' for none)
+//   EW_VISION_MODEL     looks at a customer's photo (default gpt-6-luna; the developer page can set another); EW_VISION_EFFORT its reasoning (default low, '' for none)
 //   (no Rewrite model: a reply that breaks a hard rail has only the offending lines dropped)
 //
 // n8n-ids.json (optional) holds the ids n8n gave the workflows, so the
@@ -61,7 +61,7 @@ const OPENAI_URL = 'https://api.openai.com/v1/';
 const NI = "$('Normalize Inbound').first().json";
 const KIND = `(${NI}.is_test ? 'test' : ((${NI}.media || {}).kind === 'image' ? 'image' : ((${NI}.media || {}).kind ? 'voice' : 'text')))`;
 const TRANSCRIBE_MODEL = process.env.EW_TRANSCRIBE_MODEL || 'gpt-transcribe';
-const VISION_MODEL = process.env.EW_VISION_MODEL || 'gpt-5-mini';
+const VISION_MODEL = process.env.EW_VISION_MODEL || 'gpt-6-luna';
 const VISION_EFFORT = process.env.EW_VISION_EFFORT ?? 'low';
 const PG = { postgres: { id: process.env.EW_PG_CRED_ID || 'EVERWAKE_DB', name: 'Everwake DB' } };
 const OPENAI = { openAiApi: { id: process.env.EW_OPENAI_CRED_ID || 'CkjJoUDZ38ndmkPM', name: 'OpenAi account' } };

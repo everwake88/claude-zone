@@ -21,14 +21,24 @@ create table if not exists everwake.ai_prices (
   cached_per_m     numeric(12, 4) not null default 0,
   output_per_m     numeric(12, 4) not null default 0,
   audio_per_minute numeric(12, 4),
+  cache_write_per_m numeric(12, 4),             -- writing to the prompt cache (GPT-5.6 and later); null = the input price
   updated_at       timestamptz not null default now()
 );
-insert into everwake.ai_prices (model, input_per_m, cached_per_m, output_per_m, audio_per_minute) values
-  ('gpt-6-luna', 0.10, 0.01, 0.50, null),
-  ('gpt-5.6-luna', 0.20, 0.02, 1.20, null),
-  ('gpt-5-mini', 0.25, 0.025, 2.00, null),
-  ('gpt-transcribe', 2.50, 0, 10.00, 0.006)
+alter table everwake.ai_prices add column if not exists cache_write_per_m numeric(12, 4);
+-- OpenAI's prices (developers.openai.com/api/docs/pricing, checked 2026-11-06); the developer page edits them
+insert into everwake.ai_prices (model, input_per_m, cached_per_m, output_per_m, audio_per_minute, cache_write_per_m) values
+  ('gpt-6-luna', 0.10, 0.01, 0.50, null, 0.125),
+  ('gpt-5.6-luna', 0.20, 0.02, 1.20, null, 0.25),
+  ('gpt-5-mini', 0.25, 0.025, 2.00, null, null),
+  ('gpt-transcribe', 0, 0, 0, 0.0045, null),              -- billed by the minute only
+  ('gpt-4o-transcribe', 2.50, 0, 10.00, 0.006, null),
+  ('gpt-4o-mini-transcribe', 1.25, 0, 5.00, 0.003, null)
 on conflict (model) do nothing;
+-- 2026-11-07: rows seeded earlier with older numbers, changed only where they still have them
+update everwake.ai_prices set input_per_m = 0, cached_per_m = 0, output_per_m = 0, audio_per_minute = 0.0045, updated_at = now()
+ where model = 'gpt-transcribe' and input_per_m = 2.50 and output_per_m = 10.00 and audio_per_minute = 0.006;
+update everwake.ai_prices set cache_write_per_m = 0.125, updated_at = now() where model = 'gpt-6-luna' and cache_write_per_m is null;
+update everwake.ai_prices set cache_write_per_m = 0.25, updated_at = now() where model = 'gpt-5.6-luna' and cache_write_per_m is null;
 
 -- ---------------------------------------------------------------------
 -- AI settings: scope 'global', or a restaurant's id for its own
@@ -43,6 +53,7 @@ create table if not exists everwake.ai_config (
   react_no_reply  boolean,                      -- ❤️ on "👍", stickers, "شكرا" when nothing is pending
   usd_egp         numeric(10, 4),               -- for showing costs in EGP (global only)
   wait_seconds    int check (wait_seconds between 2 and 10),   -- how long to wait for more messages before replying
+  vision_model    text,                         -- reads the photos customers send; null = what the workflow was built with
   updated_at      timestamptz not null default now(),
   updated_by      uuid
 );
@@ -50,6 +61,7 @@ insert into everwake.ai_config (scope, brain_effort, agent_effort, details_by_co
 values ('global', 'low', 'low', true, true, 50)
 on conflict (scope) do nothing;
 alter table everwake.ai_config add column if not exists wait_seconds int check (wait_seconds between 2 and 10);
+alter table everwake.ai_config add column if not exists vision_model text;
 -- 2026-11-06: both steps think at low, and the reply waits 5 s for more messages (a value set on the developer page stays)
 update everwake.ai_config set brain_effort = 'low' where scope = 'global' and brain_effort = 'medium';
 update everwake.ai_config set wait_seconds = 5 where scope = 'global' and wait_seconds is null;
@@ -63,7 +75,8 @@ returns jsonb language sql stable security definer set search_path = everwake, p
     'details_by_code', coalesce(t.details_by_code, g.details_by_code, false),
     'react_no_reply', coalesce(t.react_no_reply, g.react_no_reply, false),
     'usd_egp', coalesce(g.usd_egp, 50),
-    'wait_seconds', least(10, greatest(2, coalesce(t.wait_seconds, g.wait_seconds, 5))))
+    'wait_seconds', least(10, greatest(2, coalesce(t.wait_seconds, g.wait_seconds, 5))),
+    'vision_model', coalesce(t.vision_model, g.vision_model))
     from (select 1) x
     left join everwake.ai_config g on g.scope = 'global'
     left join everwake.ai_config t on t.scope = p_tenant::text
@@ -85,6 +98,7 @@ create table if not exists everwake.ai_usage (
   endpoint         text,
   input_tokens     int not null default 0,      -- all of them, cached included
   cached_tokens    int not null default 0,
+  cache_write_tokens int not null default 0,    -- of the input, written to the prompt cache (billed at the write price)
   output_tokens    int not null default 0,      -- the thinking included
   reasoning_tokens int not null default 0,
   audio_seconds    numeric(10, 2),
@@ -94,6 +108,7 @@ create table if not exists everwake.ai_usage (
   price_cached_per_m numeric(12, 4),
   price_out_per_m    numeric(12, 4),
   price_audio_per_minute numeric(12, 4),
+  price_cache_write_per_m numeric(12, 4),
   http_status      int,
   duration_ms      int,
   created_at       timestamptz not null default now()
@@ -102,6 +117,8 @@ alter table everwake.ai_usage add column if not exists effort text;
 alter table everwake.ai_usage add column if not exists price_in_per_m numeric(12, 4),
   add column if not exists price_cached_per_m numeric(12, 4), add column if not exists price_out_per_m numeric(12, 4),
   add column if not exists price_audio_per_minute numeric(12, 4);
+alter table everwake.ai_usage add column if not exists cache_write_tokens int not null default 0,
+  add column if not exists price_cache_write_per_m numeric(12, 4);
 create index if not exists ai_usage_tenant_time_idx on everwake.ai_usage (tenant_id, created_at);
 create index if not exists ai_usage_run_idx on everwake.ai_usage (run_id);
 create index if not exists ai_usage_customer_idx on everwake.ai_usage (tenant_id, wa_id, created_at);
@@ -118,19 +135,24 @@ begin
    where new.model is not null and lower(new.model) like lower(model) || '%'
    order by length(model) desc limit 1;
   if found then
+    -- each input token is billed once: uncached, read from the cache, or written to it.
+    -- A model priced by the minute (transcription) is priced by the minute whenever the length is known.
     new.cost_usd := case
-      when new.audio_seconds is not null and p.audio_per_minute is not null and new.input_tokens = 0
+      when new.audio_seconds is not null and p.audio_per_minute is not null
         then new.audio_seconds / 60.0 * p.audio_per_minute
-      else (greatest(new.input_tokens - new.cached_tokens, 0) * p.input_per_m
-            + new.cached_tokens * p.cached_per_m + new.output_tokens * p.output_per_m) / 1000000.0 end;
+      else (greatest(new.input_tokens - new.cached_tokens - new.cache_write_tokens, 0) * p.input_per_m
+            + new.cached_tokens * p.cached_per_m
+            + new.cache_write_tokens * coalesce(p.cache_write_per_m, p.input_per_m)
+            + new.output_tokens * p.output_per_m) / 1000000.0 end;
     new.priced := true;
     new.price_in_per_m := p.input_per_m; new.price_cached_per_m := p.cached_per_m;
     new.price_out_per_m := p.output_per_m; new.price_audio_per_minute := p.audio_per_minute;
+    new.price_cache_write_per_m := p.cache_write_per_m;
   end if;
   return new;
 end $$;
 drop trigger if exists ai_usage_price on everwake.ai_usage;
-create trigger ai_usage_price before insert or update of model, input_tokens, cached_tokens, output_tokens, audio_seconds
+create trigger ai_usage_price before insert or update of model, input_tokens, cached_tokens, cache_write_tokens, output_tokens, audio_seconds
   on everwake.ai_usage for each row execute function everwake.ai_usage_price();
 
 -- the engine's own record of its calls to OpenAI: n8n calls OpenAI itself and
@@ -141,7 +163,7 @@ returns int language plpgsql security definer set search_path = everwake, pg_tem
 declare n int;
 begin
   if p_tenant is null or jsonb_typeof(p_calls) is distinct from 'array' then return 0; end if;
-  insert into everwake.ai_usage (tenant_id, run_id, message_id, step, kind, model, effort, endpoint, input_tokens, cached_tokens,
+  insert into everwake.ai_usage (tenant_id, run_id, message_id, step, kind, model, effort, endpoint, input_tokens, cached_tokens, cache_write_tokens,
                                  output_tokens, reasoning_tokens, audio_seconds, http_status, duration_ms)
   select p_tenant, left(p_run_id, 120), p_message_id,
          case when c->>'step' in ('brain', 'agent', 'transcribe', 'vision') then c->>'step' else 'other' end,
@@ -150,6 +172,7 @@ begin
          case when c->>'effort' in ('minimal', 'low', 'medium', 'high') then c->>'effort' end,
          left(c->>'endpoint', 40),
          greatest(coalesce((c->>'input')::numeric, 0), 0)::int, greatest(coalesce((c->>'cached')::numeric, 0), 0)::int,
+         greatest(coalesce((c->>'written')::numeric, 0), 0)::int,
          greatest(coalesce((c->>'output')::numeric, 0), 0)::int, greatest(coalesce((c->>'thinking')::numeric, 0), 0)::int,
          nullif(c->>'seconds', '')::numeric, nullif(c->>'status', '')::numeric::int, nullif(c->>'ms', '')::numeric::int
     from jsonb_array_elements(p_calls) c
@@ -204,7 +227,7 @@ language sql stable security definer set search_path = everwake, pg_temp as $$
            sum(input_tokens) as input_tokens, sum(cached_tokens) as cached_tokens,
            sum(output_tokens) as output_tokens, sum(reasoning_tokens) as reasoning_tokens,
            sum(coalesce(cost_usd, 0)) as cost_usd,
-           jsonb_agg(jsonb_build_object('step', step, 'model', model, 'in', input_tokens, 'cached', cached_tokens,
+           jsonb_agg(jsonb_build_object('step', step, 'model', model, 'in', input_tokens, 'cached', cached_tokens, 'written', cache_write_tokens,
                      'out', output_tokens, 'thinking', reasoning_tokens, 'cost', cost_usd, 'priced', priced,
                      'seconds', audio_seconds, 'ms', duration_ms, 'status', http_status) order by created_at) as steps
       from u group by rid
@@ -245,6 +268,7 @@ begin
     'usd_egp', fx,
     'totals', (select jsonb_build_object('calls', count(*), 'cost_usd', coalesce(sum(cost_usd), 0),
                        'input', coalesce(sum(input_tokens), 0), 'cached', coalesce(sum(cached_tokens), 0),
+                       'written', coalesce(sum(cache_write_tokens), 0),
                        'output', coalesce(sum(output_tokens), 0), 'thinking', coalesce(sum(reasoning_tokens), 0),
                        'unpriced', count(*) filter (where not priced),
                        'cache_hit_calls', count(*) filter (where cached_tokens > 0))

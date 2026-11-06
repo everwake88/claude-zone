@@ -24,6 +24,8 @@ if (prep.kind === 'audio') {
 // the call to OpenAI, if one was made (a file that could not be fetched never reached it)
 const calls = prep.ok ? [aiCall(prep.kind === 'audio' ? 'transcribe' : 'vision', prep.kind === 'audio' ? 'audio/transcriptions' : 'chat/completions',
                                prep.kind === 'audio' ? prep.transcribe_model : prep.vision_model, openaiAnswer(r), prep.started_at)] : [];
+// a voice note is billed by the minute: its length from OpenAI, else from WhatsApp
+if (calls[0] && prep.kind === 'audio' && calls[0].seconds == null && num(prep.seconds) > 0) calls[0].seconds = num(prep.seconds);
 
 return [{
   json: {

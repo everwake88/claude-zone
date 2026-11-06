@@ -54,7 +54,9 @@ Levers, all on the developer page → **Restaurants**, for every restaurant or o
 - **Models and effort**: both the Brain and the Agent at `low` by default; `medium` for a restaurant whose chats need more care. The **AI costs** tab splits the cost by how hard each step thinks, to compare.
 - **Wait before replying**: 5 s by default (2–10). Longer bundles quick messages into one reply (fewer AI calls), at the cost of a slightly later answer. Changing the model needs no rebuild; n8n reads it on every turn.
 - **❤️ for messages that need no reply** and **details by code**: on by default; switch off to send those messages to the AI again.
-- **New model**: add its prices under **Prices** before using it, or its calls show as unpriced.
+- **New model**: add its prices under **Prices** before using it (input, cached, cache write, output, or per minute), or its calls show as unpriced.
+- **Photo model**: `gpt-6-luna` by default (it reads images); set another on the developer page without a rebuild. `gpt-5-mini` shuts down on Dec 11, 2026.
+- **Later idea:** OpenAI's Flex tier runs GPT-6 Luna at half price, but slower. Worth a test for a restaurant that can live with slower replies.
 
 The records are written by n8n itself; if the dashboard is down, the agent keeps answering and keeps recording.
 

@@ -45,7 +45,7 @@ The Seagull pipeline, unchanged in shape:
    - `not_live` — the restaurant is still onboarding and this is not a test number. Staff answer from the phone as usual.
    - `team_answer` — not a customer message: the team answered a question the agent asked (below), and the dashboard wakes the agent through the same webhook, with the channel's token, so it tells the customer at once. It only runs when there is an answer the agent hasn't passed on, and never in a chat a person has taken over.
    - `from_me` — someone typed on the restaurant's phone. Logged as a team reply (after 5 s, so the engine's own sends are not mistaken for a person), and by default it takes the chat over.
-3. **Photos and voice notes** — fetched from WhatsApp (Evolution `getBase64FromMediaMessage`, or the file in the webhook itself) and understood before the turn: a voice note is transcribed (`gpt-transcribe`), a photo described (`gpt-5-mini`; a menu or app screenshot has its dish names and prices copied, a payment screenshot its amount and reference). The agent reads `[voice note: «…»]` / `[photo: …]` in place of the marker, the inbox shows it under the message, and a quick text after it waits for it (015, a minute at most). Models: `EW_TRANSCRIBE_MODEL`, `EW_VISION_MODEL`.
+3. **Photos and voice notes** — fetched from WhatsApp (Evolution `getBase64FromMediaMessage`, or the file in the webhook itself) and understood before the turn: a voice note is transcribed (`gpt-transcribe`), a photo described (`gpt-6-luna` by default, or the photo model set on the developer page; a menu or app screenshot has its dish names and prices copied, a payment screenshot its amount and reference). The agent reads `[voice note: «…»]` / `[photo: …]` in place of the marker, the inbox shows it under the message, and a quick text after it waits for it (015, a minute at most). Models: `EW_TRANSCRIBE_MODEL`, `EW_VISION_MODEL`.
 3b. **Debounce** (`everwake.claim_window`) — 5 seconds by default (`wait_seconds`, 2–10 per restaurant on the developer page; read with the AI settings before the wait). Only the run holding the newest message answers, and it bundles all of them. A takeover or the OFF switch during the wait ends the run quietly. If the customer writes again while a reply is being thought out, that reply is dropped (`persist_turn` hands its messages back) and the next turn answers everything together — unless the turn did something final (placed an order, sent a booking, made a payment link), whose reply always goes out.
 4. **Location** — a pin is reverse-geocoded (Google, then OpenStreetMap). `everwake.save_pin` then matches it against the delivery zones (polygons or circles, plain SQL, no PostGIS). It picks the zone, its fee, its minimum and its branch, and sets the branch when none is chosen yet.
 5. **Turn context** (`everwake.turn_context`) — the state, the cart, the customer's last three orders and saved addresses, the last 20 messages (customer, agent, team, automatic), the menu snapshot.
@@ -209,7 +209,10 @@ Every answer carries OpenAI's own usage: input tokens (the cached part included)
 - A failed call is on record at no cost.
 - Recording never stops a turn.
 
-Cost of a call = (input − cached) × input price + cached × cached price + output × output price, per million.
+Cost of a call = (input − cached − written) × input price + cached × cached price + written × cache-write price + output × output price, per million.
+- **Cache writes:** on GPT-5.6 and later, OpenAI bills tokens written to the prompt cache at their own price (GPT-6 Luna: $0.125 per 1M for the 30-minute cache), reported as `cache_write_tokens`. Each input token is billed once: uncached, read or written.
+- **Per-minute models:** a model with a price per minute (`gpt-transcribe`, $0.0045) is priced by the voice note's length: OpenAI's figure, else WhatsApp's.
+- **Source:** prices as on developers.openai.com/api/docs/pricing (checked 2026-11-06).
 
 **Turns and orders** (`ai_turns`). The calls of one message are a turn. A turn
 counts towards the customer's next order placed within 12 hours (the chat

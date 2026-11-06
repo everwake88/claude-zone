@@ -13,10 +13,10 @@ import { zonedMidnight } from '@/lib/zoned';
 // per message, per order, per restaurant, with the cache — and the settings behind it: each
 // restaurant's percent, its AI settings, the model prices.
 
-type Step = { step: string; model: string | null; in: number; cached: number; out: number; thinking: number; cost: number | null; priced: boolean; seconds: number | null; ms: number | null; status: number | null };
+type Step = { step: string; model: string | null; in: number; cached: number; written?: number; out: number; thinking: number; cost: number | null; priced: boolean; seconds: number | null; ms: number | null; status: number | null };
 interface Costs {
   usd_egp: number;
-  totals: { calls: number; cost_usd: number; input: number; cached: number; output: number; thinking: number; unpriced: number; cache_hit_calls: number };
+  totals: { calls: number; cost_usd: number; input: number; cached: number; written?: number; output: number; thinking: number; unpriced: number; cache_hit_calls: number };
   messages: number; orders: number; no_order_usd: number; test_usd: number;
   per_order: { avg_usd: number | null; min_usd: number | null; max_usd: number | null; avg_messages: number | null };
   by_step: { step: string; calls: number; cost_usd: number; input: number; cached: number; output: number; thinking: number }[];
@@ -27,9 +27,9 @@ interface Costs {
   orders_list: { order_id: number; order_no: string; tenant: string; slug: string; placed_at: string; total: number; messages: number; cost_usd: number; to_order_usd: number | null; after_usd: number | null; cache_share: number | null; conversation_id: number | null }[];
 }
 interface Msg { run_id: string; at: string; tenant: string; slug: string; customer: string | null; kind: string; calls: number; input: number; cached: number; output: number; thinking: number; cost_usd: number; part: string; order_no: string | null; steps: Step[]; message: string | null }
-interface AiCfg { brain_model?: string | null; brain_effort?: string | null; agent_model?: string | null; agent_effort?: string | null; details_by_code?: boolean | null; react_no_reply?: boolean | null; usd_egp?: number | null; wait_seconds?: number | null }
+interface AiCfg { brain_model?: string | null; brain_effort?: string | null; agent_model?: string | null; agent_effort?: string | null; details_by_code?: boolean | null; react_no_reply?: boolean | null; usd_egp?: number | null; wait_seconds?: number | null; vision_model?: string | null }
 interface DevTenant { id: string; slug: string; name: string; status: string; bill: { fee_percent: number; include_delivery_fee: boolean; include_vat: boolean; starts_on: string | null }; ai: AiCfg; ai_own: AiCfg | null }
-interface Price { model: string; input_per_m: number; cached_per_m: number; output_per_m: number; audio_per_minute: number | null }
+interface Price { model: string; input_per_m: number; cached_per_m: number; output_per_m: number; audio_per_minute: number | null; cache_write_per_m: number | null }
 
 const TZ = 'Africa/Cairo';
 const RANGES = { today: 'Today', '7': '7 days', '30': '30 days', month: 'This month' } as const;
@@ -132,7 +132,7 @@ function CostsView({ c, egp, usd }: { c: Costs; egp: (v: number | null | undefin
             <RankList format={v => egp(v / c.usd_egp)} rows={c.by_step.map(s => ({ label: s.step, value: Number(s.cost_usd) * c.usd_egp, sub: `${n0(s.calls)} calls` }))} />
             <dl className="grid grid-cols-2 gap-2 text-xs">
               {[['Chats with no order', egp(c.no_order_usd)], ['Test chats', egp(c.test_usd)],
-                ['Input tokens', n0(T.input)], ['…of them cached', n0(T.cached)], ['Output tokens', n0(T.output)], ['…of them thinking', n0(T.thinking)]].map(([k, v]) => (
+                ['Input tokens', n0(T.input)], ['…of them cached', n0(T.cached)], ['…written to the cache', n0(T.written || 0)], ['Output tokens', n0(T.output)], ['…of them thinking', n0(T.thinking)]].map(([k, v]) => (
                 <div key={k} className="rounded-[var(--ui-radius-inner)] bg-paper/70 p-2.5"><dt className="text-muted">{k}</dt><dd className="mt-0.5 font-semibold tabular-nums">{v}</dd></div>
               ))}
             </dl>
@@ -198,8 +198,8 @@ function MessagesView({ rows, egp }: { rows: Msg[]; egp: (v: number | null | und
               </button>
               {on && (
                 <div className="bg-paper/50 px-5 pb-4">
-                  <Table head={['Step', 'Model', 'Input', 'Cached', 'Output', 'Thinking', 'Time', 'Cost']}
-                    rows={m.steps.map(s => [s.step, s.model || '—', n0(s.in), <span key="c" className={s.cached ? 'text-positive' : 'text-muted'}>{n0(s.cached)}</span>,
+                  <Table head={['Step', 'Model', 'Input', 'Cached', 'Written', 'Output', 'Thinking', 'Time', 'Cost']}
+                    rows={m.steps.map(s => [s.step, s.model || '—', n0(s.in), <span key="c" className={s.cached ? 'text-positive' : 'text-muted'}>{n0(s.cached)}</span>, n0(s.written || 0),
                       n0(s.out), n0(s.thinking), s.ms ? `${(s.ms / 1000).toFixed(1)} s` : (s.seconds ? `${s.seconds} s audio` : '—'),
                       s.priced ? <span key="p" title={`$${Number(s.cost).toFixed(8)}`}>{egp(s.cost, 4)}</span> : 'no price'])} />
                 </div>
@@ -247,6 +247,7 @@ function AiFields({ value, onChange, global }: { value: AiCfg; onChange: (v: AiC
       <label className="text-xs text-muted">Reply thinks<Select className="mt-1" value={value.agent_effort || ''} onChange={e => onChange({ agent_effort: e.target.value || null })}>{opt(EFF, global ? 'low (default)' : 'as for everyone')}</Select></label>
       <label className="text-xs text-muted">Details asked by code<Select className="mt-1" value={tri(value.details_by_code)} onChange={e => onChange({ details_by_code: fromTri(e.target.value) })}>{opt(['', 'on', 'off'], global ? 'off' : 'as for everyone')}</Select></label>
       <label className="text-xs text-muted">❤️ for messages that need no reply<Select className="mt-1" value={tri(value.react_no_reply)} onChange={e => onChange({ react_no_reply: fromTri(e.target.value) })}>{opt(['', 'on', 'off'], global ? 'off' : 'as for everyone')}</Select></label>
+      <label className="text-xs text-muted">Photo model<Input className="mt-1" placeholder={global ? 'gpt-6-luna (as built)' : 'as for everyone'} value={value.vision_model || ''} onChange={e => onChange({ vision_model: e.target.value || null })} /></label>
       <label className="text-xs text-muted">Wait before replying (seconds)<Input className="mt-1" type="number" min="2" max="10" step="1" placeholder={global ? '5 (default)' : 'as for everyone'}
         value={value.wait_seconds ?? ''} onChange={e => onChange({ wait_seconds: e.target.value === '' ? null : Math.min(10, Math.max(2, Math.round(Number(e.target.value)))) })} /></label>
       {global && <label className="text-xs text-muted">EGP per dollar<Input className="mt-1" type="number" step="0.01" value={value.usd_egp ?? ''} onChange={e => onChange({ usd_egp: e.target.value === '' ? null : Number(e.target.value) })} /></label>}
@@ -265,7 +266,7 @@ function RestaurantRow({ t, reload }: { t: DevTenant; reload: () => Promise<void
     const a = own ? await sb().from('ai_config').upsert({ scope: t.id, brain_model: ai.brain_model || null, brain_effort: ai.brain_effort || null,
                                                           agent_model: ai.agent_model || null, agent_effort: ai.agent_effort || null,
                                                           details_by_code: ai.details_by_code ?? null, react_no_reply: ai.react_no_reply ?? null,
-                                                          wait_seconds: ai.wait_seconds ?? null,
+                                                          wait_seconds: ai.wait_seconds ?? null, vision_model: ai.vision_model || null,
                                                           updated_at: new Date().toISOString() })
                   : await sb().from('ai_config').delete().eq('scope', t.id);
     if (a.error) throw new Error(a.error.message);
@@ -284,7 +285,7 @@ function RestaurantRow({ t, reload }: { t: DevTenant; reload: () => Promise<void
           <p className="text-xs text-muted"><Sparkles className="me-1 inline size-3.5" />WhatsApp orders: the food after discounts{bill.include_delivery_fee ? ' + delivery' : ''}{bill.include_vat ? ' + VAT' : ''}. QR orders: their total.</p>
         </div>
         <AiFields value={ai} onChange={v => setAi({ ...ai, ...v })} />
-        <p className="text-xs text-muted">In use now: planning {t.ai.brain_model || 'gpt-6-luna'} · {t.ai.brain_effort} · reply {t.ai.agent_model || 'gpt-6-luna'} · {t.ai.agent_effort} · details by code {t.ai.details_by_code ? 'on' : 'off'} · ❤️ {t.ai.react_no_reply ? 'on' : 'off'} · waits {t.ai.wait_seconds ?? 5} s</p>
+        <p className="text-xs text-muted">In use now: planning {t.ai.brain_model || 'gpt-6-luna'} · {t.ai.brain_effort} · reply {t.ai.agent_model || 'gpt-6-luna'} · {t.ai.agent_effort} · details by code {t.ai.details_by_code ? 'on' : 'off'} · ❤️ {t.ai.react_no_reply ? 'on' : 'off'} · waits {t.ai.wait_seconds ?? 5} s · photos {t.ai.vision_model || 'gpt-6-luna'}</p>
       </div>
     </Card>
   );
@@ -304,16 +305,17 @@ function PricesView() {
   if (!prices.data) return <Spinner />;
   return (
     <Card title="Model prices ($ per 1M tokens)" action={<span className="flex gap-2">
-      <Button size="sm" variant="outline" onClick={() => setRows([...list, { model: '', input_per_m: 0, cached_per_m: 0, output_per_m: 0, audio_per_minute: null }])}><Plus className="size-4" /> Model</Button>
+      <Button size="sm" variant="outline" onClick={() => setRows([...list, { model: '', input_per_m: 0, cached_per_m: 0, output_per_m: 0, audio_per_minute: null, cache_write_per_m: null }])}><Plus className="size-4" /> Model</Button>
       <Button size="sm" variant="gold" busy={busy} onClick={save}>Save</Button></span>}>
-      <p className="mb-3 text-xs text-muted">A model's name is matched from its start: "gpt-6-luna" prices "gpt-6-luna-2026-10-01" too. A call priced at the time it was made keeps that price.</p>
-      <Table head={['Model', 'Input', 'Cached input', 'Output', 'Audio per minute']}
+      <p className="mb-3 text-xs text-muted">A model's name is matched from its start: "gpt-6-luna" prices "gpt-6-luna-2026-10-01" too. Each input token is billed once: uncached, read from the cache, or written to it (GPT-5.6 and later; empty = the input price). A model with a price per minute is priced by the minute. A call keeps the prices it was made at.</p>
+      <Table head={['Model', 'Input', 'Cached input', 'Cache write', 'Output', 'Audio per minute']}
         rows={list.map((r, i) => [
-          <Input key="m" value={r.model} onChange={e => set(i, 'model', e.target.value)} />,
-          <Input key="i" type="number" step="0.001" value={r.input_per_m} onChange={e => set(i, 'input_per_m', e.target.value)} />,
-          <Input key="c" type="number" step="0.001" value={r.cached_per_m} onChange={e => set(i, 'cached_per_m', e.target.value)} />,
-          <Input key="o" type="number" step="0.001" value={r.output_per_m} onChange={e => set(i, 'output_per_m', e.target.value)} />,
-          <Input key="a" type="number" step="0.001" value={r.audio_per_minute ?? ''} onChange={e => set(i, 'audio_per_minute', e.target.value)} />])} />
+          <Input key="m" className="min-w-[12rem]" value={r.model} onChange={e => set(i, 'model', e.target.value)} />,
+          <Input key="i" className="min-w-[6.5rem]" type="number" step="0.001" value={r.input_per_m} onChange={e => set(i, 'input_per_m', e.target.value)} />,
+          <Input key="c" className="min-w-[6.5rem]" type="number" step="0.001" value={r.cached_per_m} onChange={e => set(i, 'cached_per_m', e.target.value)} />,
+          <Input key="w" className="min-w-[6.5rem]" type="number" step="0.001" placeholder="= input" value={r.cache_write_per_m ?? ''} onChange={e => set(i, 'cache_write_per_m', e.target.value)} />,
+          <Input key="o" className="min-w-[6.5rem]" type="number" step="0.001" value={r.output_per_m} onChange={e => set(i, 'output_per_m', e.target.value)} />,
+          <Input key="a" className="min-w-[6.5rem]" type="number" step="0.001" value={r.audio_per_minute ?? ''} onChange={e => set(i, 'audio_per_minute', e.target.value)} />])} />
     </Card>
   );
 }

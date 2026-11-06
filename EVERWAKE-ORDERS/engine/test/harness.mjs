@@ -126,8 +126,8 @@ export async function manageReservation(db, intake, action, details = '') {
 
 // ---- the stand-in for OpenAI ------------------------------------------------------
 // an HTTP Request node's full response to a Responses API call, with usage as OpenAI reports it
-export const BRAIN_USAGE = { input_tokens: 10240, input_tokens_details: { cached_tokens: 8960 }, output_tokens: 2311, output_tokens_details: { reasoning_tokens: 1987 } };
-export const AGENT_USAGE = { input_tokens: 12001, input_tokens_details: { cached_tokens: 11904 }, output_tokens: 180, output_tokens_details: { reasoning_tokens: 64 } };
+export const BRAIN_USAGE = { input_tokens: 10240, input_tokens_details: { cached_tokens: 8960, cache_write_tokens: 1024 }, output_tokens: 2311, output_tokens_details: { reasoning_tokens: 1987 } };
+export const AGENT_USAGE = { input_tokens: 12001, input_tokens_details: { cached_tokens: 11904, cache_write_tokens: 96 }, output_tokens: 180, output_tokens_details: { reasoning_tokens: 64 } };
 export function fakeResponse(output, usage, model = 'gpt-6-luna-2026-10-01') {
   return { statusCode: 200, headers: {}, body: { id: 'resp_' + Math.random().toString(36).slice(2, 10), object: 'response', status: 'completed',
                                                 model, output, usage } };
