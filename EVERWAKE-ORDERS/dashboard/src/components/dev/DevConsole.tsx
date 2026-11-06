@@ -125,7 +125,7 @@ function CostsView({ c, egp, usd }: { c: Costs; egp: (v: number | null | undefin
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2" title="AI cost per day (EGP)">
-          {days.length ? <Columns bars={days} format={v => String(Math.round(v))} /> : <p className="text-sm text-muted">No AI calls in this period yet.</p>}
+          {days.length ? <Columns bars={days} format={v => (Math.max(...days.map(d => d.value)) < 10 ? v.toFixed(2) : String(Math.round(v)))} /> : <p className="text-sm text-muted">No AI calls in this period yet.</p>}
         </Card>
         <Card title="Where it goes">
           <div className="space-y-4">
