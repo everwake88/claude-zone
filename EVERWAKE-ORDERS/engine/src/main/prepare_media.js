@@ -33,6 +33,7 @@ return [{
   json: {
     kind: media.kind === 'image' ? 'image' : 'audio',
     ok: file64.length > 100,
+    started_at: new Date().toISOString(),
     b64: file64,
     mime,
     file_name: `${media.kind === 'image' ? 'photo' : 'voice'}.${ext}`,

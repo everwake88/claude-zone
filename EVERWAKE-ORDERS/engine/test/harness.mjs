@@ -1,13 +1,15 @@
 // Runs the engine's n8n Code nodes exactly as n8n does ($input, $('Node'),
 // $runIndex, Buffer), against a real database built from the migrations.
-// The two model calls (Brain, Agent) are scripted by each test, so every
-// other step — SQL, code, tools — is the real thing.
+// The calls to OpenAI are answered by a stand-in that speaks the Responses
+// API (each test scripts the plan, the tool calls and the reply), so every
+// other step — the Brain and Agent loop nodes, SQL, code, tools, the cost
+// records — is the real thing.
 import { readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { expand } from '../build.mjs';
+import { expand, fill } from '../build.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DB_DIR = join(HERE, '..', '..', 'database');
@@ -44,7 +46,7 @@ export { unb64 };
 
 // one Code node: returns the items it outputs (the .json of each)
 export async function runCode(file, { input = {}, nodes = {}, runIndex = 0 } = {}) {
-  const src = expand(readFileSync(join(HERE, '..', 'src', file), 'utf8'));
+  const src = fill(expand(readFileSync(join(HERE, '..', 'src', file), 'utf8')));
   const $input = { first: () => ({ json: input }), all: () => [{ json: input }], item: { json: input } };
   const $ = (name) => {
     if (!(name in nodes)) throw new Error(`Referenced node "${name}" is unexecuted`);
@@ -122,6 +124,15 @@ export async function manageReservation(db, intake, action, details = '') {
   return JSON.parse((await runCode('reservation/return_to_agent.js', { input: res }))[0].response);
 }
 
+// ---- the stand-in for OpenAI ------------------------------------------------------
+// an HTTP Request node's full response to a Responses API call, with usage as OpenAI reports it
+export const BRAIN_USAGE = { input_tokens: 10240, input_tokens_details: { cached_tokens: 8960 }, output_tokens: 2311, output_tokens_details: { reasoning_tokens: 1987 } };
+export const AGENT_USAGE = { input_tokens: 12001, input_tokens_details: { cached_tokens: 11904 }, output_tokens: 180, output_tokens_details: { reasoning_tokens: 64 } };
+export function fakeResponse(output, usage, model = 'gpt-6-luna-2026-10-01') {
+  return { statusCode: 200, headers: {}, body: { id: 'resp_' + Math.random().toString(36).slice(2, 10), object: 'response', status: 'completed',
+                                                model, output, usage } };
+}
+
 // ---- one whole turn of the Main workflow ----------------------------------------
 // script(brief) → { plan, tools: async (call) => [...steps], reply }
 export async function turn(db, payload, script, opts = {}) {
@@ -170,30 +181,63 @@ export async function turn(db, payload, script, opts = {}) {
   }
 
   const s = await script(brief, r);
-  const plan = (await runCode('main/attach_plan.js', { input: { text: JSON.stringify(s.plan || {}) }, nodes }))[0];
+  // the Brain: its request, the stand-in's answer, its result (as n8n would run them)
+  nodes['Brain Request'] = (await runCode('main/brain_request.js', { input: routed, nodes }))[0];
+  const brainAnswer = s.brainFail ? { error: { message: s.brainFail } }
+    : fakeResponse([{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(s.plan || {}) }] }], s.brainUsage || BRAIN_USAGE);
+  nodes['Brain Result'] = (await runCode('main/brain_result.js', { input: brainAnswer, nodes }))[0];
+  const plan = (await runCode('main/attach_plan.js', { input: nodes['Brain Result'], nodes }))[0];
   nodes['Attach Plan'] = plan;
 
-  // the Agent: the scripted tool calls run through the real tool workflows
+  // the Agent's tool loop: each scripted tool call is a round, the reply ends it; the tools are the real workflows
   const steps = [];
-  for (const call of s.tools || []) {
-    // a call n8n refused or the tool workflow failed on: the agent sees {"error": …}
-    const result = call.fail ? { error: call.fail }
-      : call.tool === 'manage_cart'
-      ? await manageCart(db, r, call.action, call.items || [], call.branch || '')
-      : call.tool === 'manage_reservation'
-        ? await manageReservation(db, r, call.action, call.details || '')
-        : await saveDetails(db, r, call.details || {});
-    steps.push({ action: { tool: call.tool }, observation: JSON.stringify(result), result });
+  const calls = [...(s.tools || [])];
+  let reqIn = plan, round = 0;
+  const bodies = [];
+  for (;;) {
+    nodes['Agent Request'] = (await runCode('main/agent_request.js', { input: reqIn, nodes }))[0];
+    bodies.push(nodes['Agent Request'].body);
+    round++;
+    let answer;
+    const call = calls[0];
+    if (s.agentFail && round >= (s.agentFailRound || 1)) answer = { error: { message: s.agentFail } };
+    else if (call && round <= 12) {
+      calls.shift();
+      const args = call.raw !== undefined ? call.raw : JSON.stringify({ action: call.action, branch: call.branch, items: call.items, details: call.details });
+      answer = fakeResponse([{ type: 'reasoning', id: 'rs_' + round, summary: [], encrypted_content: 'enc' + round },
+                             { type: 'function_call', id: 'fc_' + round, call_id: 'call_' + round, name: call.tool, arguments: args }], s.agentUsage || AGENT_USAGE);
+    } else {
+      const reply = typeof s.reply === 'function' ? s.reply(steps) : s.reply;
+      answer = fakeResponse([{ type: 'message', content: [{ type: 'output_text', text: typeof reply === 'string' ? reply : JSON.stringify(reply) }] }], s.agentUsage || AGENT_USAGE);
+    }
+    const step = (await runCode('main/agent_step.js', { input: answer, nodes }))[0];
+    nodes['Agent Step'] = step;
+    if (step.next === 'done') break;
+    if (step.next === 'again') { reqIn = step; continue; }
+    const a = step.tool_args;
+    let toolOut;
+    try {
+      const result = call.fail ? null
+        : step.next === 'manage_cart' ? await manageCart(db, r, a.action, a.items, a.branch === 'none' ? '' : a.branch)
+        : step.next === 'manage_reservation' ? await manageReservation(db, r, a.action, typeof a.details === 'string' ? a.details : JSON.stringify(a.details))
+        : await saveDetails(db, r, a.details);
+      // a call the tool workflow failed on: the Execute Workflow node hands on { error }
+      toolOut = call.fail ? { error: call.fail } : { response: JSON.stringify(result) };
+      steps.push({ action: { tool: step.next }, observation: toolOut.response || JSON.stringify(toolOut), result: call.fail ? { error: call.fail } : result });
+    } catch (e) { toolOut = { error: e.message }; steps.push({ action: { tool: step.next }, observation: JSON.stringify(toolOut), result: toolOut }); }
+    nodes['Agent Tool Result'] = (await runCode('main/agent_tool_result.js', { input: toolOut, nodes }))[0];
+    reqIn = nodes['Agent Tool Result'];
   }
-  const reply = typeof s.reply === 'function' ? s.reply(steps) : s.reply;
-  nodes.Agent = { output: reply, intermediateSteps: steps.map(({ action, observation }) => ({ action, observation })),
-                  tokenUsage: { promptTokens: 1000, completionTokens: 200 } };
+  nodes.Agent = (await runCode('main/agent_finish.js', { input: nodes['Agent Step'], nodes }))[0];
+  // Record AI Usage, as the workflow's Postgres node runs it
+  const usage = await sql(db, "select everwake.record_ai_usage($1::uuid, nullif($2::text, '')::bigint, $3::text, $4::text, convert_from(decode($5::text, 'base64'), 'UTF8')::jsonb) as r",
+                          [r.tenant_id, String(r.message_id || ''), norm.run_id || '', norm.is_test ? 'test' : 'text', nodes.Agent.b64_usage]);
   const readBack = await sql(db, 'select everwake.read_back($1::uuid, $2::text) as r', [r.tenant_id, r.wa_id]);
   nodes['Read Back State'] = readBack;
   let checked = (await runCode('main/check_reply.js', { input: readBack, nodes }))[0];
   nodes['Check Reply'] = checked;
   if (checked.needs_rewrite) checked = (await runCode('main/repair_reply.js', { input: checked, nodes }))[0];
-  return finish(db, r, nodes, checked, { route: 'agent', intake: r, brief, plan, steps, s });
+  return finish(db, r, nodes, checked, { route: 'agent', intake: r, brief, plan, steps, s, bodies, recorded: usage.r });
 }
 
 // the turn's own record and its messages, however it was answered

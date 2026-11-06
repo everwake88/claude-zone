@@ -4,8 +4,11 @@
 // reads with the customer's message: [voice note: «…»] or [photo: …]
 // (their caption stays with it). A file that could not be fetched or
 // understood says so plainly, so the agent asks rather than guesses.
+// The call's exact usage (a voice note's tokens or seconds, a photo's
+// tokens) goes to Record Media Usage.
 // =====================================================================
 // @include shared/basics.js
+// @include shared/openai.js
 
 const prep = $('Prepare Media').first().json;
 const r = obj($input.first().json);
@@ -18,9 +21,15 @@ if (prep.kind === 'audio') {
   text = (seen ? `[photo: ${seen.slice(0, 1500)}]` : '[photo — it could not be opened]') + (prep.caption ? ' ' + prep.caption : '');
 }
 
+// the call to OpenAI, if one was made (a file that could not be fetched never reached it)
+const calls = prep.ok ? [aiCall(prep.kind === 'audio' ? 'transcribe' : 'vision', prep.kind === 'audio' ? 'audio/transcriptions' : 'chat/completions',
+                               prep.kind === 'audio' ? prep.transcribe_model : prep.vision_model, openaiAnswer(r), prep.started_at)] : [];
+
 return [{
   json: {
     understood: text,
+    ai_calls: calls,
+    b64_usage: b64(calls),
     failed: !prep.ok || !!r.error,
     error: r.error ? str(obj(r.error).message || r.error).slice(0, 300) : null,
     b64_media: b64({ buffer_id: prep.buffer_id, message_id: prep.message_id, marker: prep.marker, text,

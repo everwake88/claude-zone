@@ -37,7 +37,7 @@ Housekeeping runs every minute from the Outbox workflow:
 ## What a conversation costs
 
 The developer page (`/dev`, platform admins only) shows the real numbers:
-every AI call is recorded by the dashboard's AI meter with its tokens and
+n8n records every AI call with OpenAI's own token counts, and they are
 priced from **Prices**. Look there first; the same data in SQL:
 
 ```sql
@@ -51,13 +51,11 @@ order by created_at desc limit 50;
 ```
 
 Levers, all on the developer page → **Restaurants**, for every restaurant or one:
-- **Models and effort**: the Brain at `medium` (default) or `low`, the Agent at `low`. Changing the model needs no rebuild; the meter puts it on the request.
+- **Models and effort**: the Brain at `medium` (default) or `low`, the Agent at `low`. Changing the model needs no rebuild; n8n reads it on every turn.
 - **❤️ for messages that need no reply** and **details by code**: on by default; switch off to send those messages to the AI again.
 - **New model**: add its prices under **Prices** before using it, or its calls show as unpriced.
 
-Needs `SUPABASE_SERVICE_ROLE_KEY` on the dashboard (the meter writes with it).
-The meter's calls last as long as the model takes; on Vercel the route allows
-300 seconds, which needs fluid compute (on by default for new projects).
+The records are written by n8n itself; if the dashboard is down, the agent keeps answering and keeps recording.
 
 ## Bills
 

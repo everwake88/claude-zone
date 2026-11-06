@@ -52,7 +52,7 @@ const logRow = {
   cart_action: arr(d.tools_used).filter(t => t === 'manage_cart').length ? 'tool_call' : 'none',
   qa_passed: !arr(d.violations).length,
   repair_used: d.repair_used === true,
-  llm_calls: d.no_ai === 'react' || d.no_ai === 'details' ? 0 : (d.brain && d.brain.used ? 1 : 0) + 1 + arr(d.tools_used).length + (d.repair_used ? 1 : 0),
+  llm_calls: d.no_ai === 'react' || d.no_ai === 'details' ? 0 : (num(d.ai_calls) || (d.brain && d.brain.used ? 1 : 0) + 1 + arr(d.tools_used).length),
   duration_total_ms: durationTotal,
   duration_llm_ms: d.agent_started_at ? Date.now() - new Date(d.brain_started_at || d.agent_started_at).getTime() : 0,
   prompt_tokens: Number(tokens.promptTokens || 0),

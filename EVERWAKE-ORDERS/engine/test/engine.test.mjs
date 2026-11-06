@@ -1291,3 +1291,127 @@ test('no AI where none is needed: a ❤️ for "👍", details asked and read by
   assert.equal(t.no_ai, undefined);
   await db.query(`update everwake.ai_config set details_by_code = true, react_no_reply = true where scope = 'global'`);
 });
+
+test('n8n calls OpenAI itself: one request per round, the start cached, every call\'s exact cost recorded', async () => {
+  const phone = '201077770001';
+  const t = await turn(db, evolutionPayload({ phone, text: 'عايز فرخة مشوية كاملة وعنواني الزمالك' }), async () => ({
+    plan: { read: 'order', move: 'add the chicken, save the area' },
+    tools: [{ tool: 'manage_cart', action: 'add', items: [{ menu_id: 'M001', quantity: 1, choices: [{ level: 1, selected: ['فرخة كاملة'] }, { level: 2, selected: ['حار'] }] }], branch: 'zamalek' },
+            { tool: 'save_customer_details', details: { address_area: 'الزمالك' } }],
+    reply: (steps) => quiet(`تمام، ضفتلك الفرخة 👌 ${steps.length === 2 ? 'وسجلت الزمالك' : ''}`)
+  }));
+  // the requests: what OpenAI is asked, round after round
+  const b = t.bodies;
+  assert.equal(b.length, 3, 'two tool rounds and the reply');
+  for (const body of b) {
+    assert.equal(body.model, 'gpt-6-luna');
+    assert.equal(body.store, false);
+    assert.equal(body.parallel_tool_calls, false);
+    assert.deepEqual(body.include, ['reasoning.encrypted_content']);
+    assert.match(body.prompt_cache_key, /^ew-[0-9a-f-]{36}-agent$/);
+    assert.equal(body.reasoning.effort, 'low');
+    assert.deepEqual(body.tools.map(x => x.name), ['manage_cart', 'save_customer_details', 'manage_reservation']);
+    assert.ok(body.instructions.length > 1000, 'agent.md');
+  }
+  // each round only adds to the end: the start stays the same, so the cache covers it
+  assert.deepEqual(b[1].input.slice(0, b[0].input.length), b[0].input);
+  assert.deepEqual(b[2].input.slice(0, b[1].input.length), b[1].input);
+  assert.ok(b[1].input.some(i => i.type === 'reasoning' && i.encrypted_content), 'the thinking goes back, encrypted');
+  const out = b[2].input.filter(i => i.type === 'function_call_output');
+  assert.equal(out.length, 2);
+  assert.equal(JSON.parse(out[1].output).status, 'SAVED', out[1].output);
+  // the Brain: its own request
+  const br = t.nodes['Brain Request'].body;
+  assert.equal(br.model, 'gpt-6-luna'); assert.equal(br.reasoning.effort, 'medium'); assert.match(br.prompt_cache_key, /-brain$/);
+  assert.equal(br.input, t.brief.brief);
+
+  // the result the turn reads, as before
+  assert.deepEqual(t.nodes.Agent.intermediateSteps.map(s => s.action.tool), ['manage_cart', 'save_customer_details']);
+  assert.equal(t.checked.decision.reply_messages[0], 'تمام، ضفتلك الفرخة 👌 وسجلت الزمالك');
+
+  // the cost records: four calls, priced exactly
+  assert.equal(t.recorded, 4);
+  const rows = (await db.query(`select step, model, input_tokens, cached_tokens, output_tokens, reasoning_tokens, cost_usd, priced, kind, wa_id
+                                  from everwake.ai_usage where run_id = $1 order by id`, [t.nodes['Normalize Inbound'].run_id])).rows;
+  assert.deepEqual(rows.map(r => r.step), ['brain', 'agent', 'agent', 'agent']);
+  assert.equal(rows[0].model, 'gpt-6-luna-2026-10-01', 'the model as OpenAI reports it');
+  // brain: (10240 − 8960) × 0.10 + 8960 × 0.01 + 2311 × 0.50, per million = 0.0013731
+  assert.equal(Number(rows[0].cost_usd), 0.0013731);
+  // each agent round: (12001 − 11904) × 0.10 + 11904 × 0.01 + 180 × 0.50, per million = 0.00021874
+  assert.ok(rows.slice(1).every(r => Number(r.cost_usd) === 0.00021874 && r.priced && r.kind === 'text' && r.wa_id === phone));
+  assert.equal(rows[0].reasoning_tokens, 1987);
+  const total = rows.reduce((a, r) => a + Number(r.cost_usd), 0);
+  assert.equal(Math.round(total * 1e8), Math.round((0.0013731 + 3 * 0.00021874) * 1e8));
+  const log = (await db.query(`select llm_calls, prompt_tokens, completion_tokens from everwake.agent_events where wa_id = $1 order by id desc limit 1`, [phone])).rows[0];
+  assert.equal(log.llm_calls, 4);
+  assert.equal(log.prompt_tokens, 10240 + 3 * 12001);
+});
+
+test('the restaurant\'s own AI settings reach the request; a bad tool call is answered and the loop goes on', async () => {
+  const t0 = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  await db.query(`insert into everwake.ai_config (scope, agent_model, agent_effort, brain_effort) values ($1, 'gpt-5.6-luna', 'medium', 'low')
+                  on conflict (scope) do update set agent_model = excluded.agent_model, agent_effort = excluded.agent_effort, brain_effort = excluded.brain_effort`, [t0]);
+  try {
+    const t = await turn(db, evolutionPayload({ phone: '201077770002', text: 'المنيو فيها ايه؟' }), async () => ({
+      plan: {},
+      tools: [{ tool: 'manage_cart', raw: 'not json' }, { tool: 'order_pizza', action: 'add' }],
+      reply: quiet('عندنا مشويات وطواجن 😊 تحب تشوف إيه؟')
+    }));
+    assert.equal(t.bodies[0].model, 'gpt-5.6-luna');
+    assert.equal(t.bodies[0].reasoning.effort, 'medium');
+    assert.equal(t.nodes['Brain Request'].body.reasoning.effort, 'low');
+    assert.equal(t.nodes['Brain Request'].body.model, 'gpt-6-luna', 'no planning model of its own: the build\'s');
+    const outs = t.bodies[2].input.filter(i => i.type === 'function_call_output').map(i => JSON.parse(i.output).error);
+    assert.deepEqual(outs, ['the arguments are not a JSON object', 'there is no tool called order_pizza']);
+    assert.equal(t.nodes.Agent.error, undefined, 'the loop carried on to the reply');
+    // the malformed cart call is on record as failed, so Check Reply treats it like any failed cart call
+    assert.equal(t.nodes['Check Reply'].tool_calls[0].status, 'ERROR');
+    assert.equal(t.nodes.Agent.intermediateSteps.length, 1, 'a tool that does not exist is not a step');
+  } finally {
+    await db.query(`delete from everwake.ai_config where scope = $1`, [t0]);
+  }
+});
+
+test('OpenAI fails: the Brain\'s failure leaves no plan, the Agent\'s sends nothing made up; ten rounds end the loop', async () => {
+  let t = await turn(db, evolutionPayload({ phone: '201077770003', text: 'السلام عليكم' }), async () => ({
+    brainFail: 'Request timed out', plan: {}, reply: quiet('وعليكم السلام! تحب تطلب إيه النهارده؟')
+  }));
+  assert.equal(t.nodes['Attach Plan'].brain.used, false);
+  assert.equal(t.checked.decision.reply_messages[0], 'وعليكم السلام! تحب تطلب إيه النهارده؟', 'the Agent answers without a plan');
+  const failed = (await db.query(`select status_ok, http_status, cost_usd from (select http_status = 200 as status_ok, http_status, cost_usd, step
+                                    from everwake.ai_usage where run_id = $1) x where step = 'brain'`, [t.nodes['Normalize Inbound'].run_id])).rows[0];
+  assert.equal(failed.status_ok, false, 'the failed call is on record, at no cost');
+  assert.equal(Number(failed.cost_usd), 0);
+
+  t = await turn(db, evolutionPayload({ phone: '201077770004', text: 'عايز اطلب' }), async () => ({
+    plan: {}, agentFail: 'Service Unavailable', reply: quiet('never sent')
+  }));
+  assert.match(t.nodes.Agent.error.message, /Service Unavailable/);
+  assert.ok(!t.checked.decision.reply_messages.includes('never sent'));
+
+  t = await turn(db, evolutionPayload({ phone: '201077770005', text: 'ملخص' }), async () => ({
+    plan: {}, tools: Array.from({ length: 12 }, () => ({ tool: 'manage_cart', action: 'summary' })), reply: quiet('x')
+  }));
+  assert.equal(t.bodies.length, 10, 'ten rounds at most');
+  assert.match(t.nodes.Agent.error.message, /stopped after 10 rounds/);
+});
+
+test('a voice note\'s and a photo\'s calls are recorded with the turn', async () => {
+  const nodes = { 'Prepare Media': { kind: 'audio', ok: true, started_at: new Date(Date.now() - 900).toISOString(), transcribe_model: 'gpt-transcribe',
+                                     buffer_id: 1, message_id: null, marker: '[voice note]' } };
+  let m = (await runCode('main/media_understood.js', { input: { text: 'عايز فرخة', usage: { type: 'duration', seconds: 7 } }, nodes }))[0];
+  assert.equal(m.ai_calls[0].step, 'transcribe'); assert.equal(m.ai_calls[0].seconds, 7); assert.ok(m.ai_calls[0].ms >= 900);
+  nodes['Prepare Media'] = { ...nodes['Prepare Media'], kind: 'image', vision_model: 'gpt-5-mini', caption: '' };
+  m = (await runCode('main/media_understood.js', { input: { model: 'gpt-5-mini-2025-08-07', choices: [{ message: { content: 'صورة منيو' } }],
+                                                            usage: { prompt_tokens: 1200, completion_tokens: 90, completion_tokens_details: { reasoning_tokens: 40 } } }, nodes }))[0];
+  assert.deepEqual([m.ai_calls[0].step, m.ai_calls[0].model, m.ai_calls[0].input, m.ai_calls[0].output, m.ai_calls[0].thinking], ['vision', 'gpt-5-mini-2025-08-07', 1200, 90, 40]);
+  const t0 = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  const n = (await sql(db, `select everwake.record_ai_usage($1::uuid, null, 'run-photo', 'image', convert_from(decode($2::text, 'base64'), 'UTF8')::jsonb) as r`, [t0, m.b64_usage])).r;
+  assert.equal(n, 1);
+  // (1200 × 0.25 + 90 × 2.00) / 1M = 0.00048
+  assert.equal(Number((await sql(db, `select cost_usd as r from everwake.ai_usage where run_id = 'run-photo'`)).r), 0.00048);
+  // a file that never reached OpenAI: nothing to record
+  nodes['Prepare Media'] = { ...nodes['Prepare Media'], ok: false };
+  m = (await runCode('main/media_understood.js', { input: {}, nodes }))[0];
+  assert.deepEqual(m.ai_calls, []);
+});

@@ -375,6 +375,7 @@ return [{
     violations,
     menu_unsendable: menuUnsendable,
     needs_rewrite: violations.length > 0,   // read by Route: Needs Repair?
-    agent_tokens: obj(agent.tokenUsage)
+    agent_tokens: obj(agent.tokenUsage),
+    ai_calls: arr(agent.ai_calls).length      // every call to OpenAI this turn (the Brain and each Agent round)
   }
 }];

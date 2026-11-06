@@ -61,7 +61,7 @@ export function DevConsole() {
   });
   const fx = costs.data?.usd_egp || 50;
   const egp = (usd: number | null | undefined, digits = 2) => usd == null ? '—' : `${(Number(usd) * fx).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })} EGP`;
-  const usd = (v: number | null | undefined) => v == null ? '—' : `$${Number(v).toLocaleString('en-US', { maximumFractionDigits: 5 })}`;
+  const usd = (v: number | null | undefined) => v == null ? '—' : `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
 
   return (
     <div className="ew-app min-h-dvh bg-paper text-ink">
@@ -115,9 +115,9 @@ function CostsView({ c, egp, usd }: { c: Costs; egp: (v: number | null | undefin
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Tile icon={Coins} tint={1} label="AI cost" value={egp(T.cost_usd)} note={`${usd(T.cost_usd)} · ${n0(T.calls)} calls${T.unpriced ? ` · ${T.unpriced} without a price` : ''}`} />
-        <Tile icon={ShoppingBag} tint={2} label="Per order (average)" value={egp(c.per_order.avg_usd)}
-              note={`${c.orders} orders · lowest ${egp(c.per_order.min_usd)} · highest ${egp(c.per_order.max_usd)}`} />
-        <Tile icon={MessageSquare} tint={3} label="Per message (average)" value={egp(c.messages ? T.cost_usd / c.messages : null, 3)}
+        <Tile icon={ShoppingBag} tint={2} label="Per order (average)" value={egp(c.per_order.avg_usd, 4)}
+              note={`${c.orders} orders · lowest ${egp(c.per_order.min_usd, 4)} · highest ${egp(c.per_order.max_usd, 4)}`} />
+        <Tile icon={MessageSquare} tint={3} label="Per message (average)" value={egp(c.messages ? T.cost_usd / c.messages : null, 4)}
               note={`${n0(c.messages)} messages · ${c.per_order.avg_messages ? Math.round(Number(c.per_order.avg_messages)) : '—'} per order`} />
         <Tile icon={Database} tint={4} label="Cache" value={pct(T.cached, T.input)} note={`of input tokens came from the cache · hit on ${pct(T.cache_hit_calls, T.calls)} of calls`} />
       </div>
@@ -144,7 +144,7 @@ function CostsView({ c, egp, usd }: { c: Costs; egp: (v: number | null | undefin
           {c.by_kind.map(k => (
             <div key={k.kind} className="rounded-[var(--ui-radius-inner)] bg-paper/70 px-4 py-3">
               <p className="text-xs capitalize text-muted">{k.kind}</p>
-              <p className="font-semibold tabular-nums">{egp(k.cost_usd)} <span className="text-xs font-normal text-muted">· {n0(k.messages)} messages · {egp(k.messages ? k.cost_usd / k.messages : 0, 3)} each</span></p>
+              <p className="font-semibold tabular-nums">{egp(k.cost_usd)} <span className="text-xs font-normal text-muted">· {n0(k.messages)} messages · {egp(k.messages ? k.cost_usd / k.messages : 0, 4)} each</span></p>
             </div>
           ))}
         </div>
@@ -153,14 +153,14 @@ function CostsView({ c, egp, usd }: { c: Costs; egp: (v: number | null | undefin
       <Card title="Restaurants">
         <Table head={['Restaurant', 'Messages', 'Orders', 'AI cost', 'Per order', 'Lowest', 'Highest', 'Cached input']}
           rows={c.by_tenant.map(t => [<Link key="n" className="font-medium hover:underline" href={`/r/${t.slug}`}>{t.name}</Link>, n0(t.messages), n0(t.orders),
-            egp(t.cost_usd), egp(t.avg_order_usd), egp(t.min_order_usd), egp(t.max_order_usd), t.cache_share == null ? '—' : `${Math.round(t.cache_share * 100)}%`])} />
+            egp(t.cost_usd), egp(t.avg_order_usd, 4), egp(t.min_order_usd, 4), egp(t.max_order_usd, 4), t.cache_share == null ? '—' : `${Math.round(t.cache_share * 100)}%`])} />
       </Card>
 
       <Card title="Orders (the chat that led to each, and the questions after it)">
         <Table head={['Order', 'Restaurant', 'Placed', 'Total', 'Messages', 'AI cost', 'To order', 'After', 'Cached input']}
           rows={c.orders_list.map(o => [<Link key="o" className="font-medium hover:underline" href={`/r/${o.slug}/orders?o=${o.order_id}`}><bdi>{o.order_no}</bdi></Link>, o.tenant,
             new Date(o.placed_at).toLocaleString('en-GB', { timeZone: TZ, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-            `${n0(o.total)} EGP`, n0(o.messages), <b key="c">{egp(o.cost_usd)}</b>, egp(o.to_order_usd), egp(o.after_usd),
+            `${n0(o.total)} EGP`, n0(o.messages), <b key="c">{egp(o.cost_usd, 4)}</b>, egp(o.to_order_usd, 4), egp(o.after_usd, 4),
             o.cache_share == null ? '—' : `${Math.round(o.cache_share * 100)}%`])} />
       </Card>
     </div>
@@ -186,14 +186,14 @@ function MessagesView({ rows, egp }: { rows: Msg[]; egp: (v: number | null | und
                 <span className="flex items-center gap-1 text-xs" title={hit ? 'the cache was used' : 'no cached input'}>
                   {hit ? <Check className="size-3.5 text-positive" /> : <X className="size-3.5 text-muted" />}{m.input ? `${Math.round((m.cached / m.input) * 100)}%` : ''}
                 </span>
-                <span className="w-24 shrink-0 text-end font-semibold tabular-nums">{egp(m.cost_usd, 3)}</span>
+                <span className="w-24 shrink-0 text-end font-semibold tabular-nums">{egp(m.cost_usd, 4)}</span>
               </button>
               {on && (
                 <div className="bg-paper/50 px-5 pb-4">
                   <Table head={['Step', 'Model', 'Input', 'Cached', 'Output', 'Thinking', 'Time', 'Cost']}
                     rows={m.steps.map(s => [s.step, s.model || '—', n0(s.in), <span key="c" className={s.cached ? 'text-positive' : 'text-muted'}>{n0(s.cached)}</span>,
                       n0(s.out), n0(s.thinking), s.ms ? `${(s.ms / 1000).toFixed(1)} s` : (s.seconds ? `${s.seconds} s audio` : '—'),
-                      s.priced ? egp(s.cost, 4) : 'no price'])} />
+                      s.priced ? <span key="p" title={`$${Number(s.cost).toFixed(8)}`}>{egp(s.cost, 4)}</span> : 'no price'])} />
                 </div>
               )}
             </li>
@@ -222,7 +222,7 @@ function RestaurantsView({ list, reload }: { list: DevTenant[]; reload: () => Pr
     <div className="space-y-5">
       <Card title="AI settings for every restaurant" action={<Button size="sm" variant="gold" busy={busy} onClick={saveGlobal}>Save</Button>}>
         <AiFields value={cfg} onChange={v => setG({ ...cfg, ...v })} global />
-        <p className="mt-3 text-xs text-muted">A model left empty keeps the one the workflow was built with. A restaurant's own setting below wins over these.</p>
+        <p className="mt-3 text-xs text-muted">A model left empty keeps the one the workflow was built with (gpt-6-luna). Every cost here is OpenAI's own count of each call, priced with the price list at the time of the call. A restaurant's own setting below wins over these.</p>
       </Card>
       {list.map(t => <RestaurantRow key={t.id} t={t} reload={reload} />)}
     </div>
@@ -233,9 +233,9 @@ function AiFields({ value, onChange, global }: { value: AiCfg; onChange: (v: AiC
   const opt = (xs: string[], inherit: string) => xs.map(x => <option key={x} value={x}>{x || inherit}</option>);
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <label className="text-xs text-muted">Planning model<Input className="mt-1" placeholder={global ? 'as built' : 'as for everyone'} value={value.brain_model || ''} onChange={e => onChange({ brain_model: e.target.value || null })} /></label>
+      <label className="text-xs text-muted">Planning model<Input className="mt-1" placeholder={global ? 'gpt-6-luna (as built)' : 'as for everyone'} value={value.brain_model || ''} onChange={e => onChange({ brain_model: e.target.value || null })} /></label>
       <label className="text-xs text-muted">Planning thinks<Select className="mt-1" value={value.brain_effort || ''} onChange={e => onChange({ brain_effort: e.target.value || null })}>{opt(EFF, global ? 'medium (default)' : 'as for everyone')}</Select></label>
-      <label className="text-xs text-muted">Reply model<Input className="mt-1" placeholder={global ? 'as built' : 'as for everyone'} value={value.agent_model || ''} onChange={e => onChange({ agent_model: e.target.value || null })} /></label>
+      <label className="text-xs text-muted">Reply model<Input className="mt-1" placeholder={global ? 'gpt-6-luna (as built)' : 'as for everyone'} value={value.agent_model || ''} onChange={e => onChange({ agent_model: e.target.value || null })} /></label>
       <label className="text-xs text-muted">Reply thinks<Select className="mt-1" value={value.agent_effort || ''} onChange={e => onChange({ agent_effort: e.target.value || null })}>{opt(EFF, global ? 'low (default)' : 'as for everyone')}</Select></label>
       <label className="text-xs text-muted">Details asked by code<Select className="mt-1" value={tri(value.details_by_code)} onChange={e => onChange({ details_by_code: fromTri(e.target.value) })}>{opt(['', 'on', 'off'], global ? 'off' : 'as for everyone')}</Select></label>
       <label className="text-xs text-muted">❤️ for messages that need no reply<Select className="mt-1" value={tri(value.react_no_reply)} onChange={e => onChange({ react_no_reply: fromTri(e.target.value) })}>{opt(['', 'on', 'off'], global ? 'off' : 'as for everyone')}</Select></label>
@@ -273,7 +273,7 @@ function RestaurantRow({ t, reload }: { t: DevTenant; reload: () => Promise<void
           <p className="text-xs text-muted"><Sparkles className="me-1 inline size-3.5" />WhatsApp orders: the food after discounts{bill.include_delivery_fee ? ' + delivery' : ''}{bill.include_vat ? ' + VAT' : ''}. QR orders: their total.</p>
         </div>
         <AiFields value={ai} onChange={v => setAi({ ...ai, ...v })} />
-        <p className="text-xs text-muted">In use now: planning {t.ai.brain_model || 'as built'} · {t.ai.brain_effort} · reply {t.ai.agent_model || 'as built'} · {t.ai.agent_effort} · details by code {t.ai.details_by_code ? 'on' : 'off'} · ❤️ {t.ai.react_no_reply ? 'on' : 'off'}</p>
+        <p className="text-xs text-muted">In use now: planning {t.ai.brain_model || 'gpt-6-luna'} · {t.ai.brain_effort} · reply {t.ai.agent_model || 'gpt-6-luna'} · {t.ai.agent_effort} · details by code {t.ai.details_by_code ? 'on' : 'off'} · ❤️ {t.ai.react_no_reply ? 'on' : 'off'}</p>
       </div>
     </Card>
   );

@@ -55,7 +55,7 @@ The Seagull pipeline, unchanged in shape:
    - `details`: the agent (its `asks_for` line) or the code itself asked for a customer detail less than 30 minutes ago, and the answer reads clearly as that detail: a name, a phone number, "the same number", a payment method, delivery or pickup, a "yes" to the saved address, an address with its building, floor and flat. It is saved through `save_customer_details` (the same checks as the AI's), and code asks the next missing detail in a short, plain sentence (`details_by_code_reply.js`). Anything else (a question, a change to the order, an address outside the zones, a refused detail, the last detail before the summary) goes back to the AI on the same turn.
    - `ai`: everything else.
    Both shortcuts can be switched off for a restaurant on the developer page.
-7. Two models. The **Brain** (medium reasoning by default, no tools) reads the turn and plans the move: what is going on, what the reply must achieve, the tool actions, what the customer already heard and what to avoid. The **Agent** (low reasoning) runs the tools and writes the reply in her own words. **Check Reply** checks hard truth only: every number must be a real price, total or detail on file; no false "order placed"; no internal codes; only the restaurant's links; no photo promised that isn't sent. A line that breaks one is dropped (**Repair Reply**); no model rewrites her words. Every call to OpenAI, these two and the voice notes and photos, goes through the dashboard's AI meter (below).
+7. Two models. The **Brain** (medium reasoning by default, no tools) reads the turn and plans the move: what is going on, what the reply must achieve, the tool actions, what the customer already heard and what to avoid. The **Agent** (low reasoning) runs the tools and writes the reply in her own words. **Check Reply** checks hard truth only: every number must be a real price, total or detail on file; no false "order placed"; no internal codes; only the restaurant's links; no photo promised that isn't sent. A line that breaks one is dropped (**Repair Reply**); no model rewrites her words. n8n makes these calls to OpenAI itself and records each one's exact usage (below).
 8. **Persist** — memory, handoff flag, questions for the team, telemetry, unlock. If a person took over while the model was thinking, nothing is sent.
    - **Asking the team** (`team_questions`, 014). When only the restaurant knows something — whether something off the menu can be made, half cash and half online, a charge the branch sets — the agent puts one clear question (two at most) in `ask_team`. It tells the customer it is checking with the branch and carries on with the rest. The inbox shows the question with **Yes**, **No** and a box to type (a note can go with Yes / No). The answer goes into the agent's FACTS as NEW; the dashboard wakes it (`team_answer` above), and the reply that passes it on marks it told. A question still waiting is never asked again or guessed. `handoff` stays for a person taking over the chat: a complaint, someone asking for a person, something gone wrong.
 9. **Send** — menu pages and dish photos first, then the text. Every message is logged, so the inbox shows exactly what the customer saw.
@@ -64,7 +64,7 @@ The Seagull pipeline, unchanged in shape:
 The system prompts are the same for every restaurant: only the knowledge in
 the message changes. Each call is laid out steady part first (the prompt, the
 restaurant, its menu, the chat so far), then what changed this turn (FACTS, the
-plan, the latest message), and the meter gives each restaurant and step its own
+plan, the latest message), and each restaurant and step has its own
 `prompt_cache_key`, so OpenAI's prompt cache covers most of what is read.
 
 ## The tools
@@ -189,22 +189,27 @@ server calls the database with the service role:
 
 ## What the AI costs, and the bills (018)
 
-**The AI meter** (`dashboard/src/app/api/ai/[...path]/route.ts`). The engine
-does not call OpenAI directly: its model nodes have their base URL set to
+**n8n calls OpenAI itself and records every call.** The Brain, each round of
+the Agent, voice notes and photos are plain HTTP Request nodes on n8n's OpenAI
+credential (the key never leaves n8n). They use the Responses API for the Brain
+and the Agent:
+- `store: false`;
+- the restaurant's model and effort from `ai_settings`, else the build's (`gpt-6-luna`);
+- a `prompt_cache_key` per restaurant and step.
 
-    <dashboard>/api/ai/t/<tenant>/<message id>/<run id>/<step>/<kind>/v1/
+The Agent is its own tool loop: *Agent Request → Agent Call (OpenAI) → Agent Step → Route: Which Tool? → Run <tool> → Agent Tool Result → Agent Request*.
+- Each round is one call to OpenAI and at most one tool call, up to 10 rounds.
+- Each round sends everything so far: the model's encrypted thinking, its calls and the tools' answers. Every round therefore starts with the same text, and the cache covers it.
+- The node **Agent** puts the turn's result in the shape Check Reply has always read.
 
-where step is brain, agent, transcribe or vision, and kind is text, voice,
-image or test. The meter sends the request on to OpenAI as it came, with the
-caller's own key, after applying the restaurant's AI settings (`ai_settings`:
-the Brain's and the Agent's model and effort) and its cache key. The answer goes
-straight back (streamed answers too). After it, the meter writes one row to
-`ai_usage`: input, cached input, output and thinking tokens, or a voice note's
-seconds. A trigger prices the row from `ai_prices` (the longest model-name
-prefix wins, so dated model names match). The meter never slows a reply, and
-a record it fails to write never breaks one. `EW_AI_METER=off` at build time
-calls OpenAI directly again (no records). `EW_AI_KEY_SHA256` on the dashboard
-limits the meter to Everwake's own key.
+Every answer carries OpenAI's own usage: input tokens (the cached part included), output tokens (the thinking included), or a voice note's seconds.
+- **Record AI Usage** (after the Agent) and **Record Media Usage** (after a voice note or photo) hand it to `record_ai_usage`, one `ai_usage` row per call.
+- Only the engine can call `record_ai_usage`.
+- A trigger prices each row from `ai_prices` (the longest model-name prefix wins, so dated model names match) and keeps the prices it used on the row. A later price change leaves past costs as they were.
+- A failed call is on record at no cost.
+- Recording never stops a turn.
+
+Cost of a call = (input − cached) × input price + cached × cached price + output × output price, per million.
 
 **Turns and orders** (`ai_turns`). The calls of one message are a turn. A turn
 counts towards the customer's next order placed within 12 hours (the chat

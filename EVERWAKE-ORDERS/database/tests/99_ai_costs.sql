@@ -66,6 +66,29 @@ begin
   assert (select (e ->> 'fee')::numeric from jsonb_array_elements(r -> 'rows') e where e ->> 'order_no' = 'QR-T1') = 6.84;
   assert (r -> 'totals' ->> 'fee')::numeric = 17.50;
   perform everwake.save_bill_rule(t, '{"fee_percent": 2}');
+
+  -- the engine records its own calls, exactly as OpenAI reported them
+  assert everwake.record_ai_usage(t, mid, 'run-e', 'voice', '[
+    {"step":"brain","model":"gpt-6-luna","endpoint":"responses","input":10240,"cached":8960,"output":2311,"thinking":1987,"status":200,"ms":5120},
+    {"step":"agent","model":"gpt-6-luna","endpoint":"responses","input":12001,"cached":11904,"output":180,"thinking":64,"status":200,"ms":2210},
+    {"step":"transcribe","model":"gpt-transcribe","endpoint":"audio/transcriptions","seconds":12.5,"status":200},
+    {"step":"nonsense","model":"gpt-6-luna","input":"12","output":3},
+    "not a call"]') = 4;
+  -- brain: (1280 × 0.10 + 8960 × 0.01 + 2311 × 0.50) / 1M = 0.0013731
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 0.0013731,
+         (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'brain')::text;
+  -- agent: (97 × 0.10 + 11904 × 0.01 + 180 × 0.50) / 1M = 0.00021874
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'agent') = 0.00021874;
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'transcribe') = 0.00125, '12.5 s of voice';
+  assert (select kind from everwake.ai_usage where run_id = 'run-e' and step = 'agent') = 'voice';
+  assert (select reasoning_tokens from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 1987;
+  assert (select price_out_per_m from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 0.50, 'the price is kept with the call';
+  assert (select step from everwake.ai_usage where run_id = 'run-e' and input_tokens = 12) = 'other';
+  -- a later price change leaves the recorded costs as they were
+  update everwake.ai_prices set output_per_m = 0.60 where model = 'gpt-6-luna';
+  assert (select cost_usd from everwake.ai_usage where run_id = 'run-e' and step = 'brain') = 0.0013731;
+  update everwake.ai_prices set output_per_m = 0.50 where model = 'gpt-6-luna';
+  assert everwake.record_ai_usage(t, null, 'run-f', 'text', '{}') = 0, 'not a list: nothing written';
 end $$;
 
 -- the developer: sees the costs
@@ -103,6 +126,16 @@ begin
   begin
     perform everwake.save_bill_rule(t, '{"fee_percent": 0}');
     assert false, 'an owner changed Everwake''s percent';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform everwake.record_ai_usage(t, null, 'run-z', 'text', '[{"step":"agent","model":"gpt-6-luna","input":1,"output":1}]');
+    assert false, 'an owner wrote AI usage';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform everwake.ai_settings(t);
+    assert false, 'an owner read the AI settings';
   exception when insufficient_privilege then null;
   end;
   r := everwake.bill_statement(t, '2020-01-15', '2020-01-16');
