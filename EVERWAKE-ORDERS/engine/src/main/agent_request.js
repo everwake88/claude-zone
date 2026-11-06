@@ -9,6 +9,7 @@
 // store: false — nothing is kept at OpenAI between calls.
 // =====================================================================
 // @include shared/basics.js
+// @include shared/cache_layout.js
 
 const j = $input.first().json;
 const ai = obj($('Route Without AI').first().json.ai_settings);
@@ -20,7 +21,8 @@ const effort = EFFORTS.includes(ai.agent_effort) ? ai.agent_effort : '__AGENT_EF
 const loop = j.agent_loop ? obj(j.agent_loop) : {
   round: 0,
   started_at: new Date().toISOString(),
-  input: [{ role: 'user', content: str($('Attach Plan').first().json.agent_prompt) }],
+  input: (() => { const a = $('Attach Plan').first().json;
+                  return cachedInput("__AGENT_PROMPT__", a.steady_text, a.chat_blocks, a.agent_rest); })(),
   steps: [],
   calls: []
 };
@@ -31,7 +33,6 @@ return [{
     call_started_at: new Date().toISOString(),
     body: {
       model: str(ai.agent_model) || '__MODEL__',
-      instructions: "__AGENT_PROMPT__",
       input: arr(loop.input),
       tools: "__AGENT_TOOLS__",
       tool_choice: 'auto',
@@ -40,6 +41,7 @@ return [{
       include: ['reasoning.encrypted_content'],
       max_output_tokens: 6000,
       store: false,
+      prompt_cache_options: CACHE_OPTIONS,
       prompt_cache_key: `ew-${tenant}-agent`
     }
   }

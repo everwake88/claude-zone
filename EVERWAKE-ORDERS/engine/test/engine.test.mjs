@@ -1312,7 +1312,13 @@ test('n8n calls OpenAI itself: one request per round, the start cached, every ca
     assert.match(body.prompt_cache_key, /^ew-[0-9a-f-]{36}-agent$/);
     assert.equal(body.reasoning.effort, 'low');
     assert.deepEqual(body.tools.map(x => x.name), ['manage_cart', 'save_customer_details', 'manage_reservation']);
-    assert.ok(body.instructions.length > 1000, 'agent.md');
+    assert.equal(body.input[0].role, 'developer');
+    assert.ok(body.input[0].content[0].text.length > 1000, 'agent.md, first, as a developer message');
+    assert.deepEqual(body.prompt_cache_options, { mode: 'implicit', ttl: '30m' });
+    const blocks = body.input[1].content;
+    assert.ok(blocks[0].prompt_cache_breakpoint && /BUSINESS FACTS/.test(blocks[0].text) && /MENU/.test(blocks[0].text), 'the restaurant and its menu: a breakpoint');
+    assert.ok(!blocks[blocks.length - 1].prompt_cache_breakpoint && /FACTS FOR THIS TURN/.test(blocks[blocks.length - 1].text), 'this turn\'s facts: after the breakpoints');
+    assert.ok(blocks.filter(x => x.prompt_cache_breakpoint).length <= 3, 'three breakpoints at most, the implicit one makes four');
   }
   // each round only adds to the end: the start stays the same, so the cache covers it
   assert.deepEqual(b[1].input.slice(0, b[0].input.length), b[0].input);
@@ -1324,7 +1330,8 @@ test('n8n calls OpenAI itself: one request per round, the start cached, every ca
   // the Brain: its own request
   const br = t.nodes['Brain Request'].body;
   assert.equal(br.model, 'gpt-6-luna'); assert.equal(br.reasoning.effort, 'low'); assert.match(br.prompt_cache_key, /-brain$/);
-  assert.equal(br.input, t.brief.brief);
+  assert.equal(br.input[1].content[0].text, t.brief.steady_text);
+  assert.ok(!br.instructions, 'the instructions are the developer message');
 
   // the result the turn reads, as before
   assert.deepEqual(t.nodes.Agent.intermediateSteps.map(s => s.action.tool), ['manage_cart', 'save_customer_details']);
@@ -1495,4 +1502,71 @@ test('photos are read by the model set on the developer page, else gpt-6-luna', 
   assert.equal(p.vision_body.model, 'gpt-5.6-terra');
   p = (await runCode('main/prepare_media.js', { input: {}, nodes: base }))[0];
   assert.equal(p.vision_model, 'gpt-6-luna', 'no settings loaded: the build\'s');
+});
+
+// OpenAI's cache, as its guide describes it for GPT-5.6 and later: a request writes the prefix up to each
+// breakpoint (the explicit ones and the implicit one at its end); a later request reads the longest of its
+// own breakpoint prefixes (and the end of its first developer message) that was written before.
+function cacheSim() {
+  const written = new Set();
+  const prefixes = (body) => {
+    const dev = JSON.stringify(body.input[0]);
+    const blocks = body.input[1].content;
+    const out = [{ key: dev, len: body.input[0].content[0].text.length, explicit: true }];
+    let acc = dev, len = out[0].len;
+    blocks.forEach((b, i) => {
+      acc += '|' + b.text; len += b.text.length;
+      if (b.prompt_cache_breakpoint || i === blocks.length - 1) out.push({ key: acc, len });
+    });
+    return out;
+  };
+  return (body) => {
+    const p = prefixes(body), total = p[p.length - 1].len;
+    const hit = [...p].reverse().find(x => written.has(x.key));
+    for (const x of p) written.add(x.key);
+    return { total, cached: hit ? hit.len : 0 };
+  };
+}
+
+test('the prompt cache: the menu and the chat so far are read back on every turn, not written again', async () => {
+  const phone = '201077770009';
+  const brain = cacheSim(), agent = cacheSim();
+  const shares = [];
+  let brainSeen = false;
+  const lines = ['السلام عليكم', 'عايز اطلب', 'عندكم فراخ؟', 'تمام فرخة مشوية', 'كاملة', 'حار', 'وكمان بطاطس', 'وعيش',
+                 'كام الحساب؟', 'تمام', 'عنواني الزمالك', 'شارع ٢٦ يوليو'];
+  for (const [n, text] of lines.entries()) {
+    // spread the messages out in time, as a real chat is (the checkpoints follow their times)
+    await db.query(`update everwake.messages set created_at = timestamp '2026-11-06 10:00' + (id * interval '7 seconds') where wa_id = $1`, [phone]);
+    const t = await turn(db, evolutionPayload({ phone, text }), async () => ({ plan: { read: 'x' }, reply: quiet(`تمام ${n} 👌`) }));
+    if (!t.nodes['Brain Request']) continue;            // answered by code (a ❤️, a detail): no AI call
+    const first = !shares.length && !brainSeen; brainSeen = true;
+    const bb = brain(t.nodes['Brain Request'].body), a = agent(t.bodies[0]);
+    if (!first) shares.push({ brain: bb.cached / bb.total, agent: a.cached / a.total });
+    // the restaurant and its menu: the same block for every turn
+    if (!first) assert.ok(bb.cached >= t.brief.steady_text.length, `turn ${n}: the menu is read from the cache`);
+  }
+  const avg = (k) => shares.reduce((s, x) => s + x[k], 0) / shares.length;
+  assert.ok(shares.length >= 6, 'enough AI turns to judge: ' + shares.length);
+  assert.ok(avg('brain') > 0.8 && avg('agent') > 0.8, `most of each request is read from the cache: brain ${JSON.stringify(shares.map(x => Math.round(x.brain * 100)))} agent ${JSON.stringify(shares.map(x => Math.round(x.agent * 100)))}`);
+  console.log('# cache share per turn, brain', shares.map(x => Math.round(x.brain * 100)).join(' '), '· agent', shares.map(x => Math.round(x.agent * 100)).join(' '));
+  // a second customer at the same restaurant reads the menu written for the first
+  const t2 = await turn(db, evolutionPayload({ phone: '201077770010', text: 'مساء الخير' }), async () => ({ plan: {}, reply: quiet('مساء النور!') }));
+  assert.ok(brain(t2.nodes['Brain Request'].body).cached >= t2.brief.steady_text.length, 'another customer reads the same menu');
+});
+
+test('the planning step switched off: one AI call per message, the reply step decides alone', async () => {
+  const t0 = (await sql(db, `select id as r from everwake.tenants where slug = 'nile_grill'`)).r;
+  await db.query(`insert into everwake.ai_config (scope, use_brain) values ($1, false) on conflict (scope) do update set use_brain = false`, [t0]);
+  try {
+    const t = await turn(db, evolutionPayload({ phone: '201077770011', text: 'عندكم كفتة؟' }), async () => ({ plan: { read: 'never used' }, reply: quiet('أيوه عندنا كفتة مشوية 😋') }));
+    assert.equal(t.nodes['Brain Request'], undefined, 'no planning call');
+    assert.equal(t.nodes['Attach Plan'].plan_text, '', 'no plan in the reply step\'s message');
+    assert.equal(t.recorded, 1, 'one AI call recorded');
+    assert.equal(t.checked.decision.reply_messages[0], 'أيوه عندنا كفتة مشوية 😋');
+    const main = JSON.parse(readFileSync(new URL('../dist/everwake-main.json', import.meta.url), 'utf8'));
+    assert.deepEqual(main.connections['Route: Plan First?'].main.map(o => o.map(c => c.node)), [['Brain Request'], ['Attach Plan']]);
+  } finally {
+    await db.query(`delete from everwake.ai_config where scope = $1`, [t0]);
+  }
 });

@@ -8,6 +8,7 @@
 // in OpenAI's cache. store: false — nothing is kept at OpenAI.
 // =====================================================================
 // @include shared/basics.js
+// @include shared/cache_layout.js
 
 const b = $input.first().json;                       // Route Without AI: the brief and the AI settings
 const ai = obj(b.ai_settings);
@@ -20,8 +21,9 @@ return [{
     brain_started_at: new Date().toISOString(),
     body: {
       model: str(ai.brain_model) || '__MODEL__',
-      instructions: "__BRAIN_PROMPT__",
-      input: str(b.brief),
+      input: cachedInput("__BRAIN_PROMPT__", b.steady_text, b.chat_blocks,
+                         [b.facts_text, '', '================ THE CUSTOMER\'S LATEST MESSAGE ================', b.latest_text].join('\n')),
+      prompt_cache_options: CACHE_OPTIONS,
       reasoning: { effort },
       max_output_tokens: 16000,
       store: false,

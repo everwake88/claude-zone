@@ -211,6 +211,12 @@ Every answer carries OpenAI's own usage: input tokens (the cached part included)
 
 Cost of a call = (input − cached − written) × input price + cached × cached price + written × cache-write price + output × output price, per million.
 - **Cache writes:** on GPT-5.6 and later, OpenAI bills tokens written to the prompt cache at their own price (GPT-6 Luna: $0.125 per 1M for the 30-minute cache), reported as `cache_write_tokens`. Each input token is billed once: uncached, read or written.
+- **The cache layout:** GPT-6 Luna finds a cached prompt again only at a saved breakpoint. So each request is sent as a developer message (the instructions) and a user message in blocks (`shared/cache_layout.js`):
+  - the restaurant and its menu, a breakpoint (the same for every customer);
+  - the chat in blocks that end before a "checkpoint" message (one in four, by its own time), with the last two complete blocks as breakpoints, so they read the same on the next turn;
+  - then this turn's facts and message.
+  - The implicit breakpoint at the end lets the Agent's next round read the whole first round.
+  - A replay of a 12-turn chat through OpenAI's caching rules reads 80–88% of each request from the cache.
 - **Per-minute models:** a model with a price per minute (`gpt-transcribe`, $0.0045) is priced by the voice note's length: OpenAI's figure, else WhatsApp's.
 - **Source:** prices as on developers.openai.com/api/docs/pricing (checked 2026-11-06).
 

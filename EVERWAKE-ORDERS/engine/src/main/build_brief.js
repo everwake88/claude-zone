@@ -322,8 +322,24 @@ const who = (m) => m.direction === 'inbound' ? 'customer: '
   : (m.sender === 'staff' ? `team member${m.staff_name ? ' (' + m.staff_name + ')' : ''}: `
   : (m.sender === 'system' ? 'automatic message from the restaurant: '
   : (m.sender === 'driver' ? 'the delivery driver (via the restaurant number): ' : 'you: ')));
-const historyLines = recent.slice(-18).map(m => who(m) + (m.reply_to ? `[${clip(m.reply_to, 200)}] ` : '')
-  + clip(m.text || `[${m.kind}]`, m.direction === 'inbound' ? 600 : 450).replace(/\n+/g, ' ⏎ '));
+// THE CHAT, in blocks the model provider can keep in its cache (GPT-6: a cache is only found again
+// at a saved breakpoint, so each block must read exactly the same on the next turn).
+// - a block ends just before a "checkpoint" message (about one in four, decided by its own time,
+//   so it is the same on every turn);
+// - while the chat is short, it starts at its first message; once the last 20 no longer hold it all,
+//   it starts at the first checkpoint in view (14 to 20 messages), so the start only moves now and then;
+// - the newest part (after the last checkpoint) is a block of its own that grows turn by turn.
+const lineOf = (m) => who(m) + (m.reply_to ? `[${clip(m.reply_to, 200)}] ` : '')
+  + clip(m.text || `[${m.kind}]`, m.direction === 'inbound' ? 600 : 450).replace(/\n+/g, ' ⏎ ');
+const isCheckpoint = (m) => { const t = Date.parse(m.at); return isFinite(t) && Math.floor(t / 1000) % 4 === 0; };
+let shown = recent;
+if (recent.length >= 20) {
+  const first = recent.findIndex((m, i) => i > 0 && isCheckpoint(m));
+  shown = first > 0 && first <= 6 ? recent.slice(first) : recent.slice(-18);
+}
+const historyLines = shown.map(lineOf);
+const historyBlocks = [[]];
+shown.forEach((m, i) => { if (i > 0 && isCheckpoint(m)) historyBlocks.push([]); historyBlocks[historyBlocks.length - 1].push(lineOf(m)); });
 const memory = arr(state.memory_notes).slice(-10);
 
 const situation = [];
@@ -484,6 +500,15 @@ const latest = safe(customerText || (answersNew.length
   ? '(no new message from them — the team has just answered your question, in FACTS)' : '(no text)'));
 const factsText = safe(facts), businessText = safe(business), menuSafe = safe(menuText);
 const historyText = safe(historyLines.join('\n'));
+// the request's parts, in this order: the steady part (the restaurant and its menu: the same for every
+// customer), the chat in its blocks (each the same as last turn, but the newest), then this turn's facts
+// and message. brain_request / agent_request mark the steady part and the last two complete chat blocks
+// as cache breakpoints, so the next turn reads them at a tenth of the price instead of writing them again.
+const HISTORY_HEAD = '================ THE CHAT SO FAR (oldest first) ================';
+const steadyText = [businessText, '', '================ MENU ================', menuSafe].join('\n');
+const chatBlocks = historyText
+  ? historyBlocks.map((lines, i) => (i === 0 ? HISTORY_HEAD + '\n' : '') + safe(lines.join('\n')))
+  : [HISTORY_HEAD + '\n(this is the first message)'];
 // what changes least comes first: the restaurant and its menu (the same for every customer until the
 // restaurant edits them), then the chat (it only grows at its end), then this turn's facts and message.
 // The model provider bills a start it has seen recently at a tenth of the price, so the long, steady
@@ -527,6 +552,8 @@ return [{
     menu_text: menuSafe,
     history_text: historyText,
     latest_text: latest,
+    steady_text: steadyText,
+    chat_blocks: chatBlocks,
     brief,
     brief_chars: brief.length
   }

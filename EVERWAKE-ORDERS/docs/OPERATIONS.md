@@ -55,6 +55,7 @@ Levers, all on the developer page → **Restaurants**, for every restaurant or o
 - **Wait before replying**: 5 s by default (2–10). Longer bundles quick messages into one reply (fewer AI calls), at the cost of a slightly later answer. Changing the model needs no rebuild; n8n reads it on every turn.
 - **❤️ for messages that need no reply** and **details by code**: on by default; switch off to send those messages to the AI again.
 - **New model**: add its prices under **Prices** before using it (input, cached, cache write, output, or per minute), or its calls show as unpriced.
+- **Planning step**: on by default; off = one AI call per message, the reply step reading everything and deciding alone. It's about 40% cheaper, and slightly less careful on hard messages.
 - **Photo model**: `gpt-6-luna` by default (it reads images); set another on the developer page without a rebuild. `gpt-5-mini` shuts down on Dec 11, 2026.
 - **Later idea:** OpenAI's Flex tier runs GPT-6 Luna at half price, but slower. Worth a test for a restaurant that can live with slower replies.
 

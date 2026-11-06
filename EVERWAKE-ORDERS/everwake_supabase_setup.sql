@@ -7989,6 +7989,7 @@ create table if not exists everwake.ai_config (
   usd_egp         numeric(10, 4),               -- for showing costs in EGP (global only)
   wait_seconds    int check (wait_seconds between 2 and 10),   -- how long to wait for more messages before replying
   vision_model    text,                         -- reads the photos customers send; null = what the workflow was built with
+  use_brain       boolean,                      -- the planning step before the reply (null = on)
   updated_at      timestamptz not null default now(),
   updated_by      uuid
 );
@@ -7997,6 +7998,7 @@ values ('global', 'low', 'low', true, true, 50)
 on conflict (scope) do nothing;
 alter table everwake.ai_config add column if not exists wait_seconds int check (wait_seconds between 2 and 10);
 alter table everwake.ai_config add column if not exists vision_model text;
+alter table everwake.ai_config add column if not exists use_brain boolean;
 -- 2026-11-06: both steps think at low, and the reply waits 5 s for more messages (a value set on the developer page stays)
 update everwake.ai_config set brain_effort = 'low' where scope = 'global' and brain_effort = 'medium';
 update everwake.ai_config set wait_seconds = 5 where scope = 'global' and wait_seconds is null;
@@ -8011,7 +8013,8 @@ returns jsonb language sql stable security definer set search_path = everwake, p
     'react_no_reply', coalesce(t.react_no_reply, g.react_no_reply, false),
     'usd_egp', coalesce(g.usd_egp, 50),
     'wait_seconds', least(10, greatest(2, coalesce(t.wait_seconds, g.wait_seconds, 5))),
-    'vision_model', coalesce(t.vision_model, g.vision_model))
+    'vision_model', coalesce(t.vision_model, g.vision_model),
+    'use_brain', coalesce(t.use_brain, g.use_brain, true))
     from (select 1) x
     left join everwake.ai_config g on g.scope = 'global'
     left join everwake.ai_config t on t.scope = p_tenant::text

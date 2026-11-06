@@ -336,6 +336,8 @@ function buildMain() {
   w.add(iff('Route: AI After All?', '$json.ai_again === true', [1700, 1000]));
   // the Brain and the Agent call OpenAI themselves (Responses API): each answer's exact usage is kept
   if (USE_BRAIN) {
+    // the planning step can be switched off per restaurant on the developer page (use_brain)
+    w.add(iff('Route: Plan First?', '($json.ai_settings || {}).use_brain !== false', [1000, 360]));
     w.add(code('Brain Request', 'main/brain_request.js', [1060, 460]));
     w.add(openai('Brain (OpenAI)', 'responses', [1180, 460]));
     w.add(code('Brain Result', 'main/brain_result.js', [1300, 460]));
@@ -427,7 +429,8 @@ function buildMain() {
   w.link('Route: Geocode OK?', 'Resolve Location', 0); w.link('Route: Geocode OK?', 'Reverse Geocode (OSM)', 1);
   w.chain('Reverse Geocode (OSM)', 'Resolve Location', 'Save Pin + Zone', 'Load Turn Context');
   w.chain('Load Turn Context', 'Build Brief', 'Route Without AI', 'Route: Which Way?');
-  w.link('Route: Which Way?', USE_BRAIN ? 'Brain Request' : 'Attach Plan', 0);
+  w.link('Route: Which Way?', USE_BRAIN ? 'Route: Plan First?' : 'Attach Plan', 0);
+  if (USE_BRAIN) { w.link('Route: Plan First?', 'Brain Request', 0); w.link('Route: Plan First?', 'Attach Plan', 1); }
   w.link('Route: Which Way?', 'Build Persist Payload', 1);
   w.link('Route: Which Way?', 'Save Details (code)', 2);
   w.chain('Save Details (code)', 'Details By Code — Reply', 'Route: AI After All?');

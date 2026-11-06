@@ -96,14 +96,13 @@ const safe = (s) => String(s == null ? '' : s).replace(/\{/g, '(').replace(/\}/g
 planText = safe(planText);
 // the steady part first (the restaurant, its menu, the chat so far) so the provider's cache covers it;
 // this turn's facts, the plan and the latest message last (same content as before, only reordered)
-const agentPrompt = [
-  b.business_text, '',
-  '================ MENU ================', b.menu_text, '',
-  '================ THE CHAT SO FAR (oldest first) ================', b.history_text || '(this is the first message)', '',
+// what changes every turn: this turn's facts, the plan and the latest message (after the cached parts)
+const agentRest = [
   b.facts_text, '',
   ...(planText ? ['================ ' + planText.split('\n')[0] + ' ================', planText.split('\n').slice(1).join('\n'), ''] : []),
   '================ THE CUSTOMER\'S LATEST MESSAGE ================', b.latest_text
 ].join('\n');
+const agentPrompt = [b.steady_text, '', ...arr(b.chat_blocks), '', agentRest].join('\n');
 
 return [{
   json: {
@@ -112,6 +111,7 @@ return [{
     brain,
     plan_text: planText,
     agent_prompt: agentPrompt,
+    agent_rest: agentRest,
     agent_prompt_chars: agentPrompt.length
   }
 }];

@@ -41,6 +41,7 @@ export async function connect() {
   return client;
 }
 
+const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
 const unb64 = (s) => JSON.parse(Buffer.from(s, 'base64').toString('utf8'));
 export { unb64 };
 
@@ -181,12 +182,17 @@ export async function turn(db, payload, script, opts = {}) {
   }
 
   const s = await script(brief, r);
-  // the Brain: its request, the stand-in's answer, its result (as n8n would run them)
-  nodes['Brain Request'] = (await runCode('main/brain_request.js', { input: routed, nodes }))[0];
-  const brainAnswer = s.brainFail ? { error: { message: s.brainFail } }
-    : fakeResponse([{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(s.plan || {}) }] }], s.brainUsage || BRAIN_USAGE);
-  nodes['Brain Result'] = (await runCode('main/brain_result.js', { input: brainAnswer, nodes }))[0];
-  const plan = (await runCode('main/attach_plan.js', { input: nodes['Brain Result'], nodes }))[0];
+  // the Brain (unless the restaurant switched the planning step off): its request, the stand-in's answer, its result
+  let plan;
+  if (obj(routed.ai_settings).use_brain === false) {
+    plan = (await runCode('main/attach_plan.js', { input: routed, nodes }))[0];
+  } else {
+    nodes['Brain Request'] = (await runCode('main/brain_request.js', { input: routed, nodes }))[0];
+    const brainAnswer = s.brainFail ? { error: { message: s.brainFail } }
+      : fakeResponse([{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(s.plan || {}) }] }], s.brainUsage || BRAIN_USAGE);
+    nodes['Brain Result'] = (await runCode('main/brain_result.js', { input: brainAnswer, nodes }))[0];
+    plan = (await runCode('main/attach_plan.js', { input: nodes['Brain Result'], nodes }))[0];
+  }
   nodes['Attach Plan'] = plan;
 
   // the Agent's tool loop: each scripted tool call is a round, the reply ends it; the tools are the real workflows

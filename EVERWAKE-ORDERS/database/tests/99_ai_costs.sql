@@ -97,6 +97,10 @@ begin
   -- the settings: both steps at low, a 5 s wait, a restaurant's own wait within 2–10 s
   v := everwake.ai_settings(t);
   assert v ->> 'brain_effort' = 'low' and v ->> 'agent_effort' = 'low' and (v ->> 'wait_seconds')::int = 5, v::text;
+  assert (v ->> 'use_brain')::boolean, 'the planning step is on unless switched off';
+  insert into everwake.ai_config (scope, use_brain) values (t::text, false) on conflict (scope) do update set use_brain = false;
+  assert not (everwake.ai_settings(t) ->> 'use_brain')::boolean;
+  delete from everwake.ai_config where scope = t::text;
   insert into everwake.ai_config (scope, wait_seconds) values (t::text, 8) on conflict (scope) do update set wait_seconds = 8;
   assert (everwake.ai_settings(t) ->> 'wait_seconds')::int = 8;
   begin
