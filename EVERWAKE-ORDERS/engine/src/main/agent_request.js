@@ -15,7 +15,9 @@ const j = $input.first().json;
 const ai = obj($('Route Without AI').first().json.ai_settings);
 const tenant = str(obj($('Intake').first().json.r).tenant_id);
 const EFFORTS = ['minimal', 'low', 'medium', 'high'];
-const effort = EFFORTS.includes(ai.agent_effort) ? ai.agent_effort : '__AGENT_EFFORT__';
+// the writer-only Main thinks at the effort it was built with (medium); the two-step Main follows the developer page
+const FIXED = '__AGENT_EFFORT_FIXED__' === 'yes';
+const effort = !FIXED && EFFORTS.includes(ai.agent_effort) ? ai.agent_effort : '__AGENT_EFFORT__';
 
 // the loop so far (from Agent Tool Result), or a new one from Attach Plan
 const loop = j.agent_loop ? obj(j.agent_loop) : {

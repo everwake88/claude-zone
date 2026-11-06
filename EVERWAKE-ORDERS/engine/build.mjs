@@ -23,8 +23,11 @@
 //   EW_PG_CRED_ID       n8n Postgres credential id  (default EVERWAKE_DB)
 //   EW_OPENAI_CRED_ID   n8n OpenAI credential id    (default the Seagull one)
 //   EW_GEOCODE_URL      Google reverse-geocoder (Apps Script) URL
-//   EW_BRAIN            'off' drops the planning Brain: the Agent then reads the whole situation and
-//                       thinks for itself (default on: the Brain thinks, the Agent writes)
+//   EW_BRAIN            'off' builds the writer-only Main instead (dist/everwake-main-writer-only.json,
+//                       "Everwake — Main (Writer only)"): no planning step; the Agent reads the whole
+//                       situation, thinks at medium (fixed, whatever the developer page says for
+//                       "Reply thinks"), runs the tools and writes. Only that one file is written.
+//                       npm run build writes both Mains.
 //   EW_AGENT_EFFORT     the Agent's reasoning effort (default low behind the Brain, medium alone)
 //   EW_BRAIN_EFFORT     the Brain's reasoning effort (default low; the developer page can change it per restaurant)
 //   EW_TRANSCRIBE_MODEL hears a customer's voice note (default gpt-transcribe)
@@ -97,6 +100,7 @@ export function fill(code) {
   return code.replace(/__TRANSCRIBE_MODEL__/g, TRANSCRIBE_MODEL).replace(/__VISION_MODEL__/g, VISION_MODEL)
     .replace(/__VISION_EFFORT__/g, VISION_EFFORT).replace(/__MODEL__/g, MODEL)
     .replace(/__BRAIN_EFFORT__/g, BRAIN_EFFORT).replace(/__AGENT_EFFORT__/g, AGENT_EFFORT)
+    .replace(/__AGENT_EFFORT_FIXED__/g, USE_BRAIN ? 'no' : 'yes')
     .replace(/"__BRAIN_PROMPT__"/g, () => JSON.stringify(prompt('brain.md')))
     .replace(/"__AGENT_PROMPT__"/g, () => JSON.stringify(prompt('agent.md')))
     .replace(/"__AGENT_TOOLS__"/g, () => JSON.stringify(AGENT_TOOLS));
@@ -193,7 +197,7 @@ const TEST = "$('Normalize Inbound').first().json.is_test === true";
 // Main
 // =========================================================================
 function buildMain() {
-  const w = new Workflow('Everwake — Main (Brain + Agent)');
+  const w = new Workflow(USE_BRAIN ? 'Everwake — Main (Brain + Agent)' : 'Everwake — Main (Writer only)');
   w.add(sticky('Sticky — Overview', [
     '## EVERWAKE — one WhatsApp ordering engine for every restaurant',
     'The Seagull pipeline, multi-restaurant. **Intake** finds the restaurant from the Evolution instance (and its webhook token), the customer from any identity (number or private id), and routes the message: **agent** · **human** (a person took over — the inbox shows it) · **paused** (the agent is OFF: one warm apology, remembered for "we\'re back") · **not live** (still onboarding: only test numbers) · **from the phone** (logged so the agent sees what staff wrote).',
@@ -659,7 +663,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     details: 'everwake-tool-save-customer-details.json', reservation: 'everwake-tool-manage-reservation.json',
     outbox: 'everwake-outbox.json', test: 'everwake-test-runner.json'
   };
+  // the writer-only build writes its own Main only (the tools, outbox and test runner are the same)
+  if (!USE_BRAIN) files.main = 'everwake-main-writer-only.json';
   for (const [k, build] of Object.entries(workflows)) {
+    if (!USE_BRAIN && k !== 'main') continue;
     const w = build();
     // every connection must point at a node that exists
     const names = new Set(w.nodes.map(n => n.name));

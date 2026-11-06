@@ -124,6 +124,10 @@ The workflows are generated. To change the engine:
 
 `EW_MODEL`, `EW_PG_CRED_ID` and `EW_OPENAI_CRED_ID` set the model and credential ids at build time.
 `EW_BRAIN_EFFORT` (default `low`) and `EW_AGENT_EFFORT` (default `low`) set how hard each step thinks; the developer page overrides them per restaurant.
+`npm run build` writes two Mains; import either one and switch between them (only one can be active, they share the webhook):
+- `everwake-main.json`, "Everwake — Main (Brain + Agent)": a planning step, then the writer, each at the effort set on the developer page.
+- `everwake-main-writer-only.json`, "Everwake — Main (Writer only)": no planning step, the writer thinks at medium (fixed in the workflow; the developer page's "Reply thinks" does not change it). The ❤️ and details-by-code shortcuts work the same.
+
 `EW_MODEL` defaults to `gpt-6-luna` for both the Brain and the Agent. Every OpenAI node (Brain, Agent Call, Transcribe, Look At Photo) uses the n8n OpenAI credential, and every call's usage is saved by the workflow itself.
 `engine/n8n-ids.json` holds the ids n8n gave Main and the three tools (`{ "main": "…", "cart": "…", "details": "…", "reservation": "…" }`, from each workflow's address). With it, a re-imported Main keeps its tools linked: without it the tool nodes say `SET_AFTER_IMPORT` again and the agent can't touch the cart.
 

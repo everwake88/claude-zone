@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Builds the Everwake n8n workflows from src/ and prompts/, and tests them against a real database.",
   "scripts": {
-    "build": "node build.mjs",
+    "build": "node build.mjs && EW_BRAIN=off node build.mjs",
     "test": "node --test --test-concurrency=1 test/*.test.mjs"
   },
   "devDependencies": {

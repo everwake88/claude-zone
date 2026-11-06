@@ -1590,3 +1590,25 @@ test('an address with a villa: its number is the building, and no floor or flat 
   assert.notEqual(askedNext, 'address', 'nothing more is asked about the address');
   assert.doesNotMatch(t.outbound[0].text, /العمارة|الدور|الشقة/);
 });
+
+test('the writer-only Main: no planning step, the writer thinks at medium whatever the developer page says', async () => {
+  const w = JSON.parse(readFileSync(new URL('../dist/everwake-main-writer-only.json', import.meta.url), 'utf8'));
+  assert.equal(w.name, 'Everwake — Main (Writer only)', 'its own name: imported next to the two-step Main');
+  const names = new Set(w.nodes.map(n => n.name));
+  for (const n of ['Brain Request', 'Brain (OpenAI)', 'Brain Result', 'Route: Plan First?']) assert.ok(!names.has(n), n);
+  for (const n of ['Route Without AI', 'Save Details (code)', 'Evolution — Send Reaction', 'Record AI Usage']) assert.ok(names.has(n), 'kept: ' + n);
+  assert.deepEqual(w.connections['Route: Which Way?'].main[0].map(c => c.node), ['Attach Plan'], 'the AI path goes straight to the writer');
+  // run its own Agent Request code: the restaurant's settings say low, this Main still asks for medium
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const code = w.nodes.find(n => n.name === 'Agent Request').parameters.jsCode;
+  const nodes = { 'Route Without AI': { ai_settings: { agent_effort: 'low', agent_model: null } }, Intake: { r: { tenant_id: 't1' } },
+                  'Attach Plan': { steady_text: 'BUSINESS FACTS\n=== MENU ===', chat_blocks: ['chat'], agent_rest: 'FACTS FOR THIS TURN' } };
+  const $ = (n) => ({ first: () => ({ json: nodes[n] }) });
+  const out = await new AsyncFunction('$input', '$', 'Buffer', code)({ first: () => ({ json: {} }) }, $, Buffer);
+  assert.equal(out[0].json.body.reasoning.effort, 'medium');
+  assert.equal(out[0].json.body.model, 'gpt-6-luna');
+  // and the two-step Main still follows the developer page
+  const two = JSON.parse(readFileSync(new URL('../dist/everwake-main.json', import.meta.url), 'utf8'));
+  const out2 = await new AsyncFunction('$input', '$', 'Buffer', two.nodes.find(n => n.name === 'Agent Request').parameters.jsCode)({ first: () => ({ json: {} }) }, $, Buffer);
+  assert.equal(out2[0].json.body.reasoning.effort, 'low');
+});
