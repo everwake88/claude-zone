@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowUpRight, Plus, Fingerprint } from 'lucide-react';
+import { ArrowUpRight, Plus, Fingerprint, Bot, BotOff } from 'lucide-react';
 import { getT, requireUser } from '@/lib/auth';
 import { one } from '@/lib/db';
 import { askedFields, type Settings } from '@/lib/settings';
@@ -145,7 +145,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
         {/* the agent herself */}
         <section className={`card agent rise${s.agent_enabled ? '' : ' off'}`} style={{ ['--i' as string]: 7 }} aria-labelledby="ag-h">
-          <div className="face" aria-hidden="true">{[...(s.agent_name || 'ن')][0]}</div>
+          <div className="face" aria-hidden="true">{s.agent_enabled ? <Bot /> : <BotOff />}</div>
           <h2 id="ag-h">{s.agent_name}</h2>
           <p className="role">{t('ag.role', { company: s.company_name })}</p>
           <span className={`pill state ${s.agent_enabled ? 'pos' : ''}`}>
