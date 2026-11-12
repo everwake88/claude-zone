@@ -65,7 +65,7 @@ export function IdentityForm({ initial, w, p }: { initial: S; w: Record<string, 
               </div>
             </div>
             <label style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
-              <input type="checkbox" name="work_id_digits_only" defaultChecked={s.work_id_digits_only} style={{ width: 16, height: 16, accentColor: 'var(--text)' }} />
+              <input type="checkbox" name="work_id_digits_only" defaultChecked={s.work_id_digits_only} style={{ width: 16, height: 16, accentColor: 'var(--sage)' }} />
               {w.digitsOnly}
             </label>
             <div className="field">

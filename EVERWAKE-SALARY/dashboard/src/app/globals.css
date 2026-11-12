@@ -84,7 +84,7 @@ input, textarea { caret-color: var(--sage); }
 
 /* ---- the shell: a floating rail, the page, the header cluster ------------------------- */
 .app { display: grid; grid-template-columns: 108px minmax(0, 1fr); min-height: 100vh; }
-.rail-col { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 24px 0 20px; }
+.rail-col { position: sticky; top: 0; z-index: 20; height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 24px 0 20px; }
 .rail-mark { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; transition: transform 160ms var(--ease-press); }
 .rail-mark:active { transform: scale(0.95); }
 .rail { flex: 1; width: 68px; display: flex; flex-direction: column; justify-content: space-between; align-items: center;
@@ -236,7 +236,8 @@ a.card { transition: transform 260ms var(--ease-out), box-shadow 260ms var(--eas
 
 .agent { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 22px var(--pad) var(--pad); }
 .agent .face { position: relative; display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%;
-  background: var(--sage-tint); color: var(--sage-deep); font-size: 30px; font-weight: 600; }
+  background: var(--sage-tint); color: var(--sage-deep); }
+.agent .face svg { width: 38px; height: 38px; stroke-width: 1.6; }
 .agent .face::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--sage-mid); opacity: 0.6;
   animation: breathe 3.2s ease-in-out infinite; }
 .agent.off .face { background: var(--raised); color: var(--muted); }
