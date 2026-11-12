@@ -2,6 +2,7 @@ import { getT } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
 import { IdentityForm } from '@/components/IdentityForm';
 import type { Key } from '@/lib/i18n';
+import { PageHeader } from '@/components/PageHeader';
 
 export default async function Identity() {
   const { t } = await getT();
@@ -20,12 +21,7 @@ export default async function Identity() {
           work_id_min_length, work_id_max_length, verified_hours } = s;
   return (
     <div className="page">
-      <div className="title-row">
-        <div>
-          <h1>{t('id.title')}</h1>
-          <p className="sub">{t('id.sub')}</p>
-        </div>
-      </div>
+      <PageHeader title={t('id.title')} sub={t('id.sub')} />
       <IdentityForm w={w} p={p} initial={{ ask_full_name, ask_national_id, ask_work_id, ask_phone, phone_must_match_sender, hidden_number_ask_phone, name_min_words,
         work_id_digits_only, work_id_min_length, work_id_max_length, verified_hours }} />
     </div>

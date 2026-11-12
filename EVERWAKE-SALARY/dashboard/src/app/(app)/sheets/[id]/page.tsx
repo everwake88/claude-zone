@@ -7,6 +7,7 @@ import { getSettings, askedFields, FIELDS } from '@/lib/settings';
 import { cell, count, dateTime, isNumeric } from '@/lib/format';
 import { periodLabel, type Key } from '@/lib/i18n';
 import { SheetForm, PublishButton, DeleteForm } from '@/components/SheetForms';
+import { PageHeader } from '@/components/PageHeader';
 
 const PAGE = 100;
 type Sheet = { id: string; period: string; title: string; status: string; columns: { key: string; header: string; visible: boolean }[];
@@ -49,22 +50,15 @@ export default async function SheetPage({ params, searchParams }: { params: Prom
 
   return (
     <div className="page">
-      <div className="title-row">
-        <div>
-          <Link className="crumb" href="/sheets"><Back aria-hidden="true" />{t('sd.back')}</Link>
-          <h1>{month}</h1>
-          <p className="sub">{sheet.status === 'published' ? t('sd.publishedNote', { date: dateTime(lang, sheet.published_at) }) : t('sd.draftNote')}
-            <span className="small ltr" style={{ display: 'block', color: 'var(--faint)' }}>{sheet.file_name}</span></p>
-        </div>
-        {sheet.status !== 'published' && (
-          <div className="actions">
-            <PublishButton id={id} label={t('sd.publish', { month })} pending={t('sd.publishing')} disabled={!hasId} />
-          </div>
-        )}
-      </div>
+      <PageHeader
+        crumb={<Link className="crumb" href="/sheets"><Back aria-hidden="true" />{t('sd.back')}</Link>}
+        title={month}
+        sub={<>{sheet.status === 'published' ? t('sd.publishedNote', { date: dateTime(lang, sheet.published_at) }) : t('sd.draftNote')}
+             <span className="small ltr" style={{ display: 'block', color: 'var(--muted)' }}>{sheet.file_name}</span></>}
+        actions={sheet.status !== 'published' ? <PublishButton id={id} label={t('sd.publish', { month })} pending={t('sd.publishing')} disabled={!hasId} /> : undefined} />
 
       {(!hasId || missingAsked.length > 0 || (existing && sheet.status !== 'published')) && (
-        <div className="stack" style={{ gap: 8 }}>
+        <div className="stack rise" style={{ gap: 8, ['--i' as string]: 1 }}>
           {!hasId && <p className="notice neg"><TriangleAlert aria-hidden="true" />{t('sd.needId')}</p>}
           {missingAsked.map((f) => <p key={f} className="notice"><TriangleAlert aria-hidden="true" />{t('sd.needAsked', { field: t(`f.${f}`) })}</p>)}
           {existing && sheet.status !== 'published' && <p className="notice plain">{t('sh.replaceWarn', { month })}</p>}
@@ -77,7 +71,7 @@ export default async function SheetPage({ params, searchParams }: { params: Prom
         fields: Object.fromEntries(FIELDS.map((f) => [f, t(`f.${f}`)]))
       }} />
 
-      <section className="panel" id="rows" aria-labelledby="rows-h">
+      <section className="panel rise" style={{ ['--i' as string]: 3 }} id="rows" aria-labelledby="rows-h">
         <div className="panel-head">
           <h2 id="rows-h">{t('sd.rows')}</h2>
           <span className="meta">{t('sd.rowsSub', { n: count(lang, sheet.row_count), p: count(lang, sheet.problem_count) })}</span>

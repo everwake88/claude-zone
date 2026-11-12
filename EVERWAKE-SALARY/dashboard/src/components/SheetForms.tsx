@@ -9,7 +9,7 @@ export function SheetForm({ id, title, columns, identity, words }: { id: string;
   return (
     <ActionForm action={saveSheet} className="grid-2">{(state) => (<>
       <input type="hidden" name="id" value={id} />
-      <section className="panel" aria-labelledby="map-h">
+      <section className="panel rise" style={{ ['--i' as string]: 2 }} aria-labelledby="map-h">
         <div className="panel-head"><h2 id="map-h">{words.identity}</h2></div>
         <div className="panel-body form">
           <p className="hint">{words.identitySub}</p>
@@ -30,7 +30,7 @@ export function SheetForm({ id, title, columns, identity, words }: { id: string;
           </div>
         </div>
       </section>
-      <section className="panel" aria-labelledby="cols-h">
+      <section className="panel rise" style={{ ['--i' as string]: 2 }} aria-labelledby="cols-h">
         <div className="panel-head"><h2 id="cols-h">{words.columns}</h2><span className="meta num">{columns.filter((c) => c.visible).length}/{columns.length}</span></div>
         <div className="panel-body form">
           <p className="hint">{words.columnsSub}</p>

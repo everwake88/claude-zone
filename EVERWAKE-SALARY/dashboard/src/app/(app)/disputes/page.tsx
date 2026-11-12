@@ -6,6 +6,9 @@ import { periodLabel } from '@/lib/i18n';
 import { resolveDispute } from '../../actions';
 import { ReplyForm } from '@/components/ReplyForm';
 import { Submit } from '@/components/Submit';
+import { PageHeader } from '@/components/PageHeader';
+import { Segmented } from '@/components/Segmented';
+import { LiveRefresh } from '@/components/LiveRefresh';
 
 type D = { id: string; ticket_no: number; employee_name: string | null; item: string; details: string; period: string | null; status: string;
            hr_note: string; created_at: string; resolved_at: string | null; resolver: string | null; conversation_id: string; person_key: string | null };
@@ -31,18 +34,14 @@ export default async function Disputes({ searchParams }: { searchParams: Promise
 
   return (
     <div className="page">
-      <div className="title-row">
-        <div>
-          <h1>{t('dp.title')}</h1>
-          <p className="sub">{t('dp.sub')}</p>
-        </div>
+      <PageHeader title={t('dp.title')} sub={t('dp.sub')} live={<LiveRefresh label={t('hd.live')} />} />
+      <div className="rise" style={{ ['--i' as string]: 1 }}>
+        <Segmented label={t('dp.title')} current={tab} options={[
+          { key: 'open', href: tabHref('open'), label: <>{t('dp.open')}<span className="n num">{count(lang, counts?.open ?? 0)}</span></> },
+          { key: 'resolved', href: tabHref('resolved'), label: <>{t('dp.resolved')}<span className="n num">{count(lang, counts?.resolved ?? 0)}</span></> }]} />
       </div>
-      <nav className="tabs" aria-label={t('dp.title')}>
-        <Link href={tabHref('open')} aria-current={tab === 'open' ? 'page' : undefined}>{t('dp.open')}<span className="n num">{count(lang, counts?.open ?? 0)}</span></Link>
-        <Link href={tabHref('resolved')} aria-current={tab === 'resolved' ? 'page' : undefined}>{t('dp.resolved')}<span className="n num">{count(lang, counts?.resolved ?? 0)}</span></Link>
-      </nav>
       <div className="split">
-        <section className="panel" aria-label={t('dp.title')} style={{ padding: 6 }}>
+        <section className="panel rise" aria-label={t('dp.title')} style={{ padding: 6, ['--i' as string]: 2 }}>
           {list.length === 0 ? <p className="empty" style={{ margin: 8 }}>{tab === 'open' ? t('dp.none') : t('dp.noneResolved')}</p> : (
             <ul className="list picklist">
               {list.map((d) => (
@@ -59,7 +58,7 @@ export default async function Disputes({ searchParams }: { searchParams: Promise
         </section>
 
         {!sel ? <p className="empty detail-empty">{t('dp.pick')}</p> : (
-          <section className="panel" aria-labelledby="d-h">
+          <section className="panel rise" style={{ ['--i' as string]: 3 }} aria-labelledby="d-h">
             <div className="panel-head">
               <h2 id="d-h">{sel.employee_name || '—'}</h2>
               <span className="meta num">{t('dp.ticket', { n: sel.ticket_no })} · {dateTime(lang, sel.created_at)}</span>

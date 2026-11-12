@@ -222,3 +222,13 @@ export async function resolveDispute(fd: FormData) {
            where id = $1`, [str(fd, 'id'), reopen ? 'open' : 'resolved', str(fd, 'note'), user.uid]);
   revalidatePath('/', 'layout');
 }
+
+// the agent on or off from its card on Overview
+export async function setAgent(on: boolean): Promise<{ ok: boolean }> {
+  const user = await requireUser();
+  try {
+    await q('update salary.settings set agent_enabled = $1, updated_at = now(), updated_by = $2', [on === true, user.uid]);
+  } catch { return { ok: false }; }
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}

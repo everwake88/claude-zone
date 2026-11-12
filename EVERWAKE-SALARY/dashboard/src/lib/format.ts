@@ -45,3 +45,18 @@ export function phone(waOrPhone: string | null): string {
   const local = d.replace(/^20(1\d{9})$/, '0$1');
   return /^01\d{9}$/.test(local) ? `${local.slice(0, 4)} ${local.slice(4, 7)} ${local.slice(7)}` : d;
 }
+
+// Names as people say them: "عبد الرحمن" and "أبو بكر" are one name, not two.
+export function nameParts(full: string): string[] {
+  const w = String(full || '').trim().split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (let i = 0; i < w.length; i++) {
+    if (/^(عبد|ابو|أبو|abd|abdel|abu)$/i.test(w[i]) && w[i + 1]) { out.push(`${w[i]} ${w[i + 1]}`); i++; }
+    else out.push(w[i]);
+  }
+  return out;
+}
+export const firstName = (full: string) => nameParts(full)[0] || '';
+export const initials = (full: string) => nameParts(full).slice(0, 2).map((p) => [...p][0]).join('').toUpperCase() || '؟';
+// a stable pale tint per person (four families, far apart), for their initials
+export const tint = (name: string) => `tint-${[...String(name || '')].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % 4}`;
