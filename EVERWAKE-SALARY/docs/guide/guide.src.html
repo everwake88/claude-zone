@@ -498,7 +498,7 @@ var CHAT_SUB = ['مساعدة الموارد البشرية • شركة الن�
 var G = {
   a:{label:['المساعد على واتساب','The assistant on WhatsApp'], c:'var(--gold-l)'},
   b:{label:['لوحة الموارد البشرية','The HR dashboard'], c:'var(--teal-l)'},
-  c:{label:['تحت الغطا: الخصوصية والبناء','Under the hood: privacy and build'], c:'var(--sky)'}
+  c:{label:['تحت الغطا: الخصوصية','Under the hood: privacy'], c:'var(--sky)'}
 };
 
 var FR = {
@@ -968,34 +968,6 @@ var DOCS = [
            ['البيانات المطلوبة للتحقق','Which details are required'],
            ['شرط رقم الواتساب','The WhatsApp-number rule'],
            ['تشغيل وإيقاف المساعد','Turning the assistant on and off']]}
-  ]
-},
-{
-  id:'engine', g:'c',
-  short:['البناء','How it is built'],
-  name:['متبني إزاي','How it is built'],
-  tag:['واتساب، <bdi>n8n</bdi>، <bdi>GPT-6 Luna</bdi>، <bdi>PostgreSQL</bdi>، ولوحة على <bdi>Vercel</bdi>','WhatsApp, n8n, GPT-6 Luna, PostgreSQL, and a dashboard on Vercel'],
-  frames:[
-    {type:'intro', num:3, suf:['أدوات','tools'],
-     label:['المساعد معاه ٣ أدوات بس، وكل واحدة بتتنفذ جوه قاعدة البيانات','The assistant has only three tools, and each one runs inside the database'],
-     pts:[['<bdi>verify_identity</bdi>: فحص الصيغ والمطابقة','verify_identity: the format checks and the match'],
-          ['<bdi>get_payslip</bdi>: صف الموظف المتحقق منه','get_payslip: the verified employee’s row'],
-          ['<bdi>escalate_to_hr</bdi>: فتح طلب اعتراض','escalate_to_hr: open a dispute ticket']]},
-    {type:'flow', label:['الأجزاء','The parts'], nodes:[
-      [['واتساب','WhatsApp'],['<bdi>Evolution API</bdi> دلوقتي • <bdi>WhatsApp Cloud API</bdi> بعدين','Evolution API today • WhatsApp Cloud API later']],
-      [['<bdi>n8n</bdi>','n8n'],['مسار واحد: استقبال، صوت وصور، انتظار، المساعد، إرسال','One workflow: intake, voice and photos, the wait, the assistant, sending']],
-      [['<bdi>OpenAI</bdi>','OpenAI'],['<bdi>GPT-6 Luna</bdi> للكلام والصور • <bdi>gpt-transcribe</bdi> للصوت','GPT-6 Luna for text and photos • gpt-transcribe for voice']],
-      [['<bdi>PostgreSQL</bdi>','PostgreSQL'],['الكشوف، المحادثات، وكل القواعد','The sheets, the chats and all the rules']],
-      [['لوحة الموارد البشرية','The HR dashboard'],['<bdi>Next.js</bdi> على <bdi>Vercel</bdi>، عربي وإنجليزي','Next.js on Vercel, Arabic and English']]]},
-    {type:'specs', label:['النماذج','The models'],
-     rows:[[['المحادثة','Conversation'],['<bdi>GPT-6 Luna</bdi> بتفكير منخفض: سريع واقتصادي','GPT-6 Luna at low reasoning: fast and economical']],
-           [['الصور','Photos'],['<bdi>GPT-6 Luna</bdi> (رؤية)','GPT-6 Luna (vision)']],
-           [['الفويس نوت','Voice notes'],['<bdi>gpt-transcribe</bdi>','gpt-transcribe']],
-           [['القرارات المهمة','The decisions that matter'],['كود في قاعدة البيانات، مش النموذج','Code in the database, not the model']]]},
-    {type:'checks', label:['متجرّب إزاي','How it is tested'],
-     wins:[['اختبارات لقاعدة البيانات: الصيغ، المطابقة، ومنع أي معلومة قبل التحقق','Database tests: formats, matching, and nothing shared before verification'],
-           ['محادثات كاملة بتتشغل على نفس كود المسار','Whole chats run through the same workflow code'],
-           ['اللوحة متراجعة عربي وإنجليزي، كمبيوتر وموبايل','The dashboard reviewed in Arabic and English, on desktop and phone']]}
   ]
 }
 ];
