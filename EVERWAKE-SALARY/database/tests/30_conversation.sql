@@ -18,6 +18,10 @@ begin
   assert (salary.claim_turn(conv, m1) ->> 'go')::boolean = false, 'superseded';
   assert (salary.claim_turn(conv, m2) ->> 'go')::boolean, 'newest claims';
 
+  -- a run still thinking about m1 sees m2 arrived: it stops; m2's run goes on
+  assert (salary.still_newest(conv, m1) ->> 'go')::boolean = false, 'm1 superseded';
+  assert (salary.still_newest(conv, m2) ->> 'go')::boolean, 'm2 newest';
+
   ctx := salary.turn_context(conv, m2);
   assert ctx -> 'asked_fields' = '["full_name","national_id","work_id"]', ctx::text;
   assert (ctx ->> 'verified')::boolean = false;
@@ -66,6 +70,7 @@ begin
   assert salary.escalate_to_hr(conv, '{"period":"2026-10","item":"خصم تأخير","details":"ولا يوم 15"}') ->> 'status' = 'added_to_open_ticket';
   assert (select count(*) from salary.disputes where conversation_id = conv) = 1;
   assert (select employee_name from salary.disputes where conversation_id = conv) = 'أحمد محمد عبد الله السيد';
+  assert jsonb_array_length(salary.turn_context(conv, m2) -> 'open_tickets') = 1, 'the open ticket is in the turn';
 
   -- the reply: logged, the two messages answered, the turn released
   perform salary.log_reply(jsonb_build_object('conversation_id', conv, 'text', 'تمام', 'upto_message_id', m2));

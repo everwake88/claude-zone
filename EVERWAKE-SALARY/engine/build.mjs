@@ -157,8 +157,11 @@ export function buildMain() {
   w.add(pg('Intake', b64sql('salary.intake($JSON)').replace('$2', '$1'), '={{ [ $json.b64_intake ] }}', [-1200, -20]));
   w.add(iff('Route: To The Agent?', "$json.r.route === 'agent'", [-1000, -20]));
   w.add(noop('Exit: Not For The Agent', [-800, 200]));
-  w.add({ ...evo('Evolution — Typing', 'chat/sendPresence', `{ number: $('Intake').first().json.r.reply_to, delay: 20000, presence: 'composing' }`,
-                 [-800, -20], { timeout: 1500, retry: false }), notes: 'Never waited for: 1.5 s at most.', notesInFlow: true });
+  // "typing…" on the employee's phone the moment the message lands, and again when the agent starts
+  // thinking (WhatsApp drops it after the delay, so a voice note plus a long turn would otherwise lose it)
+  const TYPING = `{ number: $('Intake').first().json.r.reply_to, delay: 30000, presence: 'composing' }`;
+  w.add({ ...evo('Evolution — Typing', 'chat/sendPresence', TYPING, [-800, -20], { timeout: 1500, retry: false }),
+          notes: 'Never waited for: 1.5 s at most.', notesInFlow: true });
 
   // a voice note or a photo: understood before the turn
   w.add(iff('Route: Voice Note Or Photo?', `!!${NI}.media`, [-600, -20]));
@@ -194,9 +197,20 @@ export function buildMain() {
   w.add(pg('Claim Turn', 'select salary.claim_turn($1::uuid, $2::bigint) as r;', `={{ [ ${CONV}, ${MSG} ] }}`, [1400, -20]));
   w.add(iff('Route: Newest Message?', '$json.r.go === true', [1600, -20]));
   w.add(noop('Exit: A Newer Message Answers', [1800, 180]));
+  w.add({ ...evo('Evolution — Still Typing', 'chat/sendPresence', TYPING, [1700, -220], { timeout: 1500, retry: false }),
+          notes: 'Never waited for: 1.5 s at most.', notesInFlow: true });
+  // the employee wrote again while this turn was thinking: stop, the turn of their newest message answers all of it
+  const STILL = 'select salary.still_newest($1::uuid, $2::bigint) as r;';
+  w.add(pg('Still Newest? (Before AI)', STILL, `={{ [ ${CONV}, ${MSG} ] }}`, [2100, -220]));
+  w.add(iff('Route: Go On (AI)?', '$json.r.go === true', [2200, -220]));
+  w.add(pg('Still Newest? (Before Sending)', STILL, `={{ [ ${CONV}, ${MSG} ] }}`, [2950, 360]));
+  w.add(iff('Route: Go On (Send)?', '$json.r.go === true', [3050, 360]));
+  w.add(noop('Exit: They Wrote Again', [3250, 560]));
+  w.add(sticky('Sticky — They wrote again', '### They wrote again\nBefore every AI call and before sending, **Still Newest?** asks whether the employee sent another message after this one. If so, this run stops without replying, and the run of their newest message answers everything they sent, together — like a person who stops typing to read the new message.',
+               [1900, 420], 700, 150, 6));
   w.add(pg('Load Turn Context', 'select salary.turn_context($1::uuid, $2::bigint) as r;', `={{ [ ${CONV}, ${MSG} ] }}`, [1800, -20]));
   w.add(code('Agent Request', 'main/agent_request.js', [2000, -20]));
-  w.add(openai('Agent Call (OpenAI)', 'responses', '$json.body', [2200, -20]));
+  w.add(openai('Agent Call (OpenAI)', 'responses', "$('Agent Request').first().json.body", [2300, -20]));
   w.add(code('Agent Step', 'main/agent_step.js', [2400, -20]));
   const ways = ['verify_identity', 'get_payslip', 'escalate_to_hr', 'again', 'done'];
   w.add({ name: 'Route: Which Tool?', type: 'n8n-nodes-base.switch', typeVersion: 3.2, position: [2600, -20],
@@ -213,7 +227,8 @@ export function buildMain() {
   w.add(code('Agent Tool Result', 'main/agent_tool_result.js', [3100, -180]));
 
   w.add(code('Prepare Reply', 'main/prepare_reply.js', [2850, 160]));
-  w.add(evo('Evolution — Send Reply', 'message/sendText', '{ number: $json.reply_to, text: $json.text, delay: 600, linkPreview: false }', [3050, 160]));
+  w.add(evo('Evolution — Send Reply', 'message/sendText',
+            "{ number: $('Prepare Reply').first().json.reply_to, text: $('Prepare Reply').first().json.text, delay: 600, linkPreview: false }", [3250, 160]));
   w.add(code('Record Reply', 'main/record_reply.js', [3250, 160]));
   w.add(pg('Log Reply', b64sql('salary.log_reply($JSON)').replace('$2', '$1'), '={{ [ $json.b64_log ] }}', [3450, 160]));
 
@@ -232,8 +247,10 @@ export function buildMain() {
   w.link('Route: Photo?', 'Look At Photo (OpenAI)', 0); w.link('Route: Photo?', 'Media Understood', 1);
   w.link('Look At Photo (OpenAI)', 'Media Understood');
   w.chain('Media Understood', 'Save What It Said', 'Wait For More Messages', 'Claim Turn', 'Route: Newest Message?');
-  w.link('Route: Newest Message?', 'Load Turn Context', 0); w.link('Route: Newest Message?', 'Exit: A Newer Message Answers', 1);
-  w.chain('Load Turn Context', 'Agent Request', 'Agent Call (OpenAI)', 'Agent Step', 'Route: Which Tool?');
+  w.link('Route: Newest Message?', 'Evolution — Still Typing', 0); w.link('Route: Newest Message?', 'Exit: A Newer Message Answers', 1);
+  w.chain('Evolution — Still Typing', 'Load Turn Context', 'Agent Request', 'Still Newest? (Before AI)', 'Route: Go On (AI)?');
+  w.link('Route: Go On (AI)?', 'Agent Call (OpenAI)', 0); w.link('Route: Go On (AI)?', 'Exit: They Wrote Again', 1);
+  w.chain('Agent Call (OpenAI)', 'Agent Step', 'Route: Which Tool?');
   w.link('Route: Which Tool?', 'Tool: verify_identity', 0);
   w.link('Route: Which Tool?', 'Tool: get_payslip', 1);
   w.link('Route: Which Tool?', 'Tool: escalate_to_hr', 2);
@@ -241,7 +258,9 @@ export function buildMain() {
   w.link('Route: Which Tool?', 'Prepare Reply', 4);
   for (const t of ['Tool: verify_identity', 'Tool: get_payslip', 'Tool: escalate_to_hr']) w.link(t, 'Agent Tool Result');
   w.link('Agent Tool Result', 'Agent Request');
-  w.chain('Prepare Reply', 'Evolution — Send Reply', 'Record Reply', 'Log Reply');
+  w.chain('Prepare Reply', 'Still Newest? (Before Sending)', 'Route: Go On (Send)?');
+  w.link('Route: Go On (Send)?', 'Evolution — Send Reply', 0); w.link('Route: Go On (Send)?', 'Exit: They Wrote Again', 1);
+  w.chain('Evolution — Send Reply', 'Record Reply', 'Log Reply');
   return w.json();
 }
 
