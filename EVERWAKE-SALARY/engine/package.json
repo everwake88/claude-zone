@@ -1,0 +1,13 @@
+{
+  "name": "everwake-salary-engine",
+  "private": true,
+  "type": "module",
+  "description": "Builds the Everwake Salary n8n workflow from src/ and prompts/, and tests it against a real database.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs"
+  },
+  "devDependencies": {
+    "pg": "8.13.1"
+  }
+}
