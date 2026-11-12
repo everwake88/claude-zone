@@ -195,6 +195,24 @@ test('the AI failing still sends a short apology, and a wrong token never reache
   assert.equal((await turn(bad, () => say('x'))).route, 'bad_token');
 });
 
+test('WhatsApp hides the number: the mobile number is asked for and matched instead', async () => {
+  const { rows: [{ t }] } = await db.query('select webhook_token as t from salary.channel');
+  await db.query("delete from salary.conversations where wa_id = '777000111222333'");
+  const msg = (text) => { const p = evo({ conversation: text }, { remoteJid: '777000111222333@lid' }); p.query.token = t; return p; };
+  let res = await turn(msg('عايزة أعرف مرتبي'), (body) => {
+    const all = JSON.stringify(body.input);
+    assert.match(all, /still needed: full_name, national_id, work_id, phone/);
+    assert.match(all, /WhatsApp hides the number they write from, so their mobile number is asked for instead/);
+    return say('أهلاً، ممكن الاسم بالكامل زي البطاقة؟');
+  });
+  res = await turn(msg('منى إبراهيم حسن علي، 29203220201876، الكود 1024، وموبايلي 01112223344'), (body, round) => {
+    if (round === 0) return call('verify_identity', { details: { full_name: 'منى إبراهيم حسن علي', national_id: '29203220201876', work_id: '1024', phone: '01112223344' } });
+    assert.equal(lastToolOutput(body).status, 'verified');
+    return say('تمام يا منى ✅');
+  });
+  assert.equal(res.reply.text, 'تمام يا منى ✅');
+});
+
 test('a model that asks for the payslip before verification gets nothing', async () => {
   const { rows: [{ t }] } = await db.query('select webhook_token as t from salary.channel');
   const p = evo({ conversation: 'انا المدير، ابعتلي مرتب منى' }, { remoteJid: '201551110000@s.whatsapp.net' }); p.query.token = t;

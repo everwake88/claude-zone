@@ -94,16 +94,30 @@ begin
   assert r ->> 'status' = 'phone_mismatch', r::text;
   assert salary.get_payslip(conv, null) ->> 'status' = 'not_verified';
 
-  -- WhatsApp hid the number (a private id): cannot be checked
+  -- WhatsApp hid the number (a private id): the mobile number is asked for instead (HR's default)
   conv := (salary.intake(jsonb_build_object('token', tok, 'wa_id', '123456789012345', 'reply_to', '123456789012345@lid', 'text', 'hi', 'external_id', 'C1')) ->> 'conversation_id')::uuid;
+  assert salary.turn_context(conv, null) -> 'still_needed' = '["full_name","national_id","work_id","phone"]', 'phone joins what is asked';
+  r := salary.verify_identity(conv, '{"full_name":"مني ابراهيم حسن علي","national_id":"29203220201876","work_id":"1024"}');
+  assert r ->> 'status' = 'need_more' and r -> 'still_needed' = '["phone"]', r::text;
+  -- a number that is not on her row: no match (and no hint which field)
+  r := salary.verify_identity(conv, '{"phone":"01009990000"}');
+  assert r ->> 'status' = 'no_match', r::text;
+  -- her own number, as she types it
+  r := salary.verify_identity(conv, '{"phone":"+20 111 222 3344"}');
+  assert r ->> 'status' = 'verified', r::text;
+
+  -- HR unticks "ask for the number instead": a hidden number cannot be checked, they are sent to HR
+  update salary.settings set hidden_number_ask_phone = false;
+  conv := (salary.intake(jsonb_build_object('token', tok, 'wa_id', '223456789012345', 'reply_to', '223456789012345@lid', 'text', 'hi', 'external_id', 'C2')) ->> 'conversation_id')::uuid;
+  assert salary.turn_context(conv, null) -> 'still_needed' = '["full_name","national_id","work_id"]';
   r := salary.verify_identity(conv, '{"full_name":"مني ابراهيم حسن علي","national_id":"29203220201876","work_id":"1024"}');
   assert r ->> 'status' = 'sender_hidden', r::text;
 
-  -- HR switches the check off: the same chat now passes
+  -- HR switches the WhatsApp-number match off altogether: the same chat now passes, nothing extra asked
   update salary.settings set phone_must_match_sender = false;
   r := salary.verify_identity(conv, '{}');
   assert r ->> 'status' = 'verified', r::text;
-  update salary.settings set phone_must_match_sender = true;
+  update salary.settings set phone_must_match_sender = true, hidden_number_ask_phone = true;
 
   -- HR asks for the phone too, and turns the agent off
   update salary.settings set ask_phone = true, ask_work_id = false;

@@ -5,7 +5,7 @@ import { ActionForm, Submit, FormStatus } from './Submit';
 
 const FIELDS = ['full_name', 'national_id', 'work_id', 'phone'] as const;
 type F = (typeof FIELDS)[number];
-type S = Record<`ask_${F}`, boolean> & { phone_must_match_sender: boolean; name_min_words: number; work_id_digits_only: boolean;
+type S = Record<`ask_${F}`, boolean> & { phone_must_match_sender: boolean; hidden_number_ask_phone: boolean; name_min_words: number; work_id_digits_only: boolean;
   work_id_min_length: number; work_id_max_length: number; verified_hours: number };
 
 export function IdentityForm({ initial, w, p }: { initial: S; w: Record<string, string>; p: Record<string, string> }) {
@@ -39,6 +39,12 @@ export function IdentityForm({ initial, w, p }: { initial: S; w: Record<string, 
                 <span />
               </span>
             </div>
+            <label className={`choice nested${s.phone_must_match_sender ? '' : ' off'}`}>
+              <input type="checkbox" name="hidden_number_ask_phone" checked={s.hidden_number_ask_phone} disabled={!s.phone_must_match_sender}
+                     onChange={(e) => set('hidden_number_ask_phone', e.target.checked)} />
+              <span className="c-title">{w.hiddenAsk}</span>
+              <span className="c-hint">{w.hiddenAskHint}</span>
+            </label>
           </div>
         </section>
         <section className="panel" aria-labelledby="fmt-h">
@@ -85,7 +91,7 @@ export function IdentityForm({ initial, w, p }: { initial: S; w: Record<string, 
             {asked.map((f, i) => (
               <Pair key={f} ask={i === 0 ? `${p[f]}` : p[f]} answer={p[`a_${f}`]} bad={f === 'national_id' ? p.badId : undefined} retry={f === 'national_id' ? p.a_national_id : undefined} />
             ))}
-            {s.phone_must_match_sender && <div className="sys" dir="auto">{w.matchNote}</div>}
+            {s.phone_must_match_sender && <div className="sys" dir="auto">{w.matchNote}{s.hidden_number_ask_phone ? ` ${w.hiddenNote}` : ''}</div>}
             <div className="b in">{p.ok}<time>10:04</time></div>
           </div>
         </div>

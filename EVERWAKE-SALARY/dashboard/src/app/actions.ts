@@ -138,10 +138,12 @@ export async function saveIdentity(_: FormState, fd: FormData): Promise<FormStat
   const max = Math.min(40, Math.max(min, int(fd, 'work_id_max_length', 20)));
   await q(`update salary.settings set ask_full_name = $1, ask_national_id = $2, ask_work_id = $3, ask_phone = $4,
              phone_must_match_sender = $5, name_min_words = $6, work_id_digits_only = $7, work_id_min_length = $8,
-             work_id_max_length = $9, verified_hours = $10, updated_at = now(), updated_by = $11`,
+             work_id_max_length = $9, verified_hours = $10, updated_at = now(), updated_by = $11,
+             -- the fallback only means something while the match is on; switching the match off keeps it as it was
+             hidden_number_ask_phone = case when $5 then $12 else hidden_number_ask_phone end`,
     [bool(fd, 'ask_full_name'), nid, wid, bool(fd, 'ask_phone'), bool(fd, 'phone_must_match_sender'),
      Math.min(6, Math.max(1, int(fd, 'name_min_words', 3))), bool(fd, 'work_id_digits_only'), min, max,
-     Math.min(720, Math.max(0, int(fd, 'verified_hours', 24))), user.uid]);
+     Math.min(720, Math.max(0, int(fd, 'verified_hours', 24))), user.uid, bool(fd, 'hidden_number_ask_phone')]);
   revalidatePath('/', 'layout');
   return { ok: true, message: t('id.saved') };
 }

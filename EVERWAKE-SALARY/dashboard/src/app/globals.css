@@ -241,6 +241,10 @@ table.t { width: 100%; border-collapse: collapse; }
 .choice input { grid-row: 1 / span 2; margin: 2px 0 0; width: 18px; height: 18px; accent-color: var(--text); cursor: pointer; }
 .choice .c-title { font-weight: 500; }
 .choice .c-hint { grid-column: 2; font-size: 13px; color: var(--muted); }
+/* a choice that belongs to the switch above it: indented under it, quiet while the switch is off */
+.choice.nested { margin-inline-start: 0; padding-top: 0; border-top: 0; }
+.choice.nested.off { cursor: default; }
+.choice.nested.off .c-title, .choice.nested.off .c-hint { color: var(--faint); }
 
 /* a switch */
 .switch-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--rule); }

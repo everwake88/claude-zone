@@ -28,6 +28,9 @@ create table if not exists salary.settings (
   ask_phone               boolean not null default false,
   -- the phone on the payroll row must be the WhatsApp number the employee writes from
   phone_must_match_sender boolean not null default true,
+  -- …and when WhatsApp hides that number (a private "@lid" id): ask for the mobile number and
+  -- match what they type with the payroll row instead (off = send them to HR)
+  hidden_number_ask_phone boolean not null default true,
   -- formats
   name_min_words          int     not null default 3 check (name_min_words between 1 and 6),
   work_id_digits_only     boolean not null default false,
@@ -45,6 +48,8 @@ create table if not exists salary.settings (
   constraint work_id_lengths check (work_id_min_length <= work_id_max_length)
 );
 insert into salary.settings (id) values (true) on conflict do nothing;
+-- added after the first release: a database built before it gets the column here
+alter table salary.settings add column if not exists hidden_number_ask_phone boolean not null default true;
 
 -- ---- the WhatsApp line ---------------------------------------------------------------------
 create table if not exists salary.channel (

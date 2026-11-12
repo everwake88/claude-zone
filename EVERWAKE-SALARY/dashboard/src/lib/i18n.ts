@@ -53,6 +53,7 @@ export const en = {
   'ov.asks': 'Before any salary detail, the agent asks for',
   'ov.change': 'Change',
   'ov.phoneMatch': 'and the WhatsApp number must be the one on the payroll row',
+  'ov.phoneMatchHidden': 'and the WhatsApp number must be the one on the payroll row (if WhatsApp hides it, the mobile number is asked for)',
 
   // sheets list
   'sh.title': 'Payroll sheets',
@@ -142,6 +143,9 @@ export const en = {
   'id.needOne': 'Keep the national ID or the work ID ticked: a name alone proves too little.',
   'id.match': 'The WhatsApp number they write from must be the number on their payroll row',
   'id.matchHint': 'Stops someone who knows a colleague’s details from reading their salary. Needs a phone column in the sheet.',
+  'id.hiddenAsk': 'If WhatsApp hides their number, ask for their mobile number instead',
+  'id.hiddenAskHint': 'WhatsApp sometimes shows a private ID instead of the number. Ticked: the agent asks for the mobile number and matches it with the payroll row. Unticked: the agent sends them to HR.',
+  'id.p.hiddenNote': 'If WhatsApp hides it, the agent asks for the mobile number instead.',
   'id.formats': 'Formats',
   'id.minWords': 'Names in the full name, at least',
   'id.digitsOnly': 'Work IDs are digits only',
@@ -314,6 +318,7 @@ export const ar: Record<Key, string> = {
   'ov.asks': 'قبل أي تفاصيل عن المرتب، المساعد بيطلب',
   'ov.change': 'تغيير',
   'ov.phoneMatch': 'ولازم رقم الواتساب يكون هو الرقم المسجل في الكشف',
+  'ov.phoneMatchHidden': 'ولازم رقم الواتساب يكون هو الرقم المسجل في الكشف (ولو واتساب خبّاه، بيتسأل عن الموبايل)',
 
   'sh.title': 'كشوف المرتبات',
   'sh.sub': 'شيت إكسل واحد لكل شهر. الموظفين يقدروا يسألوا عن الشهور المنشورة بس.',
@@ -399,6 +404,9 @@ export const ar: Record<Key, string> = {
   'id.needOne': 'خلي الرقم القومي أو كود الموظف متعلم عليه: الاسم لوحده مش كفاية.',
   'id.match': 'رقم الواتساب اللي بيكتب منه لازم يكون هو الرقم المسجل في صفه في الكشف',
   'id.matchHint': 'بيمنع حد عارف بيانات زميله إنه يشوف مرتبه. محتاج عمود موبايل في الشيت.',
+  'id.hiddenAsk': 'لو واتساب خبّى رقمه، اسأله عن رقم موبايله بدل كده',
+  'id.hiddenAskHint': 'واتساب ساعات بيظهر رقم تعريفي خاص بدل الرقم. متعلم عليه: المساعد بيسأل عن الموبايل ويطابقه مع صفه في الكشف. مش متعلم عليه: المساعد بيوجهه للموارد البشرية.',
+  'id.p.hiddenNote': 'ولو واتساب خبّى الرقم، المساعد بيسأل عن الموبايل بدل كده.',
   'id.formats': 'الصيغ',
   'id.minWords': 'عدد الأسماء في الاسم بالكامل، على الأقل',
   'id.digitsOnly': 'كود الموظف أرقام بس',

@@ -44,6 +44,9 @@ Never load `database/seed/demo.sql` in production: it is demo data for testing.
    with it), and how employees reach HR.
 5. **Identity check**: tick what the agent asks for. The default is the full name,
    the national ID and the work ID, with the WhatsApp number matched to the payroll row.
+   When WhatsApp hides an employee's number, the agent asks for their mobile number
+   and matches that instead (untick "If WhatsApp hides their number…" to send them to
+   HR). Switch the match off to skip the number check altogether.
 6. **Payroll sheets → Upload a month**: upload this month's Excel, check the columns
    on the review page (which column is the name, the national ID, the work ID, the
    phone; which columns employees may see), fix any rows it flags, and **Publish**.

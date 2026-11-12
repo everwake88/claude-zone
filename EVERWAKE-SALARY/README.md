@@ -43,6 +43,9 @@ an employee tries can get around them:
 - **An exact match** on every field HR ticked, against the newest published month.
 - **The WhatsApp number must be the number on the payroll row** (HR can switch
   this off). Someone who knows a colleague's details still can't read their salary.
+  When WhatsApp hides the sender's number (a private ID instead of the number), the
+  agent asks for the mobile number and matches what they type with the payroll row;
+  HR can untick that, and then those employees are sent to HR instead.
 - **A wrong attempt never says which field was wrong**, and the attempts log keeps
   the values masked (`••••••••••1234`).
 - **Hidden columns** (the national ID, the phone, an "HR notes" column) stay in the

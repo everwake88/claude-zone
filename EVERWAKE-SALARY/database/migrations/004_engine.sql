@@ -93,6 +93,16 @@ language sql immutable as $$
     case when s.ask_phone then 'phone' end], null)
 $$;
 
+-- what this chat must give: HR's fields, plus the mobile number when the WhatsApp number has to be
+-- matched but WhatsApp hides it (and HR allows asking for it instead)
+create or replace function salary.needed_fields(s salary.settings, c salary.conversations) returns text[]
+language sql immutable as $$
+  select case when s.phone_must_match_sender and s.hidden_number_ask_phone and c.phone is null
+                   and not 'phone' = any (salary.asked_fields(s))
+              then salary.asked_fields(s) || 'phone'::text
+              else salary.asked_fields(s) end
+$$;
+
 -- a verification older than HR's hours is dropped here (the employee is asked again)
 create or replace function salary.current_conversation(p_conv uuid) returns salary.conversations
 language plpgsql as $$
@@ -124,7 +134,7 @@ declare
 begin
   select * into s from salary.settings;
   c := salary.current_conversation(p_conv);
-  asked := salary.asked_fields(s);
+  asked := salary.needed_fields(s, c);
   verified := c.verified_at is not null;
 
   select coalesce(jsonb_agg(jsonb_build_object(
@@ -141,6 +151,7 @@ begin
     'asked_fields', to_jsonb(asked),
     'phone_must_match_sender', s.phone_must_match_sender,
     'sender_phone_known', c.phone is not null,
+    'hidden_number_ask_phone', s.hidden_number_ask_phone,
     'name_min_words', s.name_min_words,
     'verified', verified,
     'employee_name', case when verified then c.employee_name end,
@@ -166,7 +177,7 @@ begin
   select * into s from salary.settings;
   c := salary.current_conversation(p_conv);
   if c.id is null then return jsonb_build_object('status', 'error', 'error', 'no such conversation'); end if;
-  asked := salary.asked_fields(s);
+  asked := salary.needed_fields(s, c);
   if c.verified_at is not null then
     return jsonb_build_object('status', 'already_verified', 'employee_name', c.employee_name,
                               'periods', salary.person_periods(c.person_key));
@@ -216,9 +227,10 @@ begin
     else
       result := 'no_match';
     end if;
-  elsif s.phone_must_match_sender and c.phone is null then
+  elsif s.phone_must_match_sender and c.phone is null and not s.hidden_number_ask_phone then
     result := 'sender_hidden';
-  elsif s.phone_must_match_sender and hit.phone is distinct from c.phone then
+  -- (hidden number, HR allows asking: the typed mobile number already matched the row above)
+  elsif s.phone_must_match_sender and c.phone is not null and hit.phone is distinct from c.phone then
     result := 'phone_mismatch';
   else
     result := 'verified';

@@ -142,7 +142,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {asked.map((f) => <span key={f} className="pill">{t(`f.${f}`)}</span>)}
               </div>
-              {settings.phone_must_match_sender && <p className="hint" style={{ marginTop: 10 }}>{t('ov.phoneMatch')}</p>}
+              {settings.phone_must_match_sender && <p className="hint" style={{ marginTop: 10 }}>{t(settings.hidden_number_ask_phone ? 'ov.phoneMatchHidden' : 'ov.phoneMatch')}</p>}
             </div>
           </div>
         </section>
