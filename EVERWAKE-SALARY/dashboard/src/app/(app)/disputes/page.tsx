@@ -75,7 +75,7 @@ export default async function Disputes({ searchParams }: { searchParams: Promise
               </div>
               <Link className="btn sm" href={`/conversations?id=${sel.conversation_id}`} style={{ justifySelf: 'start' }}>{t('dp.chat')}</Link>
               <ReplyForm id={sel.id} words={{ reply: t('dp.reply'), hint: t('dp.replyHint'), send: t('dp.send') }} />
-              <form action={resolveDispute} className="form" style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
+              <form action={resolveDispute} className="form" style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
                 <input type="hidden" name="id" value={sel.id} />
                 {sel.status === 'open' ? (
                   <>
@@ -101,8 +101,8 @@ export default async function Disputes({ searchParams }: { searchParams: Promise
                   {row?.items?.length ? (
                     <dl className="kv">
                       {row.items.map((i) => (
-                        <div key={i.column}><dt style={i.column === sel.item ? { color: 'var(--text)', fontWeight: 600 } : undefined}>{i.column}</dt>
-                          <dd className="num" style={i.column === sel.item ? { color: 'var(--accent)' } : undefined}>{cell(lang, i.value)}</dd></div>
+                        <div key={i.column}><dt style={i.column === sel.item ? { color: 'var(--ink)', fontWeight: 600 } : undefined}>{i.column}</dt>
+                          <dd className="num" style={i.column === sel.item ? { color: 'var(--sage-deep)', fontWeight: 600 } : undefined}>{cell(lang, i.value)}</dd></div>
                       ))}
                     </dl>
                   ) : <p className="empty">{t('dp.noRow')}</p>}

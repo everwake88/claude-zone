@@ -83,7 +83,7 @@ export default async function SheetPage({ params, searchParams }: { params: Prom
               <input className="input" name="q" defaultValue={search} placeholder={t('sd.search')} aria-label={t('sd.search')} style={{ paddingInlineStart: 36 }} />
             </div>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
-              <input type="checkbox" name="bad" value="1" defaultChecked={onlyBad} style={{ width: 16, height: 16, accentColor: 'var(--text)' }} />
+              <input type="checkbox" name="bad" value="1" defaultChecked={onlyBad} style={{ width: 16, height: 16, accentColor: 'var(--sage)' }} />
               {t('sd.onlyProblems')}
             </label>
             <button className="btn sm" type="submit">{t('sd.find')}</button>
@@ -124,7 +124,7 @@ export default async function SheetPage({ params, searchParams }: { params: Prom
         )}
       </section>
 
-      <section className="section" aria-labelledby="del-h" style={{ borderTop: '1px solid var(--border)', paddingTop: 28 }}>
+      <section className="section" aria-labelledby="del-h" style={{ borderTop: '1px solid var(--line-strong)', paddingTop: 28 }}>
         <header><h2 id="del-h">{t('sd.delete')}</h2><p>{t('sd.deleteSub', { month })}</p></header>
         <DeleteForm id={id} words={{ confirm: t('sd.deleteConfirm', { month: sheet.period.slice(0, 7) }), button: t('sd.deleteBtn', { month }) }} />
       </section>

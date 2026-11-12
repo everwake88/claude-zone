@@ -42,7 +42,7 @@ export default async function Sheets({ searchParams }: { searchParams: Promise<{
                       <tr key={r.id}>
                         <td><Link className="cell-link" href={`/sheets/${r.id}`}>{periodLabel(lang, r.period)}</Link><div className="small muted">{r.title}</div></td>
                         <td className="num no-phone">{count(lang, r.row_count)}</td>
-                        <td className="num no-phone">{r.problem_count ? <span style={{ color: 'var(--negative)' }}>{count(lang, r.problem_count)}</span> : '0'}</td>
+                        <td className="num no-phone">{r.problem_count ? <span style={{ color: 'var(--neg)' }}>{count(lang, r.problem_count)}</span> : '0'}</td>
                         <td>{r.status === 'published' ? <span className="pill pos">{t('sh.published')}</span> : <span className="pill warn">{t('sh.draft')}</span>}</td>
                         <td data-l2 className="small muted">
                           <span className="only-phone">{t('sd.rowsSub', { n: count(lang, r.row_count), p: count(lang, r.problem_count) })} · </span>

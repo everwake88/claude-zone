@@ -37,7 +37,7 @@ export function SheetForm({ id, title, columns, identity, words }: { id: string;
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '4px 16px' }}>
             {columns.map((c) => (
               <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 32, cursor: 'pointer' }}>
-                <input type="checkbox" name={`show_${c.key}`} defaultChecked={c.visible} style={{ width: 16, height: 16, accentColor: 'var(--text)' }} />
+                <input type="checkbox" name={`show_${c.key}`} defaultChecked={c.visible} style={{ width: 16, height: 16, accentColor: 'var(--sage)' }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.header}</span>
               </label>
             ))}

@@ -12,7 +12,7 @@ export function Chat({ messages, lang, hrLabel }: { messages: Msg[]; lang: Lang;
         <div key={m.id} className={`b ${m.author === 'employee' ? 'in' : m.author === 'hr' ? 'hr' : 'out'}`} dir="auto">
           {m.author === 'hr' && <span className="who-tag">{hrLabel}</span>}
           {m.text}
-          <time dir="ltr">{m.send_error && <TriangleAlert aria-label={m.send_error} style={{ width: 12, height: 12, verticalAlign: '-2px', color: 'var(--negative)', marginInlineEnd: 4 }} />}{time(lang, m.created_at)}</time>
+          <time dir={lang === 'ar' ? 'rtl' : 'ltr'}>{m.send_error && <TriangleAlert aria-label={m.send_error} style={{ width: 12, height: 12, verticalAlign: '-2px', color: 'var(--neg)', marginInlineEnd: 4 }} />}{time(lang, m.created_at)}</time>
         </div>
       ))}
     </div>
