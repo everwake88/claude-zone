@@ -15,6 +15,7 @@ EVERWAKE WEBSITE/        everything for the website
   src/partials/          the shared top bar, footer, contact form and <head>
   tools/sync_chrome.py   stamps the shared parts into every page, checks links
   docs/                  how to edit, publish and go live
+EVERWAKE-SALARY/         HR salary assistant on WhatsApp + the HR dashboard — see its README
 EVERWAKE-ORDERS/         WhatsApp ordering for restaurant chains — see its README
   database/              the schema and every function the engine calls, with tests
   engine/                the n8n workflows, generated from src/ and prompts/
@@ -53,6 +54,13 @@ The WhatsApp ordering platform: one AI ordering agent serving every
 restaurant, and a dashboard each restaurant runs it from. Start at
 **[EVERWAKE-ORDERS/README.md](EVERWAKE-ORDERS/README.md)**, then
 [docs/SETUP.md](EVERWAKE-ORDERS/docs/SETUP.md) to set it up.
+
+## Everwake Salary
+
+An HR assistant on WhatsApp that answers employees' salary questions (net, deductions,
+KPIs) after checking who they are, and the dashboard HR uploads each month's payroll
+sheet from. Start at **[EVERWAKE-SALARY/README.md](EVERWAKE-SALARY/README.md)**, then
+[docs/SETUP.md](EVERWAKE-SALARY/docs/SETUP.md).
 
 ## Changing your details — start here
 
