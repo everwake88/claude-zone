@@ -11,7 +11,7 @@ const globalForPool = globalThis as unknown as { __salaryPool?: Pool };
 
 function makePool() {
   const ssl = process.env.DATABASE_SSL === 'disable' ? false : { rejectUnauthorized: process.env.DATABASE_SSL !== 'no-verify' };
-  return new Pool({ connectionString: process.env.DATABASE_URL, ssl, max: 3, idleTimeoutMillis: 10_000 });
+  return new Pool({ connectionString: process.env.DATABASE_URL, ssl, max: 5, idleTimeoutMillis: 10_000 });
 }
 export const pool = globalForPool.__salaryPool ?? (globalForPool.__salaryPool = makePool());
 

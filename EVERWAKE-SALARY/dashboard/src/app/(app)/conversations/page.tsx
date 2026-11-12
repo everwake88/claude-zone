@@ -5,6 +5,8 @@ import { q, one } from '@/lib/db';
 import { ago, phone, dateTime } from '@/lib/format';
 import type { Key } from '@/lib/i18n';
 import { Chat, type Msg } from '@/components/Chat';
+import { PageHeader } from '@/components/PageHeader';
+import { LiveRefresh } from '@/components/LiveRefresh';
 
 type C = { id: string; wa_id: string; phone: string | null; push_name: string | null; employee_name: string | null; verified_at: string | null;
            last: string | null; last_at: string | null };
@@ -28,14 +30,9 @@ export default async function Conversations({ searchParams }: { searchParams: Pr
 
   return (
     <div className="page">
-      <div className="title-row">
-        <div>
-          <h1>{t('cv.title')}</h1>
-          <p className="sub">{t('cv.sub')}</p>
-        </div>
-      </div>
+      <PageHeader title={t('cv.title')} sub={t('cv.sub')} live={<LiveRefresh label={t('hd.live')} />} />
       <div className="split">
-        <section className="panel" aria-label={t('cv.title')} style={{ padding: 6 }}>
+        <section className="panel rise" aria-label={t('cv.title')} style={{ padding: 6, ['--i' as string]: 1 }}>
           <form method="get" style={{ position: 'relative', margin: 8 }}>
             <Search aria-hidden="true" style={{ position: 'absolute', insetInlineStart: 12, top: 11, width: 16, height: 16, color: 'var(--muted)' }} />
             <input className="input" name="q" defaultValue={search} placeholder={t('cv.search')} aria-label={t('cv.search')} style={{ paddingInlineStart: 36 }} />
@@ -56,7 +53,7 @@ export default async function Conversations({ searchParams }: { searchParams: Pr
         </section>
         {!sel ? <p className="empty detail-empty">{t('cv.pick')}</p> : (
           <div className="stack">
-            <section className="panel" aria-labelledby="c-h">
+            <section className="panel rise" style={{ ['--i' as string]: 2 }} aria-labelledby="c-h">
               <div className="panel-head">
                 <h2 id="c-h"><bdi>{name(sel)}</bdi></h2>
                 {(sel.employee_name || sel.push_name || !sel.phone) && <span className="meta ltr">{sel.phone ? phone(sel.phone) : t('cv.hiddenNumber')}</span>}
@@ -68,7 +65,7 @@ export default async function Conversations({ searchParams }: { searchParams: Pr
                 <Chat messages={messages} lang={lang} hrLabel={t('cv.hr')} />
               </div>
             </section>
-            <section className="panel" aria-labelledby="a-h">
+            <section className="panel rise" style={{ ['--i' as string]: 3 }} aria-labelledby="a-h">
               <div className="panel-head"><h2 id="a-h">{t('cv.attempts')}</h2></div>
               <div className="panel-body">
                 {attempts.length === 0 ? <p className="empty">{t('cv.noAttempts')}</p> : (

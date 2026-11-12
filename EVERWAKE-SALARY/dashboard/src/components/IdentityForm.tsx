@@ -17,7 +17,7 @@ export function IdentityForm({ initial, w, p }: { initial: S; w: Record<string, 
   return (
     <ActionForm action={saveIdentity} className="grid-2">{(state) => (<>
       <div className="stack">
-        <section className="panel" aria-labelledby="ask-h">
+        <section className="panel rise" style={{ ['--i' as string]: 1 }} aria-labelledby="ask-h">
           <div className="panel-head"><h2 id="ask-h">{w.ask}</h2></div>
           <div className="panel-body">
             {FIELDS.map((f) => (
@@ -47,7 +47,7 @@ export function IdentityForm({ initial, w, p }: { initial: S; w: Record<string, 
             </label>
           </div>
         </section>
-        <section className="panel" aria-labelledby="fmt-h">
+        <section className="panel rise" style={{ ['--i' as string]: 2 }} aria-labelledby="fmt-h">
           <div className="panel-head"><h2 id="fmt-h">{w.formats}</h2></div>
           <div className="panel-body form">
             <div className="field">
@@ -81,7 +81,7 @@ export function IdentityForm({ initial, w, p }: { initial: S; w: Record<string, 
         </section>
       </div>
 
-      <section className="panel" aria-labelledby="pv-h" style={{ position: 'sticky', top: 24 }}>
+      <section className="panel rise" aria-labelledby="pv-h" style={{ position: 'sticky', top: 24, ['--i' as string]: 2 }}>
         <div className="panel-head"><h2 id="pv-h">{w.preview}</h2></div>
         <div className="panel-body">
           <p className="hint" style={{ marginBottom: 12 }}>{w.previewSub}</p>

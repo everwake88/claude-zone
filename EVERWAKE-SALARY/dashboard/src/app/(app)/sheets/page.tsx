@@ -4,10 +4,12 @@ import { q } from '@/lib/db';
 import { count, dateTime } from '@/lib/format';
 import { periodLabel } from '@/lib/i18n';
 import { UploadForm } from '@/components/UploadForm';
+import { PageHeader } from '@/components/PageHeader';
+import { YearStrip } from '@/components/YearStrip';
 
 type Row = { id: string; period: string; title: string; row_count: number; problem_count: number; status: string; uploaded_at: string; by: string | null };
 
-export default async function Sheets({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+export default async function Sheets({ searchParams }: { searchParams: Promise<{ month?: string; year?: string }> }) {
   const { t, lang } = await getT();
   const sp = await searchParams;
   const rows = await q<Row>(`select s.id, s.period, s.title, s.row_count, s.problem_count, s.status, s.uploaded_at, u.name as by
@@ -19,14 +21,10 @@ export default async function Sheets({ searchParams }: { searchParams: Promise<{
 
   return (
     <div className="page">
-      <div className="title-row">
-        <div>
-          <h1>{t('sh.title')}</h1>
-          <p className="sub">{t('sh.sub')}</p>
-        </div>
-      </div>
+      <PageHeader title={t('sh.title')} sub={t('sh.sub')} />
+      <YearStrip sheets={rows} year={Number(sp.year) || now.getFullYear()} now={now} lang={lang} t={t} i={1} />
       <div className="grid-2">
-        <section className="panel" aria-labelledby="months-h">
+        <section className="panel rise" style={{ ['--i' as string]: 2 }} aria-labelledby="months-h">
           <div className="panel-head">
             <h2 id="months-h">{t('nav.sheets')}</h2>
             <span className="meta num">{count(lang, rows.length)}</span>
@@ -57,7 +55,7 @@ export default async function Sheets({ searchParams }: { searchParams: Promise<{
             )}
           </div>
         </section>
-        <section className="panel" aria-labelledby="up-h" id="upload">
+        <section className="panel rise" style={{ ['--i' as string]: 3, scrollMarginTop: 24 }} aria-labelledby="up-h" id="upload">
           <div className="panel-head"><h2 id="up-h">{t('sh.uploadTitle')}</h2></div>
           <div className="panel-body">
             <UploadForm defaultMonth={defaultMonth} published={published} words={{

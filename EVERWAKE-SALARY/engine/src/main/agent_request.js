@@ -45,6 +45,8 @@ function firstInput() {
     now.push(`- verified: yes — ${str(t.employee_name)}${t.verified_until ? ` (until ${t.verified_until})` : ''}`,
              `- payroll months on file for them, newest first: ${periods.join(', ') || 'none'}`,
              '- their payroll figures are not in this message: get_payslip returns them.');
+    const tickets = arr(t.open_tickets).map(d => `ticket ${d.ticket_no}: ${str(d.item) || 'other'}${d.period ? ` (${d.period})` : ''}, opened ${d.opened}`);
+    if (tickets.length) now.push(`- their disputes still with HR: ${tickets.join('; ')}`);
   } else {
     const given = Object.keys(collected).map(f => `${f} = "${str(collected[f])}"`);
     now.push('- verified: no — nothing about any salary can be shared yet',

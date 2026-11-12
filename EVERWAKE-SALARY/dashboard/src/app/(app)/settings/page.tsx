@@ -7,6 +7,8 @@ import { dateTime } from '@/lib/format';
 import { removeMember } from '../../actions';
 import { CompanyForm, ChannelForm, AddMemberForm, PasswordForm } from '@/components/SettingsForms';
 import type { Key } from '@/lib/i18n';
+import { PageHeader } from '@/components/PageHeader';
+import { Segmented } from '@/components/Segmented';
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const user = await requireUser();
@@ -82,11 +84,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="page">
-      <div className="title-row"><div><h1>{t('st.title')}</h1></div></div>
-      <nav className="tabs" aria-label={t('st.title')}>
-        {tabs.map(([k, label]) => <Link key={k} href={`/settings?tab=${k}`} aria-current={tab === k ? 'page' : undefined}>{label}</Link>)}
-      </nav>
-      <div>{body}</div>
+      <PageHeader title={t('st.title')} />
+      <div className="rise" style={{ ['--i' as string]: 1 }}>
+        <Segmented label={t('st.title')} current={tab} options={tabs.map(([k, label]) => ({ key: k, href: `/settings?tab=${k}`, label }))} />
+      </div>
+      <div className="rise" style={{ ['--i' as string]: 2 }}>{body}</div>
     </div>
   );
 }

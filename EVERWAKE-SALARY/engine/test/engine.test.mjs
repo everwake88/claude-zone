@@ -116,7 +116,9 @@ async function turn(payload, model) {
   for (let round = 0; round < 8; round++) {
     out['Agent Request'] = runCode('Agent Request', input, out);
     requests.push(out['Agent Request'].body);
-    const answer = model(out['Agent Request'].body, round);
+    // the employee wrote again while this turn was thinking: stop without replying
+    if (!(await runPg('Still Newest? (Before AI)', [r.conversation_id, r.message_id])).r.go) return { route: 'they_wrote_again', requests };
+    const answer = await model(out['Agent Request'].body, round);
     out['Agent Step'] = runCode('Agent Step', { statusCode: 200, body: answer }, out);
     const st = out['Agent Step'];
     if (st.next === 'done') break;
@@ -126,6 +128,7 @@ async function turn(payload, model) {
     input = out['Agent Tool Result'];
   }
   out['Prepare Reply'] = runCode('Prepare Reply', out['Agent Step'], out);
+  if (!(await runPg('Still Newest? (Before Sending)', [r.conversation_id, r.message_id])).r.go) return { route: 'they_wrote_again', requests };
   out['Record Reply'] = runCode('Record Reply', { statusCode: 201, body: { key: { id: 'OUT' + Math.random() } } }, out);
   await runPg('Log Reply', [out['Record Reply'].b64_log]);
   return { route: 'agent', reply: out['Prepare Reply'], requests, conv: r.conversation_id };
@@ -211,6 +214,38 @@ test('WhatsApp hides the number: the mobile number is asked for and matched inst
     return say('تمام يا منى ✅');
   });
   assert.equal(res.reply.text, 'تمام يا منى ✅');
+});
+
+test('they write again while the agent is thinking: that turn stops, the next answers both messages together', async () => {
+  const { rows: [{ t }] } = await db.query('select webhook_token as t from salary.channel');
+  await db.query("delete from salary.conversations where wa_id = '201223334455'");
+  const msg = (text) => { const p = evo({ conversation: text }, { remoteJid: '201223334455@s.whatsapp.net' }); p.query.token = t; return p; };
+  // first message: while the AI works on it, the second one arrives (its own run starts at intake)
+  let second;
+  const first = await turn(msg('السلام عليكم'), async (body, round) => {
+    if (round === 0) {
+      second = runCode('Normalize Inbound', msg('عايز أعرف الخصومات بتاعة الشهر ده'), {});
+      await runPg('Intake', [second.b64_intake]);
+      return call('verify_identity', { details: { full_name: null, national_id: null, work_id: null, phone: null } });
+    }
+    return say('أهلاً بحضرتك');
+  });
+  assert.equal(first.route, 'they_wrote_again', 'the first reply is never sent');
+  const { rows: [c] } = await db.query("select count(*) filter (where direction = 'out')::int as outs from salary.messages m join salary.conversations c on c.id = m.conversation_id where c.wa_id = '201223334455'");
+  assert.equal(c.outs, 0);
+
+  // the second message's run (after its own wait) answers both: both are marked new in the chat it reads
+  const res = await turn(msg('ولا أي رد؟'), (body) => {
+    const chat = JSON.stringify(body.input);
+    assert.match(chat, /employee \(new\): السلام عليكم/);
+    assert.match(chat, /employee \(new\): عايز أعرف الخصومات/);
+    return say('أهلاً بحضرتك 🙏 علشان أقولك الخصومات، محتاجة الأول اسمك بالكامل زي البطاقة.');
+  });
+  assert.equal(res.route, 'agent');
+  const { rows: [m] } = await db.query(`select count(*) filter (where direction = 'out')::int as outs,
+      count(*) filter (where direction = 'in' and not answered)::int as open
+    from salary.messages m join salary.conversations c on c.id = m.conversation_id where c.wa_id = '201223334455'`);
+  assert.deepEqual(m, { outs: 1, open: 0 }, 'one reply for all three messages');
 });
 
 test('a model that asks for the payslip before verification gets nothing', async () => {

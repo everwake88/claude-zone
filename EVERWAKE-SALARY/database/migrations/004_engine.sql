@@ -83,6 +83,15 @@ begin
   return jsonb_build_object('go', claimed is not null);
 end $$;
 
+-- Checked before every AI call and right before the reply is sent: has the employee written again since
+-- this turn's message? Then this turn stops without sending, and the turn of their newest message answers
+-- everything they sent together — the way a person who sees a new message arrive stops typing and reads it.
+create or replace function salary.still_newest(p_conv uuid, p_message bigint) returns jsonb
+language sql stable as $$
+  select jsonb_build_object('go', not exists (
+    select 1 from salary.messages where conversation_id = p_conv and direction = 'in' and id > p_message))
+$$;
+
 -- the fields HR ticked, in the order they are asked
 create or replace function salary.asked_fields(s salary.settings) returns text[]
 language sql immutable as $$
@@ -158,6 +167,11 @@ begin
     'verified_until', case when verified and s.verified_hours > 0
                            then to_char((c.verified_at + make_interval(hours => s.verified_hours)) at time zone 'Africa/Cairo', 'YYYY-MM-DD HH24:MI') end,
     'periods', case when verified then salary.person_periods(c.person_key) else '[]'::jsonb end,
+    -- their disputes still with HR (also the ticket a superseded turn opened without telling them)
+    'open_tickets', case when verified then coalesce((
+        select jsonb_agg(jsonb_build_object('ticket_no', d.ticket_no, 'item', d.item, 'period', to_char(d.period, 'YYYY-MM'),
+                                            'opened', to_char(d.created_at at time zone 'Africa/Cairo', 'YYYY-MM-DD')) order by d.created_at)
+        from salary.disputes d where d.person_key = c.person_key and d.status = 'open'), '[]'::jsonb) else '[]'::jsonb end,
     'collected', case when verified then '{}'::jsonb else c.collected end,
     'still_needed', case when verified then '[]'::jsonb
                          else to_jsonb(array(select f from unnest(asked) f where not c.collected ? f)) end,
