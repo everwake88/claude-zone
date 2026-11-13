@@ -30,7 +30,7 @@ export default async function Conversations({ searchParams }: { searchParams: Pr
 
   return (
     <div className="page">
-      <PageHeader title={t('cv.title')} sub={t('cv.sub')} live={<LiveRefresh label={t('hd.live')} />} />
+      <PageHeader title={t('cv.title')} sub={t('cv.sub')} live={<LiveRefresh label={t('hd.live')} stamp={Date.now()} />} />
       <div className="split">
         <section className="panel rise" aria-label={t('cv.title')} style={{ padding: 6, ['--i' as string]: 1 }}>
           <form method="get" style={{ position: 'relative', margin: 8 }}>

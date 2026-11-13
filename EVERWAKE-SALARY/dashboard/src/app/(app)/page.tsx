@@ -86,7 +86,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="page">
-      <PageHeader title={first ? t('hd.hello', { name: `\u2068${first}\u2069` }) : t('ov.title')} sub={finding} live={<LiveRefresh label={t('hd.live')} />} />
+      <PageHeader title={first ? t('hd.hello', { name: `\u2068${first}\u2069` }) : t('ov.title')} sub={finding} live={<LiveRefresh label={t('hd.live')} stamp={Date.now()} />} />
 
       <div className="ov">
         {/* the four figures HR reads first */}
