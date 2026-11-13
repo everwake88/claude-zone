@@ -2,7 +2,8 @@
 // EVERWAKE SALARY — Main · NODE: Agent Request
 // One round of the agent's tool loop, for OpenAI's Responses API.
 // The first round is built from Load Turn Context:
-//   developer   the instructions (prompts/agent.md) — the same for everyone
+//   developer   the instructions HR keeps in the dashboard (Agent instructions), word rules
+//               included; prompts/agent.md only if the database has none — the same for everyone
 //   COMPANY     the company, what HR asks for — the same for every employee
 //   CHAT        the latest messages, one block each (the cache reuses them)
 //   NOW         where this employee stands: verified or not, what is in, what is missing
@@ -59,7 +60,7 @@ function firstInput() {
         : '- WhatsApp hides the number they write from, so it cannot be matched: verify_identity will answer sender_hidden');
     }
   }
-  return cachedInput("__AGENT_PROMPT__", company, chat, now.join('\n'));
+  return cachedInput(str(t.instructions) || "__AGENT_PROMPT__", company, chat, now.join('\n'));
 }
 
 const loop = j.agent_loop ? obj(j.agent_loop) : { round: 0, input: firstInput() };

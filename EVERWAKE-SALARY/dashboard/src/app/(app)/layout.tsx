@@ -24,7 +24,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/sheets', icon: 'sheets', label: t('nav.sheets') },
     { href: '/disputes', icon: 'disputes', label: open ? `${t('nav.disputes')} · ${open}` : t('nav.disputes'), dot: open > 0 },
     { href: '/conversations', icon: 'conversations', label: t('nav.conversations') },
-    { href: '/identity', icon: 'identity', label: t('nav.identity') }
+    { href: '/identity', icon: 'identity', label: t('nav.identity') },
+    { href: '/instructions', icon: 'instructions', label: t('nav.instructions') }
   ];
   const settings: NavItem = { href: '/settings', icon: 'settings', label: t('nav.settings') };
 

@@ -23,7 +23,7 @@ payroll sheet HR uploaded. HR runs it from a dashboard.
 | Folder | What it is |
 |---|---|
 | `database/` | The schema and every function the agent and the dashboard call, a demo company, and the SQL tests. `migrate.sh` builds or updates your database. |
-| `engine/` | The n8n workflow. Code lives in `src/` (one file per Code node) and the agent's instructions in `prompts/agent.md`; `npm run build` writes the importable workflow to `dist/`. |
+| `engine/` | The n8n workflow. Code lives in `src/` (one file per Code node); `npm run build` writes the importable workflow to `dist/`. The agent's instructions are edited in the dashboard (Agent instructions) and kept in the database; `prompts/agent.md` is the original they start from (copied into `database/migrations/005_instructions.sql`, and a test keeps the two the same). |
 | `dashboard/` | The HR dashboard (Next.js 15), deployed on Vercel. |
 | `docs/SETUP.md` | From zero to the first WhatsApp answer. |
 

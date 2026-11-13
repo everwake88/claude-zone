@@ -155,6 +155,8 @@ begin
         order by id desc limit 30) m;
 
   return jsonb_build_object(
+    -- the instructions HR keeps in the dashboard (005), word rules included
+    'instructions', salary.instructions_text(),
     'company_name', s.company_name, 'agent_name', s.agent_name, 'hr_contact', s.hr_contact,
     'today', to_char(now() at time zone 'Africa/Cairo', 'YYYY-MM-DD'),
     'asked_fields', to_jsonb(asked),
