@@ -95,3 +95,8 @@ connection in Settings.
   number; your WhatsApp reply reaches them from the company number.
 - **Switching the agent off** (Settings → Company): messages are still kept, and
   nobody gets an answer until it is on again.
+- **Changing how the agent talks** (Agent instructions): edit the instructions text
+  and save, or add a word rule ("don't say راتب, say مرتب"; "never say تم بنجاح").
+  Both apply from the next message, with nothing to change in n8n. Every save is
+  kept under Versions, and "Use this version" brings an older one back. The privacy
+  rules do not depend on this text: they are enforced in the database.

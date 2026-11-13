@@ -8,6 +8,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
+import { readFileSync } from 'node:fs';
 import { buildMain } from '../build.mjs';
 
 const wf = buildMain();
@@ -64,6 +65,20 @@ test('the agent request carries the prompt, the tools and the cache key', () => 
   const all = JSON.stringify(out.body.input);
   assert.match(all, /verified: no/);
   assert.match(all, /national ID number \(14 digits\)/);
+});
+
+test('the instructions HR saved in the dashboard replace the built-in ones', () => {
+  const ctx = { r: { instructions: 'You are Nour. <wording>\n- never say «تم بنجاح»\n</wording>', company_name: 'X', agent_name: 'نور',
+                     asked_fields: ['national_id'], history: [], collected: {}, still_needed: ['national_id'] } };
+  const out = runCode('Agent Request', {}, { 'Load Turn Context': ctx });
+  assert.equal(out.body.input[0].content[0].text, ctx.r.instructions);
+});
+
+test('the default instructions in the database are the ones in prompts/agent.md', () => {
+  const sql = readFileSync(new URL('../../database/migrations/005_instructions.sql', import.meta.url), 'utf8');
+  const inDb = sql.split('$default$')[1];
+  const file = readFileSync(new URL('../prompts/agent.md', import.meta.url), 'utf8').replace(/\n+$/, '');
+  assert.equal(inDb, file, 'edit prompts/agent.md, then copy it into 005_instructions.sql (between the $default$ marks)');
 });
 
 // ---- Evolution payloads -------------------------------------------------------------------

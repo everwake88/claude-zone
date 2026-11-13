@@ -10,6 +10,8 @@ import { requireUser, getT } from '@/lib/auth';
 import { readWorkbook, guessIdentity, type Column } from '@/lib/excel';
 import { sendWhatsApp } from '@/lib/whatsapp';
 import { periodLabel } from '@/lib/i18n';
+import { dateTime } from '@/lib/format';
+import { loadInstructions, type InstrResult } from '@/lib/instructions';
 
 // compared against when the email has no account, so a wrong email takes as long as a wrong password
 const NO_ACCOUNT_HASH = bcrypt.hashSync('no account', 10);
@@ -146,6 +148,54 @@ export async function saveIdentity(_: FormState, fd: FormData): Promise<FormStat
      Math.min(720, Math.max(0, int(fd, 'verified_hours', 24))), user.uid, bool(fd, 'hidden_number_ask_phone')]);
   revalidatePath('/', 'layout');
   return { ok: true, message: t('id.saved') };
+}
+
+// ---- the agent's instructions and word rules (live from the next message) -----------------------
+// Each answers with the page's fresh data (see lib/instructions.ts), and the page shows it.
+export async function saveInstructions(fd: FormData): Promise<InstrResult> {
+  const user = await requireUser();
+  const { t, lang } = await getT();
+  const body = String(fd.get('body') ?? '').replace(/\r\n/g, '\n').trim();
+  if (body.length < 100) return { error: t('in.tooShort') };
+  if (body.length > 40000) return { error: t('in.tooLong') };
+  const live = await one<{ id: string; body: string; saved_at: string; name: string | null }>(
+    `select i.id::text, i.body, i.saved_at, u.name from salary.agent_instructions i
+       left join salary.hr_users u on u.id = i.saved_by order by i.id desc limit 1`);
+  // someone else saved while this was open: keep what they typed, and say so
+  if (live && live.id !== str(fd, 'base_id')) {
+    return { error: t('in.newer', { name: live.name || 'Everwake', time: dateTime(lang, live.saved_at) }) };
+  }
+  if (live && live.body === body) return { message: t('in.same') };
+  await q('insert into salary.agent_instructions (body, note, saved_by) values ($1, nullif($2, \'\'), $3)',
+    [body, str(fd, 'note').slice(0, 300), user.uid]);
+  return { ok: true, message: t('in.saved'), data: await loadInstructions(lang) };
+}
+export async function restoreInstructions(id: string): Promise<InstrResult> {
+  const user = await requireUser();
+  const { t, lang } = await getT();
+  if (id === 'default') {
+    await q('insert into salary.agent_instructions (body, saved_by) values (salary.default_instructions(), $1)', [user.uid]);
+  } else if (/^\d+$/.test(id)) {
+    await q(`insert into salary.agent_instructions (body, restored_from, saved_by)
+               select body, id, $2 from salary.agent_instructions where id = $1`, [id, user.uid]);
+  }
+  return { ok: true, message: t('in.restored'), data: await loadInstructions(lang) };
+}
+export async function addWordRule(fd: FormData): Promise<InstrResult> {
+  const user = await requireUser();
+  const { t, lang } = await getT();
+  const avoid = str(fd, 'avoid').slice(0, 120), say = str(fd, 'say').slice(0, 120);
+  if (!avoid) return { error: t('in.needAvoid') };
+  if (say && say.toLowerCase() === avoid.toLowerCase()) return { error: t('in.sameWord') };
+  await q(`insert into salary.word_rules (avoid, say, created_by) values ($1, nullif($2, ''), $3)
+           on conflict (lower(btrim(avoid))) do update set say = excluded.say, created_by = excluded.created_by`, [avoid, say, user.uid]);
+  return { ok: true, message: t('in.wordSaved'), data: await loadInstructions(lang) };
+}
+export async function deleteWordRule(id: string): Promise<InstrResult> {
+  await requireUser();
+  const { lang } = await getT();
+  if (/^\d+$/.test(id)) await q('delete from salary.word_rules where id = $1', [id]);
+  return { ok: true, data: await loadInstructions(lang) };
 }
 
 // ---- settings --------------------------------------------------------------------------------

@@ -34,7 +34,7 @@ export default async function Disputes({ searchParams }: { searchParams: Promise
 
   return (
     <div className="page">
-      <PageHeader title={t('dp.title')} sub={t('dp.sub')} live={<LiveRefresh label={t('hd.live')} />} />
+      <PageHeader title={t('dp.title')} sub={t('dp.sub')} live={<LiveRefresh label={t('hd.live')} stamp={Date.now()} />} />
       <div className="rise" style={{ ['--i' as string]: 1 }}>
         <Segmented label={t('dp.title')} current={tab} options={[
           { key: 'open', href: tabHref('open'), label: <>{t('dp.open')}<span className="n num">{count(lang, counts?.open ?? 0)}</span></> },

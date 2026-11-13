@@ -2,9 +2,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutGrid, Sheet, MessageSquareWarning, MessagesSquare, Fingerprint, Settings, LogOut } from 'lucide-react';
+import { LayoutGrid, Sheet, MessageSquareWarning, MessagesSquare, Fingerprint, ScrollText, Settings, LogOut } from 'lucide-react';
 
-const ICONS = { overview: LayoutGrid, sheets: Sheet, disputes: MessageSquareWarning, conversations: MessagesSquare, identity: Fingerprint, settings: Settings };
+const ICONS = { overview: LayoutGrid, sheets: Sheet, disputes: MessageSquareWarning, conversations: MessagesSquare, identity: Fingerprint, instructions: ScrollText, settings: Settings };
 export type NavItem = { href: string; icon: keyof typeof ICONS; label: string; dot?: boolean };
 
 const isActive = (href: string, path: string) => (href === '/' ? path === '/' : path.startsWith(href));
